@@ -2731,7 +2731,6 @@ function applyPoseToFairy(f,pose){
     f.arms[1].scale.set(0.01,0.01,0.01);
     f.legs[0].scale.set(0.01,0.01,0.01);
     f.legs[1].scale.set(0.01,0.01,0.01);
-    f.bodyM.rotation.z=Math.PI/4;
     f.group.position.y=f.group.userData.baseY+0.1;
   }else if(pose==="fold"){
     // 반으로 접기: 몸통을 X축으로 꺾어 내리고 다리를 ㄴ자로 앞으로 꺾음
@@ -3394,6 +3393,7 @@ function updateMovement(dt){
     return;
   }
   let baseSpeed=G.role==="seeker"?7.2:(G.pose==="lie"?2.8:5.6);
+  if(G.pose==="roll") baseSpeed=0; // 말기 자세는 이동 불가!
   if(G.onSprinkler) baseSpeed *= 0.5;
   if(isZombieMode() && G.zombieState === 2) {
     baseSpeed = isNight ? 7.8 : 4.2; // 밤에는 7.8로 빨라지고 낮에는 4.2로 느려짐
@@ -4036,11 +4036,15 @@ $("btnFillAll").onclick=()=>{
 document.querySelectorAll(".poseCol .mbtn").forEach(b=>b.onpointerdown=()=>setPose(b.dataset.pose));
 function setPose(p){
   if(G.role!=="hider"||G.found)return;
-  if(p!==G.pose&&!poseFitsHere(p)){
-    toast(p==="lie"?"😅 여긴 누울 수 없는 곳이에요.":"😅 여긴 그 자세를 할 수 없는 곳이에요.");
+  let targetPose=p;
+  if(p==="roll"&&G.pose==="roll"){
+    targetPose="lie"; // 말기에서 한번 더 트리거 시 눕기(lie)로 토글
+  }
+  if(targetPose!==G.pose&&!poseFitsHere(targetPose)){
+    toast(targetPose==="lie"?"😅 여긴 누울 수 없는 곳이에요.":"😅 여긴 그 자세를 할 수 없는 곳이에요.");
     return;
   }
-  G.pose=p;
+  G.pose=targetPose;
   syncLocalFairy();
   Net.sendPose&&Net.sendPose();
 }
