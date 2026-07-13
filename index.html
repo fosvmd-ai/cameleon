@@ -456,6 +456,11 @@ if (typeof window.TEACHER_CODE === "undefined" || !window.TEACHER_CODE) window.T
         <input type="range" id="seekSecSlider" min="60" max="300" step="10" value="180">
         <span id="seekSecVal" class="settingsVal">3분</span>
       </div>
+      <div class="settingsRow">
+        <label class="chk" style="margin-top:0; justify-content:flex-start; width:100%; font-size:14px;">
+          <input type="checkbox" id="chkZombieMode"> 🧟 좀비 모드 활성화
+        </label>
+      </div>
     </div>
 
     <div id="playerGrid"></div>
@@ -2661,6 +2666,18 @@ function buildFairy(canvas,isPencil=false){
   }
   group.add(aL,aR,lL,lR); parts.push(aL,aR,lL,lR);
 
+  // 좀비용 빨간 눈 (zomEyes)
+  const zomEyesGroup = new THREE.Group();
+  if(!isPencil){
+    const zomEyeMat=new THREE.MeshBasicMaterial({color:0xff0000});
+    const zomEyeGeo=new THREE.SphereGeometry(0.042,8,6);
+    const zomEyeL=new THREE.Mesh(zomEyeGeo,zomEyeMat); zomEyeL.position.set(-0.11,1.05,0.18);
+    const zomEyeR=new THREE.Mesh(zomEyeGeo,zomEyeMat); zomEyeR.position.set(0.11,1.05,0.18);
+    zomEyesGroup.add(zomEyeL, zomEyeR);
+    zomEyesGroup.visible = false;
+    group.add(zomEyesGroup);
+  }
+
   // 술래 판정 전용 히트박스: 실제 몸보다 약간 넓게 잡아 태블릿에서도 판정이 안정적입니다.
   // opacity 0이지만 visible은 true로 유지해야 Raycaster가 감지합니다.
   const hitbox=new THREE.Mesh(
@@ -2684,7 +2701,7 @@ function buildFairy(canvas,isPencil=false){
     new THREE.MeshBasicMaterial({map:shTex,transparent:true,depthWrite:false}));
   sh.rotation.x=-Math.PI/2; sh.position.y=0.02; sh.visible=false;
   // 위장 플레이에서 위치가 드러나지 않도록 캐릭터 그림자는 씬에 추가하지 않습니다.
-  return {group,parts,tex,mat,canvas,bodyM,arms:[aL,aR],legs:[lL,lR],shadow:sh,hitbox,nameLabel,walkPhase:Math.random()*Math.PI*2};
+  return {group,parts,tex,mat,canvas,bodyM,arms:[aL,aR],legs:[lL,lR],shadow:sh,hitbox,nameLabel,zomEyes:zomEyesGroup,walkPhase:Math.random()*Math.PI*2};
 }
 function applyPoseToFairy(f,pose){
   f.group.rotation.set(0,0,0);
@@ -2742,8 +2759,52 @@ function applyPoseToFairy(f,pose){
     }
   }
 }
-function animateFairyMovement(f,dt,moveAmount,pose="stand",grounded=true,flying=false){
+function applyZombieSkinToFairy(f, state){
+  if(!f || !f.parts) return;
+  const isZombie = state === 2;
+  const isInfected = state === 1;
+  
+  if (isZombie) {
+    f.parts.forEach(part => {
+      if(part.material) part.material.color.setHex(0x66aa66);
+    });
+    if(f.zomEyes) f.zomEyes.visible = true;
+  } else if (isInfected) {
+    f.parts.forEach(part => {
+      if(part.material) part.material.color.setHex(0xaacc88);
+    });
+    if(f.zomEyes) f.zomEyes.visible = false;
+  } else {
+    f.parts.forEach(part => {
+      if(part.material) part.material.color.setHex(0xffffff);
+    });
+    if(f.zomEyes) f.zomEyes.visible = false;
+  }
+}
+function animateFairyMovement(f,dt,moveAmount,pose="stand",grounded=true,flying=false,zombieState=0){
   if(!f||!f.arms||!f.legs)return;
+  
+  // 좀비 애니메이션 분기
+  if(zombieState===2){
+    f.walkPhase+=(moveAmount>0.05?dt*5.5:dt*1.5);
+    const moving=moveAmount>0.05;
+    const armSwing=-Math.PI/2; // 팔을 앞으로 평행하게 쭉 뻗음
+    const legSwing=moving?Math.sin(f.walkPhase)*0.32:0;
+    const bob=moving?Math.abs(Math.sin(f.walkPhase*2))*0.03:0;
+    const bodyTilt=moving?Math.sin(f.walkPhase*2)*0.035:0;
+    const smooth=Math.min(1,dt*12);
+    
+    f.arms[0].rotation.x=lerp(f.arms[0].rotation.x,armSwing,smooth);
+    f.arms[1].rotation.x=lerp(f.arms[1].rotation.x,armSwing,smooth);
+    f.arms[0].rotation.z=lerp(f.arms[0].rotation.z,0.08,smooth);
+    f.arms[1].rotation.z=lerp(f.arms[1].rotation.z,-0.08,smooth);
+    f.legs[0].rotation.x=lerp(f.legs[0].rotation.x,legSwing,smooth);
+    f.legs[1].rotation.x=lerp(f.legs[1].rotation.x,-legSwing,smooth);
+    f.bodyM.rotation.z=lerp(f.bodyM.rotation.z,bodyTilt,smooth);
+    f.group.position.y+=bob;
+    return;
+  }
+
   const moving=moveAmount>0.05;
   f.walkPhase+=(moving?dt*(9+Math.min(moveAmount,6)*0.7):dt*2);
   let armSwing=0,legSwing=0,bob=0,bodyTilt=0;
@@ -2757,7 +2818,6 @@ function animateFairyMovement(f,dt,moveAmount,pose="stand",grounded=true,flying=
     bodyTilt=moving?Math.sin(f.walkPhase)*0.035:0;
     armSwing=moving?Math.sin(f.walkPhase)*0.12:0;
   }else if(pose==="roll"){
-    // 구르는 연출: 움직일 때 몸통을 X축으로 데구르르 회전시킴
     if(moving){
       f.bodyM.rotation.x+=dt*moveAmount*3.5;
     }
@@ -2861,6 +2921,7 @@ const G={
   tvMode:false,                                   // v2: 선생님 TV 전체 조망 모드
   joinedMidgame:false,                            // v2: 게임 도중 합류(재입장) 시 스폰 재배치 표시
   onSprinkler:false,                              // 운동장 스프링클러 적용 여부
+  zombieState:0,                                  // 좀비 상태 (0: 인간, 1: 감염중, 2: 좀비)
 };
 let foundLog=[];  // v2: TV HUD용 최근 발견 로그 (최대 5개)
 let tvYaw=0, tvDragActive=false, tvDragStartX=0, tvDragStartYaw=0;
@@ -2942,8 +3003,9 @@ function updateRemotes(dt){
     r.fairy.group.userData.baseY=r.cur.y;
     r.fairy.group.rotation.y=r.cur.ry+Math.PI;
     applyPoseToFairy(r.fairy,r.target.pose);
+    applyZombieSkinToFairy(r.fairy,r.target.zombieState||0); // 좀비 스킨 적용
     const remoteSpeed=dt>0?Math.hypot(r.cur.x-oldX,r.cur.z-oldZ)/dt:0;
-    animateFairyMovement(r.fairy,dt,remoteSpeed,r.target.pose,true,r.target.flying);
+    animateFairyMovement(r.fairy,dt,remoteSpeed,r.target.pose,true,r.target.flying,r.target.zombieState||0);
     if(r.fairy.nameLabel){
       r.fairy.nameLabel.visible=G.spectating&&r.info.role==="hider";
     }
@@ -2979,6 +3041,7 @@ function syncLocalFairy(){
   myFairy.group.userData.baseY=p.y;
   myFairy.group.rotation.y=yaw+Math.PI;
   applyPoseToFairy(myFairy,pose);
+  applyZombieSkinToFairy(myFairy, G.zombieState || 0); // 로컬 좀비 도색
   setFairyNameLabel(myFairy.nameLabel,G.nick||Net.nick||"나");
   myFairy.nameLabel.visible=G.spectating&&G.role==="hider"&&!G.found;
 }
@@ -3332,6 +3395,9 @@ function updateMovement(dt){
   }
   let baseSpeed=G.role==="seeker"?7.2:(G.pose==="lie"?2.8:5.6);
   if(G.onSprinkler) baseSpeed *= 0.5;
+  if(isZombieMode() && G.zombieState === 2) {
+    baseSpeed = isNight ? 7.8 : 4.2; // 밤에는 7.8로 빨라지고 낮에는 4.2로 느려짐
+  }
   const speed=ghost?13.5:baseSpeed;
   const f=new THREE.Vector3(-Math.sin(G.yaw),0,-Math.cos(G.yaw));
   const rgt=new THREE.Vector3(-f.z,0,f.x);
@@ -3396,7 +3462,7 @@ function updateMovement(dt){
     if(shakeT>0){shakeT-=dt;camera.rotateZ((Math.random()-0.5)*0.05);camera.rotateX((Math.random()-0.5)*0.04);}
   }
   if(myFairy.group.visible&&!G.spectating){
-    animateFairyMovement(myFairy,dt,dir.length()*speed,G.pose,G.grounded,G.flying);
+    animateFairyMovement(myFairy,dt,dir.length()*speed,G.pose,G.grounded,G.flying,G.zombieState||0);
   }
   G.paint=1000; G.refillOn=false; G.refillT=0;
 }
@@ -4170,13 +4236,21 @@ const Net={
       if(m.phase!==prev) onPhaseChange(m.phase,prev);
     });
     const pref=ref(this.db,`rooms/${this.code}/players`);
-    onChildAdded(pref,s=>{ this.players[s.key]=s.val(); onPlayersChange(s.key,"add");
+    onChildAdded(pref,s=>{ 
+      this.players[s.key]=s.val(); 
+      if (s.key === this.uid) {
+        G.zombieState = s.val().zombieState || 0;
+      }
+      onPlayersChange(s.key,"add");
       if(s.key===this.meta.host) onHostBack();          // 선생님이 유예 시간 안에 돌아옴
     });
     onChildChanged(pref,s=>{
       const before=this.players[s.key]||{}; const after=s.val();
       this.players[s.key]=after;
       ensureRemote(s.key,after);
+      if (s.key === this.uid) {
+        G.zombieState = after.zombieState || 0;
+      }
       if(!before.found&&after.found) onSomeoneFound(s.key,after);
       onPlayersChange(s.key,"change");
     });
@@ -4189,6 +4263,25 @@ const Net={
         return;
       }
       if(wasHost&&s.key!==this.uid)onHostLost();
+    });
+
+    // 치료제 동기화 리스너 추가
+    const curesRef = ref(this.db, `rooms/${this.code}/cures`);
+    onChildAdded(curesRef, s => {
+      const data = s.val(); if(!data) return;
+      if (cureSpawns.some(item => item.id === data.id)) return;
+      const mesh = buildCureMesh();
+      mesh.position.set(data.x, data.y, data.z);
+      scene.add(mesh);
+      cureSpawns.push({ id: data.id, x: data.x, y: data.y, z: data.z, mesh });
+    });
+    onChildRemoved(curesRef, s => {
+      const id = s.key;
+      const idx = cureSpawns.findIndex(item => item.id === id);
+      if (idx !== -1) {
+        scene.remove(cureSpawns[idx].mesh);
+        cureSpawns.splice(idx, 1);
+      }
     });
     // '진짜 강퇴' 신호: 선생님이 내보낸 경우에만 이 플래그가 켜집니다.
     onValue(ref(this.db,`rooms/${this.code}/kicks/${this.uid}`),s=>{
@@ -4247,6 +4340,7 @@ const Net={
     r.target.x=+a[0];r.target.y=+a[1];r.target.z=+a[2];r.target.ry=+a[3];
     r.target.pose=["stand","lie","lean","roll","fold"][+a[4]||0];
     r.target.flying=a[5]==="1";
+    r.target.zombieState=+a[6]||0;
     if(r.cur.x===0&&r.cur.y===0&&r.cur.z===0){Object.assign(r.cur,{x:r.target.x,y:r.target.y,z:r.target.z,ry:r.target.ry});}
   },
   sendPos(){
@@ -4254,7 +4348,7 @@ const Net={
     if(G.lobbyPractice||G.role==="ghost"||G.spectating)return;
     if(G.role==="seeker"&&G.phase==="PAINT")return; // 술래는 숨는 시간에 스폰 전
     const pi=["stand","lie","lean","roll","fold"].indexOf(G.pose);
-    const str=[G.pos.x.toFixed(2),G.pos.y.toFixed(2),G.pos.z.toFixed(2),(G.yaw%(Math.PI*2)).toFixed(2),pi,G.flying?1:0].join(",");
+    const str=[G.pos.x.toFixed(2),G.pos.y.toFixed(2),G.pos.z.toFixed(2),(G.yaw%(Math.PI*2)).toFixed(2),pi,G.flying?1:0,G.zombieState||0].join(",");
     if(str===G.lastPosSent)return;
     G.lastPosSent=str;
     this.positions[this.uid]=str;
@@ -4365,7 +4459,7 @@ const Net={
   /* ── v2: 로비 설정 (방장 전용) ── */
   updateSettings(patch){
     if(!G.isHost||this.mode!=="online")return;
-    const settings=Object.assign({paintSec:60,seekSec:180},this.meta.settings||{},patch);
+    const settings=Object.assign({paintSec:60,seekSec:180,zombieMode:false},this.meta.settings||{},patch);
     this.fb.update(this.fb.ref(this.db,`rooms/${this.code}/meta/settings`),settings).catch(()=>{});
   },
   toggleManualSeeker(uid){
@@ -4534,66 +4628,102 @@ const Net={
       }
 
       // v2: 술래 지정 3가지 경로 — ①직접 지정 있으면 그것만 ②없으면 랜덤(5명당 1명, 공평성) ③교사 역할 반영
-      const manualList=Object.keys(this.meta.manualSeekers||{}).filter(u=>ids.includes(u)&&u!==this.uid);
+      const settings=this.meta.settings||{paintSec:60,seekSec:180,zombieMode:false};
+      const zombieMode=!!settings.zombieMode;
+
       const seekers=new Set();
       let usedRandom=false;
-      if(manualList.length>0){
-        manualList.forEach(u=>seekers.add(u));
-      }else{
-        usedRandom=true;
-        const studentPool=ids.filter(u=>u!==this.uid);
-        let nSeek=Math.max(1,Math.ceil(ids.length/5));
-        nSeek=Math.min(nSeek,Math.max(1,Math.floor(ids.length/2)));
-        let need=nSeek-(hostRole==="seeker"?1:0);
-        need=Math.max(0,Math.min(need,studentPool.length));
-        let statsPlayers={};
-        try{
-          const statsSnap=await get(ref(this.db,`rooms/${this.code}/stats/players`));
-          statsPlayers=statsSnap.exists()?statsSnap.val():{};
-        }catch(e){}
-        const scored=studentPool.map(u=>({u,c:(statsPlayers[u]&&statsPlayers[u].seekCount)||0,r:Math.random()}));
-        scored.sort((a,b)=>a.c-b.c||a.r-b.r);
-        scored.slice(0,need).forEach(s=>seekers.add(s.u));
+      let seekerOrder=[];
+
+      if (!zombieMode) {
+        const manualList=Object.keys(this.meta.manualSeekers||{}).filter(u=>ids.includes(u)&&u!==this.uid);
+        if(manualList.length>0){
+          manualList.forEach(u=>seekers.add(u));
+        }else{
+          usedRandom=true;
+          const studentPool=ids.filter(u=>u!==this.uid);
+          let nSeek=Math.max(1,Math.ceil(ids.length/5));
+          nSeek=Math.min(nSeek,Math.max(1,Math.floor(ids.length/2)));
+          let need=nSeek-(hostRole==="seeker"?1:0);
+          need=Math.max(0,Math.min(need,studentPool.length));
+          let statsPlayers={};
+          try{
+            const statsSnap=await get(ref(this.db,`rooms/${this.code}/stats/players`));
+            statsPlayers=statsSnap.exists()?statsSnap.val():{};
+          }catch(e){}
+          const scored=studentPool.map(u=>({u,c:(statsPlayers[u]&&statsPlayers[u].seekCount)||0,r:Math.random()}));
+          scored.sort((a,b)=>a.c-b.c||a.r-b.r);
+          scored.slice(0,need).forEach(s=>seekers.add(s.u));
+        }
+        if(hostRole==="seeker")seekers.add(this.uid);
+        if(seekers.size<1||seekers.size>=ids.length){
+          toast("술래 지정이 올바르지 않아요. 술래와 지우개가 각각 1명 이상 필요해요!");
+          return false;
+        }
+        seekerOrder=[...seekers];
       }
-      if(hostRole==="seeker")seekers.add(this.uid);
-      if(seekers.size<1||seekers.size>=ids.length){
-        toast("술래 지정이 올바르지 않아요. 술래와 지우개가 각각 1명 이상 필요해요!");
-        return false;
+
+      // 좀비 모드일 때 숙주 좀비 비율 선출 (최소 1명 이상)
+      const zombieSet = new Set();
+      if (zombieMode) {
+        const studentPool = ids.slice();
+        for (let i = studentPool.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [studentPool[i], studentPool[j]] = [studentPool[j], studentPool[i]];
+        }
+        const numZombies = Math.max(1, Math.floor(ids.length * 0.25));
+        for (let i = 0; i < numZombies; i++) {
+          zombieSet.add(studentPool[i]);
+        }
       }
-      const seekerOrder=[...seekers];
 
       // 1단계: 역할을 먼저 확정합니다. 술래가 지우개로 잠깐 스폰되는 경쟁 상태를 막습니다.
       const roleUpd={};
+      roleUpd[`rooms/${this.code}/cures`]=null; // 라운드 시작 시 이전 치료제 삭제
       Object.keys(latestPlayers).forEach(u=>{
-        const role=(u===this.uid&&hostRole==="spectator")?"ghost":(seekers.has(u)?"seeker":"hider");
+        let role;
+        if (zombieMode) {
+          role = (u===this.uid&&hostRole==="spectator")?"ghost":"hider";
+        } else {
+          role = (u===this.uid&&hostRole==="spectator")?"ghost":(seekers.has(u)?"seeker":"hider");
+        }
         roleUpd[`rooms/${this.code}/players/${u}/role`]=role;
         roleUpd[`rooms/${this.code}/players/${u}/found`]=false;
         roleUpd[`rooms/${this.code}/players/${u}/tex`]=null;
         roleUpd[`rooms/${this.code}/players/${u}/foundAt`]=null;
         roleUpd[`rooms/${this.code}/players/${u}/foundBy`]=null;
+        
+        const zState = zombieMode ? (zombieSet.has(u) ? 2 : 0) : 0;
+        roleUpd[`rooms/${this.code}/players/${u}/zombieState`]=zState;
+        
         roleUpd[`rooms/${this.code}/pos/${u}`]=null;
-        this.players[u]=Object.assign({},latestPlayers[u],{role,found:false,tex:null,foundAt:null,foundBy:null});
+        this.players[u]=Object.assign({},latestPlayers[u],{role,found:false,tex:null,foundAt:null,foundBy:null,zombieState:zState});
       });
       await update(ref(this.db),roleUpd);
 
       // 2단계: 모든 클라이언트가 역할을 받은 뒤 페이즈를 시작합니다.
       await new Promise(resolve=>setTimeout(resolve,80));
-      const settings=this.meta.settings||{paintSec:60,seekSec:180};
       const metaPatch={
         round:(this.meta.round||0)+1,
-        seekerIds:Object.fromEntries(seekerOrder.map(u=>[u,true])),
-        seekerOrder,
+        seekerIds:zombieMode ? {} : Object.fromEntries(seekerOrder.map(u=>[u,true])),
+        seekerOrder:zombieMode ? [] : seekerOrder,
         winner:null,
         frozen:false   // v2: 새 라운드 시작 시 얼음 해제
       };
-      if(usedRandom){
-        metaPatch.phase="ROULETTE";
-        metaPatch.phaseEndsAt=0;
-        metaPatch.roulette={candidates:ids,startAt:this.now()+150,perMs:1400,final:seekerOrder};
-      }else{
+      if (zombieMode) {
         metaPatch.phase="PAINT";
         metaPatch.phaseEndsAt=this.now()+(settings.paintSec||60)*1000;
         metaPatch.roulette=null;
+      } else {
+        if(usedRandom){
+          metaPatch.phase="ROULETTE";
+          metaPatch.phaseEndsAt=0;
+          metaPatch.roulette={candidates:ids,startAt:this.now()+150,perMs:1400,final:seekerOrder};
+        }else{
+          metaPatch.phase="PAINT";
+          metaPatch.phaseEndsAt=this.now()+(settings.paintSec||60)*1000;
+          metaPatch.roulette=null;
+        }
       }
       await update(ref(this.db,`rooms/${this.code}/meta`),metaPatch);
       return true;
@@ -4639,10 +4769,10 @@ async function onPhaseChange(phase,prev){
   }
   if(G.phase!==phase)return;
   if(phase==="ROULETTE")enterRoulette();
-  else if(phase==="PAINT")enterPaint();
+  else if(phase==="PAINT"){ initZombieGame(); enterPaint(); }
   else if(phase==="SEEK")enterSeek();
   else if(phase==="RESULT")enterResult();
-  else if(phase==="LOBBY"){ if(G.isHost)resetLobbyForNewRound(); showScreen("LOBBY"); }
+  else if(phase==="LOBBY"){ initZombieGame(); if(G.isHost)resetLobbyForNewRound(); showScreen("LOBBY"); }
   syncLocalFairy();
   updateMobileButtons();
 }
@@ -4747,7 +4877,7 @@ let resultTour=null;
 function parsePositionString(v){
   if(!v)return null;const a=String(v).split(",");
   if(a.length<3)return null;
-  return {x:+a[0]||0,y:+a[1]||0,z:+a[2]||0,ry:+a[3]||0,pose:["stand","lie","lean","roll","fold"][+a[4]||0]};
+  return {x:+a[0]||0,y:+a[1]||0,z:+a[2]||0,ry:+a[3]||0,pose:["stand","lie","lean","roll","fold"][+a[4]||0],zombieState:+a[6]||0};
 }
 function describeClassroomPosition(p){
   const high=p.y>15?" · 높은 곳":p.y>6?" · 가구 위":"";
@@ -4984,13 +5114,15 @@ function refreshLobbyGrid(){
 /* v2: 게임 설정 슬라이더 표시/동기화 */
 function fmtMinSec(sec){ const m=Math.floor(sec/60),s=sec%60; return s?`${m}분 ${s}초`:`${m}분`; }
 function refreshLobbySettingsUI(){
-  const settings=Object.assign({paintSec:60,seekSec:180},Net.meta.settings||{});
+  const settings=Object.assign({paintSec:60,seekSec:180,zombieMode:false},Net.meta.settings||{});
   const box=$("settingsBox");
   box.classList.toggle("readonly",!G.isHost);
   if(document.activeElement!==$("paintSecSlider")){ $("paintSecSlider").value=settings.paintSec; }
   if(document.activeElement!==$("seekSecSlider")){ $("seekSecSlider").value=settings.seekSec; }
   $("paintSecSlider").disabled=!G.isHost;
   $("seekSecSlider").disabled=!G.isHost;
+  $("chkZombieMode").checked=!!settings.zombieMode;
+  $("chkZombieMode").disabled=!G.isHost;
   $("paintSecVal").textContent=fmtMinSec(+$("paintSecSlider").value);
   $("seekSecVal").textContent=fmtMinSec(+$("seekSecSlider").value);
   $("hostRoleBox").classList.toggle("hidden",!G.isHost);
@@ -5004,6 +5136,9 @@ $("paintSecSlider").addEventListener("input",e=>{
 $("seekSecSlider").addEventListener("input",e=>{
   $("seekSecVal").textContent=fmtMinSec(+e.target.value);
   if(G.isHost)Net.updateSettings({seekSec:+e.target.value});
+});
+$("chkZombieMode").addEventListener("change",e=>{
+  if(G.isHost)Net.updateSettings({zombieMode:e.target.checked});
 });
 document.querySelectorAll(".hostRoleBtn").forEach(b=>b.onclick=()=>{
   Audio2.resume();
@@ -5678,7 +5813,224 @@ buildTextures(); buildActiveMap("classroom"); buildPresets(); drawWheel(); drawV
 renderMapCards();
 setColor("#4A7FB5");
 showScreen("TITLE");
-/* 안티 치즈: 지우개가 에셋(충돌체) 안에 절반 이상 파묻혀 있으면(술래가 못 찾음) 잠시 후 다시 태어남 */
+
+/* ================================================================
+   🧟 좀비 모드 & 밤낮 주기 시스템 관련 기믹 함수들
+   ================================================================ */
+let isNight = false;
+let infectionTimer = 0;
+let cureSpawns = [];
+let cureSpawnTimer = 0;
+
+function isZombieMode() {
+  return !!(Net.mode === "online" && Net.meta && Net.meta.settings && Net.meta.settings.zombieMode);
+}
+
+function buildCureMesh() {
+  const group = new THREE.Group();
+  const metalMat = lambert({color: 0xcccccc});
+  const liquidMat = lambert({color: 0x4aa8ff, transparent: true, opacity: 0.8});
+  const glassMat = lambert({color: 0xffffff, transparent: true, opacity: 0.3});
+  
+  const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 1.2, 8), glassMat);
+  group.add(cyl);
+  
+  const liquid = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.8, 8), liquidMat);
+  group.add(liquid);
+  
+  const plunger = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.6, 8), metalMat);
+  plunger.position.y = 0.8;
+  group.add(plunger);
+  
+  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.08, 8), metalMat);
+  handle.position.y = 1.1;
+  group.add(handle);
+  
+  const needle = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.5, 6), metalMat);
+  needle.position.y = -0.85;
+  group.add(needle);
+  
+  group.position.y = 1.0;
+  return group;
+}
+
+function spawnCureOnFirebase() {
+  if (!hiderSpawns.length) return;
+  const sp = hiderSpawns[Math.floor(Math.random() * hiderSpawns.length)];
+  const id = "cure_" + Math.floor(Math.random() * 1000000);
+  const cureData = { id, x: sp.x, y: 1.0, z: sp.z };
+  Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/cures/${id}`), cureData).catch(()=>{});
+}
+
+function updateDayNightCycle(dt) {
+  if (!isZombieMode()) {
+    if(sun.intensity !== SUN_BASE) {
+      sun.intensity = SUN_BASE;
+      ambientLight.color.setHex(0xffffff);
+      ambientLight.intensity = AMB_BASE;
+    }
+    return;
+  }
+  
+  const cycle = 60;
+  const t = (Net.now ? Net.now() : Date.now()) / 1000;
+  const sec = t % cycle;
+  const nightStart = 30;
+  const transition = 3;
+  
+  let targetIntensity = SUN_BASE;
+  let targetAmbientIntensity = AMB_BASE;
+  let targetAmbientColor = 0xffffff;
+  
+  if (sec >= nightStart) {
+    isNight = true;
+    targetIntensity = 0.05;
+    targetAmbientIntensity = 0.15;
+    targetAmbientColor = 0x1b2c3f;
+    
+    if (sec < nightStart + transition && G.screen === "GAME") {
+      const alertDiv = $("centerAlert");
+      if(alertDiv) {
+        alertDiv.textContent = `🌙 밤이 찾아옵니다! 좀비 폭주 주의!`;
+        alertDiv.classList.remove("hidden");
+      }
+    }
+  } else {
+    isNight = false;
+    targetIntensity = SUN_BASE;
+    targetAmbientIntensity = AMB_BASE;
+    targetAmbientColor = 0xffffff;
+    
+    if (sec >= nightStart - transition && G.screen === "GAME") {
+      const alertDiv = $("centerAlert");
+      if(alertDiv) {
+        alertDiv.textContent = `☀️ 곧 낮이 됩니다! 좀비가 약해집니다.`;
+        alertDiv.classList.remove("hidden");
+      }
+    } else {
+      const alertDiv = $("centerAlert");
+      if(alertDiv && !alertDiv.classList.contains("hidden") && !alertDiv.textContent.includes("스프링클러") && !alertDiv.textContent.includes("진행")) {
+        alertDiv.classList.add("hidden");
+      }
+    }
+  }
+  
+  sun.intensity = lerp(sun.intensity, targetIntensity, dt * 1.5);
+  ambientLight.intensity = lerp(ambientLight.intensity, targetAmbientIntensity, dt * 1.5);
+  ambientLight.color.lerp(new THREE.Color(targetAmbientColor), dt * 1.5);
+}
+
+function updateZombieLogic(dt) {
+  if (!isZombieMode()) return;
+  
+  // 1) 감염 전파 검사 (로컬 인간이 리모트 좀비와 만남)
+  if (G.zombieState === 0 && G.screen === "GAME" && G.role === "hider" && !G.found && !G.spectating) {
+    let zombieNear = false;
+    remotes.forEach(r => {
+      if (r.target && r.target.zombieState === 2 && r.info.role !== "ghost") {
+        const dx = G.pos.x - r.cur.x;
+        const dz = G.pos.z - r.cur.z;
+        const dist = Math.hypot(dx, dz);
+        if (dist < 1.6 && Math.abs(G.pos.y - r.cur.y) < 1.8) {
+          zombieNear = true;
+        }
+      }
+    });
+    
+    if (zombieNear) {
+      G.zombieState = 1; // 감염 중
+      infectionTimer = 5.0;
+      Audio2.sfxBreak();
+      toast("🧟 으악! 좀비에게 물렸습니다! 5초 뒤 좀비로 변합니다!");
+      if(Net.mode === "online") {
+        Net.fb.update(Net.fb.ref(Net.db, `rooms/${Net.code}/players/${Net.uid}`), {zombieState: 1}).catch(()=>{});
+      }
+    }
+  }
+  
+  // 2) 감염 진행 중 독기 연출 및 좀비 변형 완료
+  if (G.zombieState === 1 && G.screen === "GAME") {
+    infectionTimer -= dt;
+    if (Math.random() < 0.25) {
+      burst(new THREE.Vector3(G.pos.x, G.pos.y + 0.5, G.pos.z), "#3f8a4f", 2, 1.2, 0.4);
+    }
+    const alertDiv = $("centerAlert");
+    if (alertDiv) {
+      alertDiv.textContent = `🧟 좀비화 진행 중... (${Math.ceil(infectionTimer)}초)`;
+      alertDiv.classList.remove("hidden");
+    }
+    
+    if (infectionTimer <= 0) {
+      G.zombieState = 2; // 완전 좀비
+      Audio2.sfxFound();
+      toast("🧟 좀비 바이러스 전염 완료! 다른 인간들을 찾아 덮치세요!");
+      if (alertDiv) alertDiv.classList.add("hidden");
+      if(Net.mode === "online") {
+        Net.fb.update(Net.fb.ref(Net.db, `rooms/${Net.code}/players/${Net.uid}`), {zombieState: 2}).catch(()=>{});
+      }
+    }
+  }
+  
+  // 3) 치료제 물리 획득 검사
+  if ((G.zombieState === 1 || G.zombieState === 2) && G.screen === "GAME" && !G.found) {
+    for (let i = cureSpawns.length - 1; i >= 0; i--) {
+      const item = cureSpawns[i];
+      const dx = G.pos.x - item.x;
+      const dz = G.pos.z - item.z;
+      const dist = Math.hypot(dx, dz);
+      if (dist < 1.6 && Math.abs(G.pos.y - item.y) < 1.5) {
+        Audio2.sfxRefill();
+        burst(new THREE.Vector3(item.x, item.y, item.z), "#ffffff", 10, 4.0, 0.8, true, 0.8);
+        toast("💉 치료제를 투여했습니다! 인간으로 정화되었습니다!");
+        
+        G.zombieState = 0;
+        const alertDiv = $("centerAlert");
+        if (alertDiv && !alertDiv.textContent.includes("스프링클러") && !alertDiv.textContent.includes("밤")) {
+          alertDiv.classList.add("hidden");
+        }
+        
+        if(Net.mode === "online") {
+          Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/cures/${item.id}`), null).catch(()=>{});
+          Net.fb.update(Net.fb.ref(Net.db, `rooms/${Net.code}/players/${Net.uid}`), {zombieState: 0}).catch(()=>{});
+        }
+        
+        scene.remove(item.mesh);
+        cureSpawns.splice(i, 1);
+        break;
+      }
+    }
+  }
+  
+  // 4) 방장 전용 치료제 스폰 스케줄
+  if (G.isHost && G.screen === "GAME") {
+    cureSpawnTimer += dt;
+    if (cureSpawnTimer >= 15.0) {
+      cureSpawnTimer = 0;
+      if (cureSpawns.length < 3) {
+        spawnCureOnFirebase();
+      }
+    }
+  }
+  
+  // 치료제 스피닝/둥실 오르내림 애니메이션
+  const time = performance.now() / 1000;
+  cureSpawns.forEach(item => {
+    item.mesh.rotation.y += dt * 1.5;
+    item.mesh.position.y = 1.0 + Math.sin(time * 3.5) * 0.15;
+  });
+}
+
+function initZombieGame() {
+  cureSpawns.forEach(item => { scene.remove(item.mesh); });
+  cureSpawns = [];
+  cureSpawnTimer = 0;
+  infectionTimer = 0;
+  const alertDiv = $("centerAlert");
+  if (alertDiv && !alertDiv.textContent.includes("스프링클러")) {
+    alertDiv.classList.add("hidden");
+  }
+}
+
 let embedTime=0;
 function checkEmbedded(dt){
   const active=(Net.mode==="online"&&G.role==="hider"&&!G.found&&!G.spectating&&!G.lobbyPractice
@@ -5706,6 +6058,11 @@ function loop(){
   requestAnimationFrame(loop);
   const now=performance.now();
   const dt=Math.min(0.05,(now-lastT)/1000); lastT=now;
+  
+  // 좀비 모드 및 밤낮 주기 갱신
+  updateDayNightCycle(dt);
+  updateZombieLogic(dt);
+
   if(G.screen==="GAME"){
     readKeys();
     const blocked=(G.role==="seeker"&&G.phase==="PAINT");
