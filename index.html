@@ -192,6 +192,11 @@ label.chk input{width:20px;height:20px;}
 #gaugeBar::after{content:"∞";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--ink);text-shadow:0 0 2px #fff;z-index:2;}
 #gaugeFill{height:100%;width:100%;background:linear-gradient(90deg,#e455a0,#F5C518,#57c76a,#4A7FB5);}
 #curColorDot{width:22px;height:22px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 2px rgba(0,0,0,.4);}
+#flyGaugeBox{position:absolute;top:48px;left:12px;display:flex;align-items:center;gap:8px;z-index:31;}
+#flyGaugeBox.hidden{display:none;}
+#flyGaugeBox .wing-icon{font-size:18px;text-shadow:1px 1px 0 rgba(0,0,0,.65);}
+#flyGaugeBar{width:110px;height:12px;border:3px solid var(--ink);border-radius:6px;background:#fff;overflow:hidden;position:relative;}
+#flyGaugeFill{height:100%;width:100%;background:linear-gradient(90deg,#88d3ff,#4aa8ff);transition:width 0.1s linear;}
 #crossWrap{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:56px;height:56px;}
 #crosshair{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   font-size:22px;color:#fff;text-shadow:1px 1px 0 rgba(0,0,0,.7);}
@@ -557,6 +562,10 @@ if (typeof window.TEACHER_CODE === "undefined" || !window.TEACHER_CODE) window.T
     <div id="gaugeBar"><div id="gaugeFill"></div></div>
     <div id="curColorDot"></div>
   </div>
+  <div id="flyGaugeBox" class="hidden">
+    <div class="wing-icon">🕊️</div>
+    <div id="flyGaugeBar"><div id="flyGaugeFill"></div></div>
+  </div>
   <div id="crossWrap">
     <div id="crosshair">＋</div>
     <svg id="cooldownRing" viewBox="0 0 56 56">
@@ -741,7 +750,7 @@ const Audio2={
   sfxBreak(){ this.tone(1200,0.05,"square",0.2); this.tone(80,0.22,"sine",0.4,0.02); },
   sfxFanfare(){ const n=[523,659,784,1046,784,1046];n.forEach((f,i)=>this.tone(f,0.28,"triangle",0.3,i*0.12)); this.tone(261,1.2,"sine",0.18,0);},
   sfxStep(){ this.tone(150+Math.random()*40,0.05,"sine",0.12); },
-  sfxJump(){ this.tone(300,0.15,"sine",0.2,0,600); },
+  sfxJump(){ this.tone(200,0.22,"sine",0.32,0,1050); },
   sfxRefill(){ this.tone(520,0.1,"sine",0.2,0,780); },
   toggleMute(){ this.init(); this.muted=!this.muted; this.master.gain.value=this.muted?0:0.5;
     localStorage.setItem("er_mute",this.muted?"1":"0"); }
@@ -2693,6 +2702,38 @@ function buildFairy(canvas,isPencil=false){
   const nameLabel=makeFairyNameLabel();
   group.add(nameLabel);
 
+  // 날개 3D 날개깃 생성
+  const wingGroup = new THREE.Group();
+  let wingL = null, wingR = null;
+  if(!isPencil){
+    const wingMat = lambert({color: 0xffffff, transparent: true, opacity: 0.85, side: THREE.DoubleSide});
+    
+    // 왼쪽 날개
+    wingL = new THREE.Group();
+    const featherL1 = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.12, 0.03), wingMat);
+    featherL1.position.set(-0.25, 0, 0); featherL1.rotation.z = -0.2;
+    wingL.add(featherL1);
+    const featherL2 = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.1, 0.03), wingMat);
+    featherL2.position.set(-0.2, -0.08, 0); featherL2.rotation.z = -0.4;
+    wingL.add(featherL2);
+    wingL.position.set(-0.2, 1.0, -0.22);
+    wingGroup.add(wingL);
+    
+    // 오른쪽 날개
+    wingR = new THREE.Group();
+    const featherR1 = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.12, 0.03), wingMat);
+    featherR1.position.set(0.25, 0, 0); featherR1.rotation.z = 0.2;
+    wingR.add(featherR1);
+    const featherR2 = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.1, 0.03), wingMat);
+    featherR2.position.set(0.2, -0.08, 0); featherR2.rotation.z = 0.4;
+    wingR.add(featherR2);
+    wingR.position.set(0.2, 1.0, -0.22);
+    wingGroup.add(wingR);
+    
+    wingGroup.visible = false; // 기본적으론 가려둠
+    group.add(wingGroup);
+  }
+
   // 발밑 그림자
   const shTex=canvasTex(64,64,(g)=>{const gr=g.createRadialGradient(32,32,4,32,32,30);
     gr.addColorStop(0,"rgba(0,0,0,.35)");gr.addColorStop(1,"rgba(0,0,0,0)");
@@ -2701,7 +2742,7 @@ function buildFairy(canvas,isPencil=false){
     new THREE.MeshBasicMaterial({map:shTex,transparent:true,depthWrite:false}));
   sh.rotation.x=-Math.PI/2; sh.position.y=0.02; sh.visible=false;
   // 위장 플레이에서 위치가 드러나지 않도록 캐릭터 그림자는 씬에 추가하지 않습니다.
-  return {group,parts,tex,mat,canvas,bodyM,arms:[aL,aR],legs:[lL,lR],shadow:sh,hitbox,nameLabel,zomEyes:zomEyesGroup,walkPhase:Math.random()*Math.PI*2};
+  return {group,parts,tex,mat,canvas,bodyM,arms:[aL,aR],legs:[lL,lR],shadow:sh,hitbox,nameLabel,zomEyes:zomEyesGroup,wings:{group:wingGroup,left:wingL,right:wingR},walkPhase:Math.random()*Math.PI*2};
 }
 function applyPoseToFairy(f,pose){
   f.group.rotation.x=0;
@@ -2858,6 +2899,19 @@ function animateFairyMovement(f,dt,moveAmount,pose="stand",grounded=true,flying=
   f.legs[1].rotation.x=lerp(f.legs[1].rotation.x,-legSwing,smooth);
   f.bodyM.rotation.z=lerp(f.bodyM.rotation.z,bodyTilt,smooth);
   f.group.position.y+=bob;
+
+  // 날개 펄럭임 연동
+  if(f.wings && f.wings.group){
+    f.wings.group.visible = !!flying;
+    if(flying && f.wings.left && f.wings.right){
+      const time = performance.now() / 1000;
+      const wave = Math.sin(time * 26) * 0.48; // 힘찬 날개짓
+      f.wings.left.rotation.y = wave + 0.35;
+      f.wings.right.rotation.y = -wave - 0.35;
+      f.wings.left.rotation.z = wave * 0.2 - 0.1;
+      f.wings.right.rotation.z = -wave * 0.2 + 0.1;
+    }
+  }
 }
 function setFairyFound(f){
   f.parts.forEach(p=>{ p.material=lambert({color:0x6a6f76,transparent:true,opacity:0.4}); });
@@ -3313,7 +3367,13 @@ function moveVertical(delta,ignoreAssets=false){
 }
 function toggleFlight(force){
   if(G.role==="ghost")return;
-  G.flying=typeof force==="boolean"?force:!G.flying;
+  const isSeeker = G.role === "seeker";
+  let targetVal = typeof force==="boolean"?force:!G.flying;
+  if(targetVal && !isSeeker && flyEnergy <= 0){
+    toast("🔋 비행 에너지가 부족해 날 수 없습니다!");
+    return;
+  }
+  G.flying=targetVal;
   G.jumpReq=false;G.grounded=false;G.flyUp=false;G.flyDown=false;
   G.lastJumpTap=0;G.lastFlyDownTap=0;
   if(G.flying){
@@ -4326,6 +4386,25 @@ const Net={
         cureSpawns.splice(idx, 1);
       }
     });
+
+    // 깃털 동기화 리스너 추가
+    const feathersRef = ref(this.db, `rooms/${this.code}/feathers`);
+    onChildAdded(feathersRef, s => {
+      const data = s.val(); if(!data) return;
+      if (featherSpawns.some(item => item.id === data.id)) return;
+      const mesh = buildFeatherMesh();
+      mesh.position.set(data.x, data.y, data.z);
+      scene.add(mesh);
+      featherSpawns.push({ id: data.id, x: data.x, y: data.y, z: data.z, mesh });
+    });
+    onChildRemoved(feathersRef, s => {
+      const id = s.key;
+      const idx = featherSpawns.findIndex(item => item.id === id);
+      if (idx !== -1) {
+        scene.remove(featherSpawns[idx].mesh);
+        featherSpawns.splice(idx, 1);
+      }
+    });
     // '진짜 강퇴' 신호: 선생님이 내보낸 경우에만 이 플래그가 켜집니다.
     onValue(ref(this.db,`rooms/${this.code}/kicks/${this.uid}`),s=>{
       if(!s.val()||G.isHost)return;
@@ -4812,10 +4891,10 @@ async function onPhaseChange(phase,prev){
   }
   if(G.phase!==phase)return;
   if(phase==="ROULETTE")enterRoulette();
-  else if(phase==="PAINT"){ initZombieGame(); enterPaint(); }
+  else if(phase==="PAINT"){ initZombieGame(); initFeatherGame(); enterPaint(); }
   else if(phase==="SEEK")enterSeek();
   else if(phase==="RESULT")enterResult();
-  else if(phase==="LOBBY"){ initZombieGame(); if(G.isHost)resetLobbyForNewRound(); showScreen("LOBBY"); }
+  else if(phase==="LOBBY"){ initZombieGame(); initFeatherGame(); if(G.isHost)resetLobbyForNewRound(); showScreen("LOBBY"); }
   syncLocalFairy();
   updateMobileButtons();
 }
@@ -6074,6 +6153,144 @@ function initZombieGame() {
   }
 }
 
+/* ================================================================
+   🕊️ 비행 에너지 및 깃털 아이템 스폰 기믹
+   ================================================================ */
+let flyEnergy = 100;
+let featherSpawns = [];
+let featherSpawnTimer = 0;
+
+function buildFeatherMesh() {
+  const group = new THREE.Group();
+  const goldMat = lambert({color: 0xffd700, transparent: true, opacity: 0.95});
+  
+  // 깃털 줄기
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.9, 6), goldMat);
+  stem.rotation.z = 0.4;
+  group.add(stem);
+  
+  // 왼쪽 깃판
+  const vaneL = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.5, 0.01), goldMat);
+  vaneL.position.set(-0.08, 0.1, 0);
+  vaneL.rotation.z = -0.25;
+  group.add(vaneL);
+  
+  // 오른쪽 깃판
+  const vaneR = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.4, 0.01), goldMat);
+  vaneR.position.set(0.06, -0.1, 0);
+  vaneR.rotation.z = -0.25;
+  group.add(vaneR);
+  
+  group.position.y = 1.0;
+  return group;
+}
+
+function spawnFeatherOnFirebase() {
+  if (!hiderSpawns.length) return;
+  const sp = hiderSpawns[Math.floor(Math.random() * hiderSpawns.length)];
+  const id = "feather_" + Math.floor(Math.random() * 1000000);
+  // 공중 스폰 지원: Y 좌표 1.5m ~ 6.0m 사이 랜덤
+  const yVal = 1.5 + Math.random() * 4.5;
+  const featherData = { id, x: sp.x, y: yVal, z: sp.z };
+  Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/feathers/${id}`), featherData).catch(()=>{});
+}
+
+function updateFlyGaugeAndFeathers(dt) {
+  if (G.screen !== "GAME") {
+    const box = $("flyGaugeBox");
+    if(box && !box.classList.contains("hidden")) box.classList.add("hidden");
+    return;
+  }
+  
+  const isSeeker = G.role === "seeker";
+  
+  // 1) 비행 중 에너지 소모 및 지상 회복
+  if (isSeeker) {
+    // 술래는 무한 비행이므로 게이지를 띄우지 않음
+    const box = $("flyGaugeBox");
+    if(box && !box.classList.contains("hidden")) box.classList.add("hidden");
+  } else {
+    const box = $("flyGaugeBox");
+    if (G.flying) {
+      if(box) box.classList.remove("hidden");
+      flyEnergy -= dt * 17.5; // 약 5.7초 비행 가능
+      if (flyEnergy <= 0) {
+        flyEnergy = 0;
+        G.flying = false;
+        toast("🕊️ 비행 에너지가 바닥나 추락했습니다!");
+      }
+    } else {
+      if (flyEnergy < 100) {
+        if(box) box.classList.remove("hidden");
+        if (G.grounded) {
+          flyEnergy += dt * 22.0; // 약 4.5초만에 풀충전
+          if (flyEnergy >= 100) {
+            flyEnergy = 100;
+            if(box) box.classList.add("hidden");
+          }
+        }
+      } else {
+        if(box && !box.classList.contains("hidden")) box.classList.add("hidden");
+      }
+    }
+    const fill = $("flyGaugeFill");
+    if (fill) fill.style.width = flyEnergy + "%";
+  }
+  
+  // 2) 깃털 획득 충돌 체크 (요정만 획득 가능)
+  if (!isSeeker && !G.found) {
+    for (let i = featherSpawns.length - 1; i >= 0; i--) {
+      const item = featherSpawns[i];
+      const dx = G.pos.x - item.x;
+      const dz = G.pos.z - item.z;
+      const dist = Math.hypot(dx, dz);
+      // 입체 획득 반경 (수평 1.5m, 수직 1.6m 내)
+      if (dist < 1.5 && Math.abs(G.pos.y - item.y) < 1.6) {
+        Audio2.sfxRefill();
+        burst(new THREE.Vector3(item.x, item.y, item.z), "#ffd700", 12, 3.5, 0.7, true, 0.7);
+        toast("🕊️ 황금 깃털 획득! 비행 에너지가 충전되었습니다!");
+        
+        flyEnergy = Math.min(100, flyEnergy + 45.0);
+        
+        if(Net.mode === "online") {
+          Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/feathers/${item.id}`), null).catch(()=>{});
+        }
+        scene.remove(item.mesh);
+        featherSpawns.splice(i, 1);
+        break;
+      }
+    }
+  }
+  
+  // 3) 방장 전용 깃털 스폰 트리거
+  if (G.isHost) {
+    featherSpawnTimer += dt;
+    if (featherSpawnTimer >= 11.0) {
+      featherSpawnTimer = 0;
+      if (featherSpawns.length < 4) {
+        spawnFeatherOnFirebase();
+      }
+    }
+  }
+  
+  // 4) 깃털 스피닝 및 바운싱 애니메이션
+  const time = performance.now() / 1000;
+  featherSpawns.forEach(item => {
+    item.mesh.rotation.y += dt * 2.0;
+    item.mesh.rotation.z = Math.sin(time * 2.5) * 0.15;
+    item.mesh.position.y = item.y + Math.sin(time * 3.0) * 0.12;
+  });
+}
+
+function initFeatherGame() {
+  featherSpawns.forEach(item => { scene.remove(item.mesh); });
+  featherSpawns = [];
+  featherSpawnTimer = 0;
+  flyEnergy = 100;
+  const box = $("flyGaugeBox");
+  if(box) box.classList.add("hidden");
+}
+
 let embedTime=0;
 function checkEmbedded(dt){
   const active=(Net.mode==="online"&&G.role==="hider"&&!G.found&&!G.spectating&&!G.lobbyPractice
@@ -6105,6 +6322,7 @@ function loop(){
   // 좀비 모드 및 밤낮 주기 갱신
   updateDayNightCycle(dt);
   updateZombieLogic(dt);
+  updateFlyGaugeAndFeathers(dt);
 
   if(G.screen==="GAME"){
     readKeys();
