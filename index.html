@@ -1948,135 +1948,216 @@ function buildPlayground(){
   addAABBCollider(-ROOM_W/2-1, WALL_H/2, 0, 2, WALL_H, ROOM_D);
   addAABBCollider(ROOM_W/2+1, WALL_H/2, 0, 2, WALL_H, ROOM_D);
   
-  // 4) 나무 펜스 (시각적 울타리)
-  const fenceMat=lambert({color:0xd5b08c});
-  const postMat=lambert({color:0xa5805c});
-  for(let x=-ROOM_W/2; x<=ROOM_W/2; x+=8){
-    addBox(0.6, 6, 0.6, postMat, x, 3, -ROOM_D/2+0.5, {collide:true});
-    addBox(0.6, 6, 0.6, postMat, x, 3, ROOM_D/2-0.5, {collide:true});
-    if(x < ROOM_W/2) {
-      addBox(8, 0.4, 0.2, fenceMat, x+4, 4.5, -ROOM_D/2+0.5, {collide:true});
-      addBox(8, 0.4, 0.2, fenceMat, x+4, 2.0, -ROOM_D/2+0.5, {collide:true});
-      addBox(8, 0.4, 0.2, fenceMat, x+4, 4.5, ROOM_D/2-0.5, {collide:true});
-      addBox(8, 0.4, 0.2, fenceMat, x+4, 2.0, ROOM_D/2-0.5, {collide:true});
-    }
+  // 4) 배경: 학교 본관 (앞쪽 -z) + 3면 높은 담장 (나머지)
+  const brickMat = lambert({color: 0xa04040});
+  const whiteMat = lambert({color: 0xeeeeee});
+  const windowGlassMat = lambert({color: 0x4aa8ff, emissive: 0x113355, emissiveIntensity: 0.2});
+  const roofBuildingMat = lambert({color: 0x3f6a8f});
+  
+  // 거대한 본관 빌딩 베이스
+  addBox(ROOM_W, 28, 6, brickMat, 0, 14, -ROOM_D/2-2.5, {collide: true});
+  // 기둥 및 층간 테두리 장식
+  addBox(ROOM_W, 1.5, 7, whiteMat, 0, 0.75, -ROOM_D/2-2, {collide: true});
+  addBox(ROOM_W, 1.2, 7, whiteMat, 0, 10, -ROOM_D/2-2, {collide: true});
+  addBox(ROOM_W, 1.2, 7, whiteMat, 0, 20, -ROOM_D/2-2, {collide: true});
+  addBox(ROOM_W+2, 2.5, 8, roofBuildingMat, 0, 29.25, -ROOM_D/2-2.5, {collide: true});
+  
+  // 창문 배치
+  for(let wx = -ROOM_W/2 + 8; wx <= ROOM_W/2 - 8; wx += 12) {
+    if(Math.abs(wx) < 6) continue; // 중앙 타워 부분 건너뜀
+    addBox(5, 5, 0.2, windowGlassMat, wx, 5, -ROOM_D/2+0.6, {collide: true});
+    addBox(5.6, 0.3, 0.4, whiteMat, wx, 7.6, -ROOM_D/2+0.7, {collide: true});
+    addBox(5, 5, 0.2, windowGlassMat, wx, 15, -ROOM_D/2+0.6, {collide: true});
+    addBox(5.6, 0.3, 0.4, whiteMat, wx, 17.6, -ROOM_D/2+0.7, {collide: true});
+    addBox(5, 5, 0.2, windowGlassMat, wx, 24, -ROOM_D/2+0.6, {collide: true});
+    addBox(5.6, 0.3, 0.4, whiteMat, wx, 26.6, -ROOM_D/2+0.7, {collide: true});
   }
-  for(let z=-ROOM_D/2; z<=ROOM_D/2; z+=8){
-    addBox(0.6, 6, 0.6, postMat, -ROOM_W/2+0.5, 3, z, {collide:true});
-    addBox(0.6, 6, 0.6, postMat, ROOM_W/2-0.5, 3, z, {collide:true});
-    if(z < ROOM_D/2) {
-      addBox(0.2, 0.4, 8, fenceMat, -ROOM_W/2+0.5, 4.5, z+4, {collide:true});
-      addBox(0.2, 0.4, 8, fenceMat, -ROOM_W/2+0.5, 2.0, z+4, {collide:true});
-      addBox(0.2, 0.4, 8, fenceMat, ROOM_W/2-0.5, 4.5, z+4, {collide:true});
-      addBox(0.2, 0.4, 8, fenceMat, ROOM_W/2-0.5, 2.0, z+4, {collide:true});
-    }
-  }
+  
+  // 중앙 시계탑
+  addBox(14, 34, 7, whiteMat, 0, 17, -ROOM_D/2-2, {collide: true});
+  addBox(12, 32, 7.2, brickMat, 0, 17, -ROOM_D/2-2, {collide: true});
+  addCyl(2, 0.4, whiteMat, 0, 31, -ROOM_D/2+1.7, {rx: Math.PI/2, collide: true});
+  addBox(0.2, 1.5, 0.2, lambert({color: 0x111111}), 0, 31, -ROOM_D/2+1.95);
 
-  // 5) 구조물 배치
-  // 🌳 나무 4그루
-  const leavesMat=lambert({color:0x3f8a4f});
+  // 3면 높은 담장
+  const wallCementMat = lambert({color: 0x999999});
+  const wallTileMat = lambert({color: 0xaa7755});
+  // 뒤쪽 담장
+  addBox(ROOM_W, 8, 1.5, wallCementMat, 0, 4, ROOM_D/2+0.75, {collide: true});
+  addBox(ROOM_W+1, 0.8, 2.2, wallTileMat, 0, 8.4, ROOM_D/2+0.75, {collide: true});
+  // 좌측 담장
+  addBox(1.5, 8, ROOM_D, wallCementMat, -ROOM_W/2-0.75, 4, 0, {collide: true});
+  addBox(2.2, 0.8, ROOM_D+1, wallTileMat, -ROOM_W/2-0.75, 8.4, 0, {collide: true});
+  // 우측 담장
+  addBox(1.5, 8, ROOM_D, wallCementMat, ROOM_W/2+0.75, 4, 0, {collide: true});
+  addBox(2.2, 0.8, ROOM_D+1, wallTileMat, ROOM_W/2+0.75, 8.4, 0, {collide: true});
+
+  // 5) 다채로운 구조물 및 오브젝트 배치
+  // 🌳 알록달록한 나무 4그루 (보호색 다양화)
+  const leavesColors = [0x3f8a4f, 0x8a5ab9, 0xe07f3e, 0x3f9d5a];
   const trunkMat=lambert({color:0x80593f});
   const treePositions = [
     [-40, -25], [40, -25], [-40, 25], [40, 25]
   ];
-  treePositions.forEach(([tx, tz]) => {
+  treePositions.forEach(([tx, tz], idx) => {
     addCyl(1.2, 10, trunkMat, tx, 5, tz, {rt:0.8, collide:true});
+    const leavesMat = lambert({color: leavesColors[idx]});
     addBox(7, 5, 7, leavesMat, tx, 12, tz, {collide:true});
     addBox(5, 4, 5, leavesMat, tx, 16, tz, {collide:true});
     addBox(3, 3, 3, leavesMat, tx, 19, tz, {collide:true});
   });
 
-  // ⚽ 축구 골대 2개 (좌우)
-  const goalFrameMat=lambert({color:0xffffff});
+  // ⚽ 알록달록한 축구 골대 2개
+  const goalFrameMatL=lambert({color:0xe64545}); // 왼쪽 빨강 골대
+  const goalFrameMatR=lambert({color:0x4a7fb5}); // 오른쪽 파랑 골대
   const goalNetMat=lambert({color:0xdddddd, transparent:true, opacity:0.45});
   // 왼쪽 골대
-  addCyl(0.3, 7, goalFrameMat, -50, 3.5, -6, {collide:true});
-  addCyl(0.3, 7, goalFrameMat, -50, 3.5, 6, {collide:true});
-  addCyl(0.3, 12.6, goalFrameMat, -50, 7, 0, {rx:Math.PI/2, collide:true});
+  addCyl(0.3, 7, goalFrameMatL, -50, 3.5, -6, {collide:true});
+  addCyl(0.3, 7, goalFrameMatL, -50, 3.5, 6, {collide:true});
+  addCyl(0.3, 12.6, goalFrameMatL, -50, 7, 0, {rx:Math.PI/2, collide:true});
   addBox(4, 0.1, 12, goalNetMat, -52, 7, 0, {collide:true});
   addBox(0.1, 7, 12, goalNetMat, -54, 3.5, 0, {collide:true});
   addBox(4, 7, 0.1, goalNetMat, -52, 3.5, -6, {collide:true});
   addBox(4, 7, 0.1, goalNetMat, -52, 3.5, 6, {collide:true});
 
   // 오른쪽 골대
-  addCyl(0.3, 7, goalFrameMat, 50, 3.5, -6, {collide:true});
-  addCyl(0.3, 7, goalFrameMat, 50, 3.5, 6, {collide:true});
-  addCyl(0.3, 12.6, goalFrameMat, 50, 7, 0, {rx:Math.PI/2, collide:true});
+  addCyl(0.3, 7, goalFrameMatR, 50, 3.5, -6, {collide:true});
+  addCyl(0.3, 7, goalFrameMatR, 50, 3.5, 6, {collide:true});
+  addCyl(0.3, 12.6, goalFrameMatR, 50, 7, 0, {rx:Math.PI/2, collide:true});
   addBox(4, 0.1, 12, goalNetMat, 52, 7, 0, {collide:true});
   addBox(0.1, 7, 12, goalNetMat, 54, 3.5, 0, {collide:true});
   addBox(4, 7, 0.1, goalNetMat, 52, 3.5, -6, {collide:true});
   addBox(4, 7, 0.1, goalNetMat, 52, 3.5, 6, {collide:true});
 
-  // 🏀 농구대
+  // 🏀 노란 농구대
   const hoopMat=lambert({color:0xff6600});
-  const ironMat=lambert({color:0x333333});
+  const ironMat=lambert({color:0xf5c518}); // 노란색 지지대
   addCyl(0.5, 14, ironMat, 35, 7, -30, {collide:true});
-  addBox(0.2, 4, 6, goalFrameMat, 35, 13, -30, {collide:true});
+  addBox(0.2, 4, 6, lambert({color: 0xffffff}), 35, 13, -30, {collide:true});
   addBox(1.5, 0.1, 1.5, hoopMat, 34, 11.5, -30, {collide:true});
 
-  // 🛝 미끄럼틀
+  // 🛝 파란색 미끄럼틀
   const slideFrameMat=lambert({color:0x4a7fb5});
   const slidePlateMat=lambert({color:0xe64545});
   for(let i=0; i<5; i++){
     addBox(3, 1, 1, slideFrameMat, 0, 0.5+i, -10-i, {collide:true});
   }
   addBox(3.2, 0.4, 3.2, slideFrameMat, 0, 5, -15, {collide:true});
-  addCyl(0.2, 5, ironMat, -1.4, 2.5, -16.4, {collide:true});
-  addCyl(0.2, 5, ironMat, 1.4, 2.5, -16.4, {collide:true});
+  addCyl(0.2, 5, lambert({color:0x888888}), -1.4, 2.5, -16.4, {collide:true});
+  addCyl(0.2, 5, lambert({color:0x888888}), 1.4, 2.5, -16.4, {collide:true});
   for(let i=0; i<6; i++){
     addBox(2.8, 0.5, 2, slidePlateMat, 0, 4.5-i*0.75, -17.5-i*1.8, {collide:true});
   }
 
-  // 🧗 정글짐
-  const jgymMat=lambert({color:0xdcf5d9});
+  // 🧗 연두색 정글짐
+  const jgymMat=lambert({color:0x3f9d5a});
+  const jgymIronMat=lambert({color:0x7ecb5f});
   for(let x=-31; x<=-22; x+=3){
     for(let z=9; z<=18; z+=3){
-      addCyl(0.12, 7.5, ironMat, x, 3.75, z, {collide:true});
+      addCyl(0.12, 7.5, jgymIronMat, x, 3.75, z, {collide:true});
     }
   }
   for(let y=2.5; y<=7.5; y+=2.5){
     for(let x=-31; x<=-22; x+=3){
-      addCyl(0.1, 9, ironMat, x, y, 13.5, {rx:Math.PI/2, collide:true});
+      addCyl(0.1, 9, jgymIronMat, x, y, 13.5, {rx:Math.PI/2, collide:true});
     }
     for(let z=9; z<=18; z+=3){
-      addCyl(0.1, 9, ironMat, -26.5, y, z, {rz:Math.PI/2, collide:true});
+      addCyl(0.1, 9, jgymIronMat, -26.5, y, z, {rz:Math.PI/2, collide:true});
     }
   }
   addBox(9.6, 0.2, 9.6, jgymMat, -26.5, 7.6, 13.5, {collide:true});
 
-  // 🪑 벤치 3개
-  const woodBenchMat=lambert({color:0xb58253});
+  // 🪑 알록달록한 벤치 3개
+  const benchColors = [0xb56fd4, 0xe07f3e, 0x2ec4b6]; // 보라, 주황, 민트
   const benchPositions = [
     [0, 25], [-20, -30], [20, 30]
   ];
-  benchPositions.forEach(([bx, bz]) => {
+  benchPositions.forEach(([bx, bz], idx) => {
+    const woodBenchMat = lambert({color: benchColors[idx]});
     addBox(8, 0.4, 2.2, woodBenchMat, bx, 1.2, bz, {collide:true});
     addBox(8, 1.8, 0.3, woodBenchMat, bx, 2.3, bz+0.9, {collide:true});
-    addBox(0.4, 1.2, 2.2, ironMat, bx-3.6, 0.6, bz, {collide:true});
-    addBox(0.4, 1.2, 2.2, ironMat, bx+3.6, 0.6, bz, {collide:true});
+    addBox(0.4, 1.2, 2.2, lambert({color: 0x222222}), bx-3.6, 0.6, bz, {collide:true});
+    addBox(0.4, 1.2, 2.2, lambert({color: 0x222222}), bx+3.6, 0.6, bz, {collide:true});
   });
 
-  // 🏠 체육 창고
+  // 🏠 주황색 지붕의 체육 창고
   const houseWallMat=lambert({color:0xe5dec9});
-  const houseRoofMat=lambert({color:0x4a7fb5});
+  const houseRoofMat=lambert({color:0xe07f3e}); // 주황색 지붕
   addBox(12, 10, 0.5, houseWallMat, -45, 5, 36, {collide:true});
   addBox(0.5, 10, 12, houseWallMat, -51, 5, 30, {collide:true});
   addBox(0.5, 10, 12, houseWallMat, -39, 5, 30, {collide:true});
   addBox(4.5, 10, 0.5, houseWallMat, -48.75, 5, 24, {collide:true});
   addBox(4.5, 10, 0.5, houseWallMat, -41.25, 5, 24, {collide:true});
   addBox(13, 1, 13, houseRoofMat, -45, 10.5, 30, {collide:true});
-  addBox(2.2, 3, 3.6, woodBenchMat, -45, 1.5, 30, {collide:true});
 
-  // 🏗️ 타이어 장애물
-  const tireMat=lambert({color:0x2b2b2b});
-  addCyl(2, 1.2, tireMat, 25, 0.6, 15, {collide:true});
-  addCyl(2, 1.2, tireMat, 27, 0.6, 17, {collide:true});
-  addCyl(2, 1.2, tireMat, 26, 1.8, 16, {collide:true});
+  // 뜀틀(Vaulting Horse) 및 안전 매트 (체육 창고 옆)
+  const matBlueMat = lambert({color: 0x4a7fb5});
+  const matRedMat = lambert({color: 0xe64545});
+  addBox(8, 0.3, 6, matBlueMat, -45, 0.15, 18, {collide:true});
+  addBox(8, 0.3, 6, matRedMat, -36, 0.15, 18, {collide:true});
+  
+  const horseTopMat = lambert({color: 0xb58253});
+  const horseBodyMat = lambert({color: 0xe5dec9});
+  addBox(2.2, 0.5, 3.6, horseTopMat, -45, 3.25, 18, {collide:true});
+  addBox(2.6, 3, 4, horseBodyMat, -45, 1.5, 18, {collide:true});
+  addBox(1.8, 0.4, 3, horseTopMat, -36, 2.5, 18, {collide:true});
+  addBox(2.2, 2.3, 3.4, horseBodyMat, -36, 1.15, 18, {collide:true});
+
+  // 🧗 평균대 (Balance Beams)
+  const beamPoleMat = lambert({color: 0x8a5ab9});
+  const beamMat = lambert({color: 0xf5c518});
+  addBox(14, 0.4, 0.8, beamMat, -15, 1.4, 18, {collide:true});
+  addBox(0.6, 1.2, 1.2, beamPoleMat, -21, 0.6, 18, {collide:true});
+  addBox(0.6, 1.2, 1.2, beamPoleMat, -9, 0.6, 18, {collide:true});
+
+  // 🧗 알록달록한 철봉 3종
+  const barMat = lambert({color: 0xdddddd});
+  addCyl(0.12, 3, lambert({color: 0xe64545}), -35, 1.5, -20, {collide:true});
+  addCyl(0.12, 3, lambert({color: 0xe64545}), -30, 1.5, -20, {collide:true});
+  addCyl(0.08, 5, barMat, -32.5, 3, -20, {rx: Math.PI/2, collide:true});
+  addCyl(0.12, 4, lambert({color: 0xf5c518}), -30, 2, -20, {collide:true});
+  addCyl(0.12, 4, lambert({color: 0xf5c518}), -25, 2, -20, {collide:true});
+  addCyl(0.08, 5, barMat, -27.5, 4, -20, {rx: Math.PI/2, collide:true});
+  addCyl(0.12, 5, lambert({color: 0x4a7fb5}), -25, 2.5, -20, {collide:true});
+  addCyl(0.12, 5, lambert({color: 0x4a7fb5}), -20, 2.5, -20, {collide:true});
+  addCyl(0.08, 5, barMat, -22.5, 5, -20, {rx: Math.PI/2, collide:true});
+
+  // 훌라후프 거치 및 훌라후프들
+  const hoopHangerMat = lambert({color: 0x777777});
+  addBox(0.3, 4, 3, hoopHangerMat, -10, 2, 28, {collide:true});
+  const hoopColors = [0xe64545, 0xf5c518, 0x4a7fb5, 0x3f8a4f];
+  hoopColors.forEach((color, idx) => {
+    addBox(0.1, 3.2, 3.2, lambert({color}), -10, 2, 27.5 + idx*0.3, {collide:true, ry: 0.15 * (idx - 1.5)});
+  });
+
+  // ⚽ 다양한 구기 종목 공 오브젝트 추가 (축구공, 야구공, 농구공)
+  // 축구 골대(좌) 주변에 축구공들 배치
+  addBox(0.9, 0.9, 0.9, lambert({color: 0xffffff}), -45, 0.45, -2, {collide: true});
+  addBox(0.9, 0.9, 0.9, lambert({color: 0x111111}), -44.5, 0.45, 1, {collide: true});
+  addBox(0.9, 0.9, 0.9, lambert({color: 0xe64545}), -43, 0.45, -1, {collide: true});
+  // 축구 골대(우) 주변에 축구공들 배치
+  addBox(0.9, 0.9, 0.9, lambert({color: 0xffffff}), 45, 0.45, 2, {collide: true});
+  addBox(0.9, 0.9, 0.9, lambert({color: 0x4a7fb5}), 44.5, 0.45, -1, {collide: true});
+  addBox(0.9, 0.9, 0.9, lambert({color: 0xf5c518}), 43, 0.45, 1, {collide: true});
+  // 농구대 밑에 농구공 배치
+  addBox(0.9, 0.9, 0.9, lambert({color: 0xff8a00}), 34, 0.45, -28, {collide: true});
+  addBox(0.9, 0.9, 0.9, lambert({color: 0x8a5ab9}), 36, 0.45, -27, {collide: true});
+  // 야구 배트와 야구공 (벤치 1 옆)
+  const batMat = lambert({color: 0xd2b48c});
+  addCyl(0.12, 3, batMat, 2, 0.2, 28, {rx: Math.PI/2.5, ry: Math.PI/6, collide: true});
+  addBox(0.5, 0.5, 0.5, lambert({color: 0xffffff}), 3, 0.25, 27, {collide: true});
+
+  // 🏗️ 여러가지 색으로 페인팅된 타이어 장애물
+  const tireColors = [0x2b2b2b, 0xe64545, 0xf5c518, 0x4a7fb5];
+  addCyl(2, 1.2, lambert({color: tireColors[0]}), 25, 0.6, 15, {collide:true});
+  addCyl(2, 1.2, lambert({color: tireColors[1]}), 27, 0.6, 17, {collide:true});
+  addCyl(2, 1.2, lambert({color: tireColors[2]}), 26, 1.8, 16, {collide:true});
+  addCyl(2, 1.2, lambert({color: tireColors[3]}), 23, 0.6, 18, {collide:true});
 
   // 🚰 음수대 (refillZone 1)
   const fountainMat=lambert({color:0x8a9ba8});
   addBox(2.5, 2.5, 2.5, fountainMat, -15, 1.25, -10, {collide:true});
-  addCyl(0.1, 0.5, ironMat, -15, 2.7, -10, {collide:true});
+  addCyl(0.1, 0.5, lambert({color:0xdddddd}), -15, 2.7, -10, {collide:true});
   refillZones.push({x:-15, z:-10, r:6, yMin:0, yMax:6, label:"음수대"});
 
   // 🏖️ 모래 놀이터 + 리필존 2
@@ -2208,11 +2289,31 @@ function updatePlaygroundGimmick(dt){
       const dx = G.pos.x - sp.x;
       const dz = G.pos.z - sp.z;
       const dist = Math.hypot(dx, dz);
+      
+      // 스프링클러 물벼락 충돌 감지 (거리가 15 이내이고 y 높이가 5 이하일 때 넉백 발생)
       if(dist < 15 && G.pos.y < 5) {
         amISprinkled = true;
-        if(Math.random() < 0.2) {
+        
+        // [넉백 물리] 닿는 즉시 외곽으로 강하게 밀려나서 붕 날아감
+        const pushSpeed = 28.0;
+        const dirX = dist > 0.1 ? dx / dist : 1;
+        const dirZ = dist > 0.1 ? dz / dist : 0;
+        
+        // moveHorizontalAxis를 이용해 충돌 감지와 함께 슬라이딩 밀침 처리
+        moveHorizontalAxis("x", dirX * pushSpeed * dt);
+        moveHorizontalAxis("z", dirZ * pushSpeed * dt);
+        
+        // 위쪽 방향 넉백 (공중 날아가기): 땅에 서 있거나 낙하 시에 튀어오르게 함
+        if(G.vy <= 1.0) {
+          G.vy = 11.5;
+          G.grounded = false;
+          Audio2.sfxJump(); // 튀어오름 효과음
+        }
+        
+        // 물가루 튀는 연출 추가
+        if(Math.random() < 0.35) {
           Audio2.sfxSpray();
-          burst(new THREE.Vector3(G.pos.x, G.pos.y + 1, G.pos.z), "#4aa8ff", 2, 2.5, 0.4);
+          burst(new THREE.Vector3(G.pos.x, G.pos.y + 1, G.pos.z), "#4aa8ff", 4, 3.5, 0.5);
         }
       }
     } else {
