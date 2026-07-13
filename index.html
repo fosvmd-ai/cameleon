@@ -2704,7 +2704,8 @@ function buildFairy(canvas,isPencil=false){
   return {group,parts,tex,mat,canvas,bodyM,arms:[aL,aR],legs:[lL,lR],shadow:sh,hitbox,nameLabel,zomEyes:zomEyesGroup,walkPhase:Math.random()*Math.PI*2};
 }
 function applyPoseToFairy(f,pose){
-  f.group.rotation.set(0,0,0);
+  f.group.rotation.x=0;
+  f.group.rotation.z=0;
   f.group.position.y=f.group.userData.baseY;
   f.bodyM.scale.set(1,1,1);
   f.bodyM.position.set(0,0.85,0);
