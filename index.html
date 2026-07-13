@@ -2589,17 +2589,18 @@ function makeFairyNameLabel(){
   sprite.userData.labelText="";
   return sprite;
 }
-function setFairyNameLabel(sprite,name){
+function setFairyNameLabel(sprite,name,fuelVal=100,showFuel=false){
   if(!sprite)return;
   const safe=String(name||"지우개").slice(0,10);
-  if(sprite.userData.labelText===safe)return;
-  sprite.userData.labelText=safe;
+  const cacheKey = safe + "_" + Math.floor(fuelVal) + "_" + showFuel;
+  if(sprite.userData.labelText===cacheKey)return;
+  sprite.userData.labelText=cacheKey;
   const c=sprite.userData.canvas,g=c.getContext("2d");
   g.clearRect(0,0,c.width,c.height);
   g.font='800 54px "Malgun Gothic",sans-serif';
   g.textAlign="center";g.textBaseline="middle";
   const tw=Math.min(440,g.measureText(safe).width+76);
-  const x=(c.width-tw)/2,y=18,w=tw,h=92,r=34;
+  const x=(c.width-tw)/2,y=6,w=tw,h=114,r=34;
   g.fillStyle="rgba(24,30,38,.84)";
   g.beginPath();
   g.moveTo(x+r,y);g.lineTo(x+w-r,y);g.quadraticCurveTo(x+w,y,x+w,y+r);
@@ -2608,8 +2609,35 @@ function setFairyNameLabel(sprite,name){
   g.lineTo(x,y+r);g.quadraticCurveTo(x,y,x+r,y);g.closePath();g.fill();
   g.strokeStyle="rgba(255,255,255,.9)";g.lineWidth=5;g.stroke();
   g.fillStyle="#fff";g.shadowColor="rgba(0,0,0,.7)";g.shadowBlur=5;
-  g.fillText(safe,c.width/2,c.height/2+2);
+  g.fillText(safe,c.width/2,c.height/2 - 12);
   g.shadowBlur=0;
+  
+  if (showFuel) {
+    const barW = w - 60;
+    const barX = x + 30;
+    const barY = y + 78;
+    const barH = 16;
+    const barR = 8;
+    
+    // 게이지 뒷배경
+    g.fillStyle = "rgba(255,255,255,0.2)";
+    g.beginPath();
+    g.roundRect(barX, barY, barW, barH, barR);
+    g.fill();
+    
+    // 게이지 채우기
+    const fillW = Math.max(0, barW * (fuelVal / 100));
+    if (fillW > 0) {
+      const grad = g.createLinearGradient(barX, 0, barX + barW, 0);
+      grad.addColorStop(0, "#88d3ff");
+      grad.addColorStop(1, "#4aa8ff");
+      g.fillStyle = grad;
+      g.beginPath();
+      g.roundRect(barX, barY, fillW, barH, barR);
+      g.fill();
+    }
+  }
+  
   sprite.userData.texture.needsUpdate=true;
 }
 function buildFairy(canvas,isPencil=false){
@@ -3108,8 +3136,10 @@ function syncLocalFairy(){
   myFairy.group.rotation.y=yaw+Math.PI;
   applyPoseToFairy(myFairy,pose);
   applyZombieSkinToFairy(myFairy, G.zombieState || 0); // 로컬 좀비 도색
-  setFairyNameLabel(myFairy.nameLabel,G.nick||Net.nick||"나");
-  myFairy.nameLabel.visible=G.spectating&&G.role==="hider"&&!G.found;
+  const isSeeker = G.role === "seeker";
+  const showLocalNameLabel = (G.role === "hider" && !G.found && !G.spectating) && (!isSeeker && (G.flying || flyEnergy < 100));
+  setFairyNameLabel(myFairy.nameLabel, G.nick||Net.nick||"나", flyEnergy, !isSeeker);
+  myFairy.nameLabel.visible = showLocalNameLabel || (G.spectating && G.role === "hider" && !G.found);
 }
 function updateThirdPersonCamera(){
   syncLocalFairy();
@@ -6186,12 +6216,13 @@ function buildFeatherMesh() {
 }
 
 function spawnFeatherOnFirebase() {
-  if (!hiderSpawns.length) return;
-  const sp = hiderSpawns[Math.floor(Math.random() * hiderSpawns.length)];
   const id = "feather_" + Math.floor(Math.random() * 1000000);
-  // 공중 스폰 지원: Y 좌표 1.5m ~ 6.0m 사이 랜덤
-  const yVal = 1.5 + Math.random() * 4.5;
-  const featherData = { id, x: sp.x, y: yVal, z: sp.z };
+  // 맵 전체 범위 X: -19 ~ 19, Z: -19 ~ 19 무작위 난수
+  const rx = (Math.random() - 0.5) * 38;
+  const rz = (Math.random() - 0.5) * 38;
+  // 공중 스폰 지원: Y 좌표 1.5m ~ 6.5m 사이 랜덤
+  const yVal = 1.5 + Math.random() * 5.0;
+  const featherData = { id, x: rx, y: yVal, z: rz };
   Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/feathers/${id}`), featherData).catch(()=>{});
 }
 
@@ -6223,7 +6254,7 @@ function updateFlyGaugeAndFeathers(dt) {
       if (flyEnergy < 100) {
         if(box) box.classList.remove("hidden");
         if (G.grounded) {
-          flyEnergy += dt * 22.0; // 약 4.5초만에 풀충전
+          flyEnergy += dt * 4.5; // 자연 충전 속도 하향: 초당 4.5% (약 22초 소요)
           if (flyEnergy >= 100) {
             flyEnergy = 100;
             if(box) box.classList.add("hidden");
