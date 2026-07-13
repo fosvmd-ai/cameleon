@@ -312,6 +312,7 @@ label.chk input{width:20px;height:20px;}
 #btnSpoit{width:60px;height:60px;right:26px;bottom:112px;}
 #btnMirror{width:70px;height:70px;right:104px;bottom:40px;}
 #btnJudge{width:100px;height:100px;right:18px;bottom:20px;background:rgba(245,197,24,.95);font-size:16px;}
+#btnInkFire{width:100px;height:100px;right:18px;bottom:20px;background:rgba(74,168,255,.95);font-size:16px;color:#fff;z-index:42;}
 #btnFlyDown{width:66px;height:66px;right:22px;bottom:26px;}
 /* 비행 중에는 상승·하강을 한 열에 두고 스포이트·색칠 버튼은 옆 열로 분리합니다. */
 #mobileUI.flyingControls #btnJump{right:18px;bottom:184px;}
@@ -461,10 +462,21 @@ if (typeof window.TEACHER_CODE === "undefined" || !window.TEACHER_CODE) window.T
         <input type="range" id="seekSecSlider" min="60" max="300" step="10" value="180">
         <span id="seekSecVal" class="settingsVal">3분</span>
       </div>
-      <div class="settingsRow">
+      <div class="settingsRow" style="display:flex; flex-direction:column; gap:4px; margin-top:2px;">
         <label class="chk" style="margin-top:0; justify-content:flex-start; width:100%; font-size:14px;">
           <input type="checkbox" id="chkZombieMode"> 🧟 좀비 모드 활성화
         </label>
+        <label class="chk" style="margin-top:4px; justify-content:flex-start; width:100%; font-size:14px;">
+          <input type="checkbox" id="chkInkMode"> 🎨 스플래툰 색칠 배틀 활성화
+        </label>
+        <div id="inkTeamRow" class="hidden" style="display:flex; align-items:center; gap:8px; font-size:13px; margin-left:22px; color:var(--ink);">
+          <span>👥 팀 개수:</span>
+          <select id="selInkTeams" style="padding:2px 6px; border:2px solid var(--ink); border-radius:6px; font-family:inherit; font-weight:bold;">
+            <option value="2">2팀 (레드 vs 블루)</option>
+            <option value="3">3팀 (레드 vs 블루 vs 옐로)</option>
+            <option value="4">4팀 (레드 vs 블루 vs 옐로 vs 그린)</option>
+          </select>
+        </div>
       </div>
     </div>
 
@@ -662,6 +674,7 @@ if (typeof window.TEACHER_CODE === "undefined" || !window.TEACHER_CODE) window.T
   <div class="mbtn" id="btnSpoit">💧<br>스포이트</div>
   <div class="mbtn" id="btnMirror">🎨<br>색칠 모드</div>
   <div class="mbtn hidden" id="btnJudge">콕<br>찍기!</div>
+  <div class="mbtn hidden" id="btnInkFire">🎨<br>발사!</div>
   <div class="mbtn hidden" id="btnFlyDown" aria-label="하강" title="하강">↓</div>
   <div class="poseCol">
     <div class="mbtn" data-pose="stand">서기</div>
@@ -1210,7 +1223,12 @@ function buildMap(){
 
 /* 공통: 방 외피(바닥·천장·벽·걸레받이·형광등) — 테마 색만 바꿔 재사용 */
 function buildRoomShell(floorMat, wallColor, ceilColor, skirtColor){
-  const floor=new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W,ROOM_D),floorMat);
+  let mat = floorMat;
+  if (isInkMode()) {
+    if (!sharedFloorTexture) initSharedFloorCanvas();
+    mat = lambert({map: sharedFloorTexture});
+  }
+  const floor=new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W,ROOM_D),mat);
   floor.rotation.x=-Math.PI/2; mapRoot.add(floor); samplables.push(floor);
   const ceil=new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W,ROOM_D),lambert({color:ceilColor}));
   ceil.rotation.x=Math.PI/2; ceil.position.y=WALL_H; mapRoot.add(ceil);
@@ -3067,7 +3085,14 @@ function ensureRemote(uid,info){
   }
   r.info=info;
   if(info.role==="ghost"){ r.fairy.group.visible=false; return r; }
-  setFairyNameLabel(r.fairy.nameLabel,info.nick||"지우개");
+  
+  if (isInkMode() && !isSeeker) {
+    const tName = TEAM_COLORS[info.teamId || "team1"]?.name || "레드팀";
+    setFairyNameLabel(r.fairy.nameLabel, `${info.nick || "지우개"} (${tName})`, 100, false);
+  } else {
+    setFairyNameLabel(r.fairy.nameLabel, info.nick||"지우개");
+  }
+  
   if(r.fairy.hitbox){
     r.fairy.hitbox.userData.uid=uid;
     r.fairy.hitbox.userData.taggable=info.role==="hider"&&!info.found;
@@ -4009,7 +4034,13 @@ renderer.domElement.addEventListener("mousedown",e=>{
       seekerLookDrag={x:e.clientX,y:e.clientY}; seekerDragMoved=false;
       return;
     }
-    if(!pointerLocked&&!IS_TOUCH) renderer.domElement.requestPointerLock();
+    if(!pointerLocked&&!IS_TOUCH) {
+      renderer.domElement.requestPointerLock();
+    } else if (pointerLocked && !IS_TOUCH) {
+      if (isInkMode() && G.role === "hider" && !G.found) {
+        fireInkWeapon();
+      }
+    }
   }
 });
 addEventListener("mousemove",e=>{
@@ -4049,6 +4080,10 @@ function updateMobileButtons(){
   $("btnPaintHold").classList.add("hidden");
   $("btnSpoit").classList.toggle("hidden",!(hidePaint));
   $("btnMirror").classList.toggle("hidden",!hidePaint||G.mirror);
+  
+  const showInkFire = isInkMode() && G.role === "hider" && !G.found && (!G.splatTimer || G.splatTimer <= 0);
+  $("btnInkFire").classList.toggle("hidden", !showInkFire);
+
   document.querySelectorAll(".poseCol .mbtn").forEach(b=>b.classList.toggle("hidden",G.role==="seeker"||G.role==="ghost"||G.mirror||G.spectating));
   updateSpectatorButton();
 }
@@ -4139,6 +4174,10 @@ const releaseFlightButton=e=>{
 };
 $("btnJump").addEventListener("lostpointercapture",releaseFlightButton);
 $("btnFlyDown").addEventListener("lostpointercapture",releaseFlightButton);
+$("btnInkFire").onpointerdown=e=>{
+  e.preventDefault(); e.stopPropagation(); Audio2.resume();
+  fireInkWeapon();
+};
 $("btnJudge").onpointerdown=()=>{tryJudge();Audio2.resume();};
 $("btnMirror").onpointerdown=()=>{setMirror(true);Audio2.resume();};
 $("btnMirrorDone").onpointerdown=()=>setMirror(false);
@@ -4373,6 +4412,8 @@ const Net={
       this.players[s.key]=s.val(); 
       if (s.key === this.uid) {
         G.zombieState = s.val().zombieState || 0;
+        G.teamId = s.val().teamId || "team1";
+        G.teamColor = TEAM_COLORS[G.teamId]?.color || "#FF3B30";
       }
       onPlayersChange(s.key,"add");
       if(s.key===this.meta.host) onHostBack();          // 선생님이 유예 시간 안에 돌아옴
@@ -4383,6 +4424,8 @@ const Net={
       ensureRemote(s.key,after);
       if (s.key === this.uid) {
         G.zombieState = after.zombieState || 0;
+        G.teamId = after.teamId || "team1";
+        G.teamColor = TEAM_COLORS[G.teamId]?.color || "#FF3B30";
       }
       if(!before.found&&after.found) onSomeoneFound(s.key,after);
       onPlayersChange(s.key,"change");
@@ -4433,6 +4476,32 @@ const Net={
       if (idx !== -1) {
         scene.remove(featherSpawns[idx].mesh);
         featherSpawns.splice(idx, 1);
+      }
+    });
+
+    // 잉크 착탄 동기화 리스너 추가
+    const splatsRef = ref(this.db, `rooms/${this.code}/splats`);
+    onChildAdded(splatsRef, s => {
+      const data = s.val(); if(!data) return;
+      paintInkOnFloor(data.x, data.z, data.r, data.color);
+    });
+
+    // 무기 상자 동기화 리스너 추가
+    const boxesRef = ref(this.db, `rooms/${this.code}/weaponBoxes`);
+    onChildAdded(boxesRef, s => {
+      const data = s.val(); if(!data) return;
+      if (weaponBoxSpawns.some(item => item.id === data.id)) return;
+      const meshObj = buildWeaponBoxMesh();
+      meshObj.group.position.set(data.x, data.y, data.z);
+      scene.add(meshObj.group);
+      weaponBoxSpawns.push({ id: data.id, x: data.x, y: data.y, z: data.z, group: meshObj.group, topMark: meshObj.topMark });
+    });
+    onChildRemoved(boxesRef, s => {
+      const id = s.key;
+      const idx = weaponBoxSpawns.findIndex(item => item.id === id);
+      if (idx !== -1) {
+        scene.remove(weaponBoxSpawns[idx].group);
+        weaponBoxSpawns.splice(idx, 1);
       }
     });
     // '진짜 강퇴' 신호: 선생님이 내보낸 경우에만 이 플래그가 켜집니다.
@@ -4832,6 +4901,26 @@ const Net={
       // 1단계: 역할을 먼저 확정합니다. 술래가 지우개로 잠깐 스폰되는 경쟁 상태를 막습니다.
       const roleUpd={};
       roleUpd[`rooms/${this.code}/cures`]=null; // 라운드 시작 시 이전 치료제 삭제
+      roleUpd[`rooms/${this.code}/feathers`]=null; // 이전 깃털 삭제
+      roleUpd[`rooms/${this.code}/splats`]=null; // 이전 잉크 칠하기 삭제
+      roleUpd[`rooms/${this.code}/splatOuts`]=null; // 이전 아웃로그 삭제
+      roleUpd[`rooms/${this.code}/weaponBoxes`]=null; // 이전 무기상자 삭제
+
+      const inkMode = !!settings.inkMode;
+      const teamCount = settings.teamCount || 2;
+      const teamList = ["team1", "team2", "team3", "team4"].slice(0, teamCount);
+      const hiderIds = ids.filter(u => u !== this.uid && !seekers.has(u));
+      
+      // 스플래툰 요정들 팀 셔플 분배
+      for (let i = hiderIds.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [hiderIds[i], hiderIds[j]] = [hiderIds[j], hiderIds[i]];
+      }
+      const assignedTeams = {};
+      hiderIds.forEach((uid, index) => {
+        assignedTeams[uid] = teamList[index % teamCount];
+      });
+
       Object.keys(latestPlayers).forEach(u=>{
         let role;
         if (zombieMode) {
@@ -4848,8 +4937,12 @@ const Net={
         const zState = zombieMode ? (zombieSet.has(u) ? 2 : 0) : 0;
         roleUpd[`rooms/${this.code}/players/${u}/zombieState`]=zState;
         
+        // 스플래툰 팀 할당
+        const tId = inkMode ? (assignedTeams[u] || "team1") : "team1";
+        roleUpd[`rooms/${this.code}/players/${u}/teamId`]=tId;
+        
         roleUpd[`rooms/${this.code}/pos/${u}`]=null;
-        this.players[u]=Object.assign({},latestPlayers[u],{role,found:false,tex:null,foundAt:null,foundBy:null,zombieState:zState});
+        this.players[u]=Object.assign({},latestPlayers[u],{role,found:false,tex:null,foundAt:null,foundBy:null,zombieState:zState,teamId:tId});
       });
       await update(ref(this.db),roleUpd);
 
@@ -4921,10 +5014,29 @@ async function onPhaseChange(phase,prev){
   }
   if(G.phase!==phase)return;
   if(phase==="ROULETTE")enterRoulette();
-  else if(phase==="PAINT"){ initZombieGame(); initFeatherGame(); enterPaint(); }
+  else if(phase==="PAINT"){ 
+    initZombieGame(); 
+    initFeatherGame(); 
+    initWeaponBoxGame();
+    if (isInkMode()) {
+      initSharedFloorCanvas();
+      if (G.role === "hider") {
+        let spawnPos = new THREE.Vector3(0, 0.1, 0);
+        if (G.teamId === "team1") spawnPos.set(-18, 0.1, -18);
+        else if (G.teamId === "team2") spawnPos.set(18, 0.1, 18);
+        else if (G.teamId === "team3") spawnPos.set(-18, 0.1, 18);
+        else if (G.teamId === "team4") spawnPos.set(18, 0.1, -18);
+        G.pos.copy(spawnPos);
+        G.vy = 0;
+        G.grounded = true;
+        G.inkPercent = 0;
+      }
+    }
+    enterPaint(); 
+  }
   else if(phase==="SEEK")enterSeek();
   else if(phase==="RESULT")enterResult();
-  else if(phase==="LOBBY"){ initZombieGame(); initFeatherGame(); if(G.isHost)resetLobbyForNewRound(); showScreen("LOBBY"); }
+  else if(phase==="LOBBY"){ initZombieGame(); initFeatherGame(); initWeaponBoxGame(); if(G.isHost)resetLobbyForNewRound(); showScreen("LOBBY"); }
   syncLocalFairy();
   updateMobileButtons();
 }
@@ -5149,6 +5261,46 @@ function enterResult(){
   G.tvMode=false; $("tvHud").classList.add("hidden"); $("tvFollowBar").classList.add("hidden");
   resetFrozenBanner();
   if(G.isHost && Net.meta && Net.meta.frozen) Net.setFrozen(false);
+  
+  if (isInkMode()) {
+    Audio2.sfxFanfare();
+    const ratios = calculateInkRatio();
+    let body = "<h3>🎨 잉크 칠하기 면적 분석 결과</h3>";
+    if (ratios && ratios.length > 0) {
+      const winnerTeam = ratios[0];
+      $("resultTitle").textContent = `🏆 ${winnerTeam.name} 최종 승리!`;
+      body += `<div style="display:flex; flex-direction:column; gap:10px; margin:16px 0; font-weight:bold;">`;
+      ratios.forEach(r => {
+        body += `
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+            <div style="width:70px; text-align:left; font-size:13px; color:#181e26;">${r.name}</div>
+            <div style="flex:1; height:20px; background:#e2e8f0; border-radius:10px; overflow:hidden; border:2px solid var(--ink);">
+              <div style="width:${r.percentage.toFixed(1)}%; height:100%; background:${r.color};"></div>
+            </div>
+            <div style="width:54px; text-align:right; font-size:13px;">${r.percentage.toFixed(1)}%</div>
+          </div>
+        `;
+      });
+      body += `</div>`;
+      if(Net.mode === "online") {
+        const winnerPlayers = Object.values(Net.players)
+          .filter(p => p.role === "hider" && p.teamId === winnerTeam.id)
+          .map(p => p.nick || "지우개");
+        if (winnerPlayers.length > 0) {
+          body += `👑 승리한 모둠원: <b>${winnerPlayers.join(", ")}</b><br>`;
+        }
+      }
+    } else {
+      $("resultTitle").textContent = "🎨 잉크 배틀 종료!";
+      body += "색칠 데이터를 읽을 수 없습니다.";
+    }
+    $("resultBody").innerHTML = body;
+    $("btnNextRound").classList.toggle("hidden",!G.isHost);
+    $("btnToLobby").classList.toggle("hidden",!G.isHost);
+    showScreen("RESULT");
+    return;
+  }
+
   const winner=(Net.mode==="online"?Net.meta.winner:G.practiceWinner)||"hider";
   const seekWin=winner==="seeker";
   $("resultTitle").textContent=seekWin?"✏️ 술래 연필 팀 승리!":"🧼 지우개 팀 승리!";
@@ -5266,7 +5418,7 @@ function refreshLobbyGrid(){
 /* v2: 게임 설정 슬라이더 표시/동기화 */
 function fmtMinSec(sec){ const m=Math.floor(sec/60),s=sec%60; return s?`${m}분 ${s}초`:`${m}분`; }
 function refreshLobbySettingsUI(){
-  const settings=Object.assign({paintSec:60,seekSec:180,zombieMode:false},Net.meta.settings||{});
+  const settings=Object.assign({paintSec:60,seekSec:180,zombieMode:false,inkMode:false,teamCount:2},Net.meta.settings||{});
   const box=$("settingsBox");
   box.classList.toggle("readonly",!G.isHost);
   if(document.activeElement!==$("paintSecSlider")){ $("paintSecSlider").value=settings.paintSec; }
@@ -5275,6 +5427,14 @@ function refreshLobbySettingsUI(){
   $("seekSecSlider").disabled=!G.isHost;
   $("chkZombieMode").checked=!!settings.zombieMode;
   $("chkZombieMode").disabled=!G.isHost;
+  
+  const inkMode=!!settings.inkMode;
+  $("chkInkMode").checked=inkMode;
+  $("chkInkMode").disabled=!G.isHost;
+  $("selInkTeams").value=settings.teamCount||2;
+  $("selInkTeams").disabled=!G.isHost;
+  $("inkTeamRow").classList.toggle("hidden",!inkMode);
+
   $("paintSecVal").textContent=fmtMinSec(+$("paintSecSlider").value);
   $("seekSecVal").textContent=fmtMinSec(+$("seekSecSlider").value);
   $("hostRoleBox").classList.toggle("hidden",!G.isHost);
@@ -5290,7 +5450,13 @@ $("seekSecSlider").addEventListener("input",e=>{
   if(G.isHost)Net.updateSettings({seekSec:+e.target.value});
 });
 $("chkZombieMode").addEventListener("change",e=>{
-  if(G.isHost)Net.updateSettings({zombieMode:e.target.checked});
+  if(G.isHost)Net.updateSettings({zombieMode:e.target.checked,inkMode:false});
+});
+$("chkInkMode").addEventListener("change",e=>{
+  if(G.isHost)Net.updateSettings({inkMode:e.target.checked,zombieMode:false});
+});
+$("selInkTeams").addEventListener("change",e=>{
+  if(G.isHost)Net.updateSettings({teamCount:+e.target.value});
 });
 document.querySelectorAll(".hostRoleBtn").forEach(b=>b.onclick=()=>{
   Audio2.resume();
@@ -6322,6 +6488,491 @@ function initFeatherGame() {
   if(box) box.classList.add("hidden");
 }
 
+/* ================================================================
+   🎨 스플래툰 색칠 배틀 모드 관련 기믹 및 캔버스 드로잉 시스템
+   ================================================================ */
+function isInkMode() {
+  return !!(Net.mode === "online" && Net.meta && Net.meta.settings && Net.meta.settings.inkMode);
+}
+
+let sharedFloorCanvas = null;
+let sharedFloorCtx = null;
+let sharedFloorTexture = null;
+
+function initSharedFloorCanvas() {
+  if (sharedFloorCanvas) {
+    if (sharedFloorTexture) sharedFloorTexture.dispose();
+    sharedFloorCanvas = null;
+    sharedFloorCtx = null;
+    sharedFloorTexture = null;
+  }
+  
+  sharedFloorCanvas = document.createElement("canvas");
+  sharedFloorCanvas.width = 1024;
+  sharedFloorCanvas.height = 1024;
+  sharedFloorCtx = sharedFloorCanvas.getContext("2d");
+  
+  // 연한 회색 기본 바닥 배경
+  sharedFloorCtx.fillStyle = "#e5e7eb";
+  sharedFloorCtx.fillRect(0, 0, 1024, 1024);
+  
+  // 격자 타일무늬 그리기
+  sharedFloorCtx.strokeStyle = "#d1d5db";
+  sharedFloorCtx.lineWidth = 4;
+  for (let i = 0; i <= 1024; i += 64) {
+    sharedFloorCtx.beginPath();
+    sharedFloorCtx.moveTo(i, 0); sharedFloorCtx.lineTo(i, 1024);
+    sharedFloorCtx.stroke();
+    sharedFloorCtx.beginPath();
+    sharedFloorCtx.moveTo(0, i); sharedFloorCtx.lineTo(1024, i);
+    sharedFloorCtx.stroke();
+  }
+  
+  sharedFloorTexture = new THREE.CanvasTexture(sharedFloorCanvas);
+  sharedFloorTexture.colorSpace = THREE.SRGBColorSpace;
+}
+
+function paintInkOnFloor(worldX, worldZ, radius, color) {
+  if (!sharedFloorCtx || !sharedFloorTexture) return;
+  
+  // u, v 변환 (X: -22 ~ 22 -> 0 ~ 1, Z: -22 ~ 22 -> 0 ~ 1)
+  const u = (worldX + 22) / 44;
+  const v = (worldZ + 22) / 44;
+  
+  const px = u * 1024;
+  const py = v * 1024;
+  const pr = (radius / 44) * 1024;
+  
+  const g = sharedFloorCtx;
+  g.save();
+  
+  // 동그란 원 형태로 덧칠
+  g.fillStyle = color;
+  g.beginPath();
+  g.arc(px, py, pr, 0, Math.PI * 2);
+  g.fill();
+  
+  // 테두리 스플래시 효과 3~5개 추가해서 자연스러운 물감 번짐 연출
+  const splats = 3 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < splats; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = pr * (0.8 + Math.random() * 0.4);
+    const sx = px + Math.cos(angle) * dist;
+    const sy = py + Math.sin(angle) * dist;
+    const sr = pr * (0.2 + Math.random() * 0.25);
+    
+    g.beginPath();
+    g.arc(sx, sy, sr, 0, Math.PI * 2);
+    g.fill();
+  }
+  
+  g.restore();
+  g.restore();
+  sharedFloorTexture.needsUpdate = true;
+}
+
+const TEAM_COLORS = {
+  team1: { color: "#FF3B30", name: "레드팀" },
+  team2: { color: "#007AFF", name: "블루팀" },
+  team3: { color: "#FFCC00", name: "옐로팀" },
+  team4: { color: "#34C759", name: "그린팀" }
+};
+const INK_WEAPONS = {
+  shooter: { name: "물총", type: "shooter", cooldown: 180, radius: 1.5 },
+  grenade: { name: "페인트 수류탄", type: "grenade", cooldown: 1200, radius: 3.5 },
+  slosher: { name: "대포", type: "slosher", cooldown: 700, radius: 2.8 },
+  buckshot: { name: "샷건", type: "buckshot", cooldown: 450, radius: 1.2 },
+  roller: { name: "붓", type: "roller", cooldown: 0, radius: 1.8 }
+};
+
+let inkProjectiles = [];
+let lastFireTime = 0;
+
+G.teamId = "team1";
+G.teamColor = "#FF3B30";
+G.inkWeapon = "shooter";
+G.inkPercent = 0; 
+G.splatTimer = 0; 
+G.invincibleTimer = 0; 
+
+function spawnInkProjectile(x, y, z, vx, vy, vz, teamId, color, type, radius) {
+  const geo = new THREE.SphereGeometry(type === "slosher" ? 0.22 : 0.12, 8, 8);
+  const mat = lambert({color: color});
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(x, y, z);
+  scene.add(mesh);
+  
+  inkProjectiles.push({
+    mesh,
+    pos: new THREE.Vector3(x, y, z),
+    vel: new THREE.Vector3(vx, vy, vz),
+    teamId,
+    color,
+    type,
+    radius,
+    age: 0,
+    maxAge: type === "grenade" ? 1.5 : 3.0
+  });
+}
+
+function updateInkProjectiles(dt) {
+  for (let i = inkProjectiles.length - 1; i >= 0; i--) {
+    const p = inkProjectiles[i];
+    p.age += dt;
+    
+    p.vel.y -= 9.8 * dt;
+    p.pos.addScaledVector(p.vel, dt);
+    p.mesh.position.copy(p.pos);
+    
+    let hit = false;
+    let hitX = p.pos.x, hitZ = p.pos.z, hitY = p.pos.y;
+    
+    if (p.pos.y <= 0.05) {
+      hit = true;
+      hitY = 0.05;
+    }
+    
+    if (!hit) {
+      for (const c of colliders) {
+        if (p.pos.x >= c.min.x && p.pos.x <= c.max.x &&
+            p.pos.z >= c.min.z && p.pos.z <= c.max.z &&
+            p.pos.y >= c.min.y && p.pos.y <= c.max.y) {
+          hit = true;
+          break;
+        }
+      }
+    }
+    
+    if (!hit && p.type === "grenade" && p.age >= p.maxAge) {
+      hit = true;
+    }
+    
+    if (hit || p.age >= p.maxAge) {
+      paintInkOnFloor(hitX, hitZ, p.radius, p.color);
+      burst(new THREE.Vector3(hitX, hitY, hitZ), p.color, p.type === "grenade" ? 16 : 8, 2.5, 0.4, false, 0.35);
+      
+      sendSplatEvent(hitX, hitZ, p.radius, p.color);
+      
+      if (G.screen === "GAME" && G.role === "hider" && !G.found && !G.spectating && (!G.invincibleTimer || G.invincibleTimer <= 0) && (!G.splatTimer || G.splatTimer <= 0)) {
+        if (p.teamId !== G.teamId) {
+          const dx = G.pos.x - hitX;
+          const dz = G.pos.z - hitZ;
+          const dist = Math.hypot(dx, dz);
+          if (dist < p.radius + 0.5 && Math.abs(G.pos.y - hitY) < 2.0) {
+            const damage = Math.max(5, (1 - dist / (p.radius + 0.5)) * (p.type === "grenade" ? 50 : 25));
+            G.inkPercent = Math.min(100, G.inkPercent + damage);
+            toast(`💥 피격됨! 오염도: ${Math.floor(G.inkPercent)}%`);
+            burst(G.pos, p.color, 5, 1.2, 0.2, false, 0.15);
+            if (G.inkPercent >= 50) {
+              splatOutPlayer();
+            }
+          }
+        }
+      }
+      
+      scene.remove(p.mesh);
+      inkProjectiles.splice(i, 1);
+    }
+  }
+}
+
+function fireInkWeapon() {
+  if (G.screen !== "GAME" || G.found || G.spectating) return;
+  if (G.splatTimer && G.splatTimer > 0) return;
+  
+  const w = INK_WEAPONS[G.inkWeapon || "shooter"];
+  if (!w) return;
+  
+  const now = performance.now();
+  if (w.cooldown > 0 && now - lastFireTime < w.cooldown) return;
+  lastFireTime = now;
+  
+  const dir = new THREE.Vector3();
+  camera.getWorldDirection(dir);
+  
+  const startPos = new THREE.Vector3(G.pos.x, G.pos.y + 0.8, G.pos.z);
+  Audio2.sfxSpray();
+  
+  const myColor = G.teamColor || "#FF3B30";
+  
+  if (w.type === "shooter") {
+    const speed = 16.0;
+    const spread = 0.05;
+    const vx = dir.x * speed + (Math.random() - 0.5) * spread;
+    const vy = dir.y * speed + 2.5;
+    const vz = dir.z * speed + (Math.random() - 0.5) * spread;
+    spawnInkProjectile(startPos.x, startPos.y, startPos.z, vx, vy, vz, G.teamId, myColor, "shooter", w.radius);
+    
+  } else if (w.type === "grenade") {
+    const speed = 10.0;
+    const vx = dir.x * speed;
+    const vy = dir.y * speed + 5.0;
+    const vz = dir.z * speed;
+    spawnInkProjectile(startPos.x, startPos.y, startPos.z, vx, vy, vz, G.teamId, myColor, "grenade", w.radius);
+    
+  } else if (w.type === "slosher") {
+    const speed = 12.0;
+    const vx = dir.x * speed;
+    const vy = dir.y * speed + 3.0;
+    const vz = dir.z * speed;
+    spawnInkProjectile(startPos.x, startPos.y, startPos.z, vx, vy, vz, G.teamId, myColor, "slosher", w.radius);
+    
+  } else if (w.type === "buckshot") {
+    const speed = 14.0;
+    for (let i = 0; i < 5; i++) {
+      const spreadX = (Math.random() - 0.5) * 0.22;
+      const spreadY = (Math.random() - 0.5) * 0.15;
+      const spreadZ = (Math.random() - 0.5) * 0.22;
+      const vx = dir.x * speed + spreadX;
+      const vy = dir.y * speed + 1.5 + spreadY;
+      const vz = dir.z * speed + spreadZ;
+      spawnInkProjectile(startPos.x, startPos.y, startPos.z, vx, vy, vz, G.teamId, myColor, "buckshot", w.radius);
+    }
+  }
+}
+
+function sendSplatEvent(x, z, r, color) {
+  if (Net.mode === "online") {
+    const id = "splat_" + Math.floor(Math.random() * 10000000);
+    Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/splats/${id}`), { x, z, r, color }).catch(()=>{});
+  }
+}
+
+/* ================================================================
+   📦 스플래툰 무기 상자 아이템 스폰 및 획득 무기 교체 시스템
+   ================================================================ */
+let weaponBoxSpawns = [];
+let weaponBoxSpawnTimer = 0;
+
+function buildWeaponBoxMesh() {
+  const group = new THREE.Group();
+  
+  const boxMat = lambert({color: 0x22262a});
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.7), boxMat);
+  box.position.y = 0.35;
+  group.add(box);
+  
+  const inkMat = lambert({color: 0xF5C518});
+  const topMark = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.35, 0.35), inkMat);
+  topMark.position.y = 0.95;
+  topMark.rotation.set(Math.PI/4, Math.PI/4, 0);
+  group.add(topMark);
+  
+  group.position.y = 0.5;
+  return { group, topMark };
+}
+
+function spawnWeaponBoxOnFirebase() {
+  const id = "weaponbox_" + Math.floor(Math.random() * 10000000);
+  const rx = (Math.random() - 0.5) * 38;
+  const rz = (Math.random() - 0.5) * 38;
+  const ry = 0.5; 
+  
+  const boxData = { id, x: rx, y: ry, z: rz };
+  Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/weaponBoxes/${id}`), boxData).catch(()=>{});
+}
+
+function updateWeaponBoxes(dt) {
+  if (!isInkMode() || G.screen !== "GAME") return;
+  
+  const isSeeker = G.role === "seeker";
+  
+  if (!isSeeker && !G.found && (!G.splatTimer || G.splatTimer <= 0)) {
+    for (let i = weaponBoxSpawns.length - 1; i >= 0; i--) {
+      const boxObj = weaponBoxSpawns[i];
+      const dx = G.pos.x - boxObj.x;
+      const dz = G.pos.z - boxObj.z;
+      const dist = Math.hypot(dx, dz);
+      
+      if (dist < 1.3 && Math.abs(G.pos.y - boxObj.y) < 1.6) {
+        Audio2.sfxRefill(); 
+        
+        const weapons = Object.keys(INK_WEAPONS);
+        const filtered = weapons.filter(w => w !== G.inkWeapon);
+        const newWep = filtered[Math.floor(Math.random() * filtered.length)];
+        
+        G.inkWeapon = newWep;
+        const wepInfo = INK_WEAPONS[newWep];
+        toast(`🔫 무기 획득! [${wepInfo.name}]로 무기가 변경되었습니다!`);
+        
+        burst(new THREE.Vector3(boxObj.x, boxObj.y + 0.5, boxObj.z), G.teamColor, 10, 2.5, 0.4, false, 0.25);
+        
+        if (Net.mode === "online") {
+          Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/weaponBoxes/${boxObj.id}`), null).catch(()=>{});
+        }
+        scene.remove(boxObj.group);
+        weaponBoxSpawns.splice(i, 1);
+        break;
+      }
+    }
+  }
+  
+  if (G.isHost) {
+    weaponBoxSpawnTimer += dt;
+    if (weaponBoxSpawnTimer >= 12.0) {
+      weaponBoxSpawnTimer = 0;
+      if (weaponBoxSpawns.length < 4) {
+        spawnWeaponBoxOnFirebase();
+      }
+    }
+  }
+  
+  const time = performance.now() / 1000;
+  weaponBoxSpawns.forEach(boxObj => {
+    boxObj.group.rotation.y += dt * 1.5;
+    if (boxObj.topMark) {
+      boxObj.topMark.rotation.x += dt * 2.0;
+      boxObj.topMark.position.y = 0.95 + Math.sin(time * 3.5) * 0.12;
+    }
+  });
+}
+
+function initWeaponBoxGame() {
+  weaponBoxSpawns.forEach(boxObj => { scene.remove(boxObj.group); });
+  weaponBoxSpawns = [];
+  weaponBoxSpawnTimer = 0;
+  G.inkWeapon = "shooter"; 
+}
+
+/* ================================================================
+   💀 스플래툰 피격 물듦 및 아웃(Splat) / 부활 / 무적 보호막 시스템
+   ================================================================ */
+function splatOutPlayer() {
+  if (G.splatTimer && G.splatTimer > 0) return;
+  
+  G.splatTimer = 3.0; 
+  G.flying = false;
+  G.flyUp = false; G.flyDown = false;
+  
+  burst(G.pos, G.teamColor, 24, 4.0, 0.7, false, 0.5);
+  Audio2.sfxBreak(); 
+  toast("💀 SPLAT! 상대방 잉크에 물들어 아웃되었습니다!");
+  
+  let spawnPos = new THREE.Vector3(0, 0.1, 0);
+  if (G.teamId === "team1") spawnPos.set(-18, 0.1, -18);
+  else if (G.teamId === "team2") spawnPos.set(18, 0.1, 18);
+  else if (G.teamId === "team3") spawnPos.set(-18, 0.1, 18);
+  else if (G.teamId === "team4") spawnPos.set(18, 0.1, -18);
+  
+  G.pos.copy(spawnPos);
+  G.vy = 0;
+  G.grounded = true;
+  G.inkPercent = 0; 
+  
+  sendSplatOutEvent();
+}
+
+function sendSplatOutEvent() {
+  if (Net.mode === "online") {
+    const id = "out_" + Math.floor(Math.random() * 10000000);
+    Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/splatOuts/${id}`), { uid: Net.uid, teamId: G.teamId, nick: G.nick || Net.nick }).catch(()=>{});
+  }
+}
+
+function updateSplatAndInvincible(dt) {
+  if (!isInkMode() || G.screen !== "GAME") {
+    G.splatTimer = 0;
+    G.invincibleTimer = 0;
+    return;
+  }
+  
+  if (G.splatTimer > 0) {
+    G.splatTimer -= dt;
+    G.moveIn.x = 0; G.moveIn.z = 0; 
+    G.jumpReq = false;
+    
+    if (G.splatTimer <= 0) {
+      G.splatTimer = 0;
+      G.invincibleTimer = 2.5; 
+      toast("🛡️ 부활 완료! 2.5초간 무적 상태입니다!");
+    }
+  }
+  
+  if (G.invincibleTimer > 0) {
+    G.invincibleTimer -= dt;
+    if (G.invincibleTimer <= 0) {
+      G.invincibleTimer = 0;
+    }
+    
+    if (Math.random() < 0.25) {
+      burst(G.pos, "#ffffff", 2, 1.5, 0.4, true, 0.15); 
+    }
+  }
+}
+
+/* ================================================================
+   📊 스플래툰 바닥 면적 점유율 집계 연산
+   ================================================================ */
+function rgbToHex(r, g, b) {
+  const toHex = c => c.toString(16).padStart(2, "0");
+  return "#" + toHex(r) + toHex(g) + toHex(b);
+}
+
+function hexColorDistance(c1, c2) {
+  const r1 = parseInt(c1.slice(1,3), 16);
+  const g1 = parseInt(c1.slice(3,5), 16);
+  const b1 = parseInt(c1.slice(5,7), 16);
+  
+  const r2 = parseInt(c2.slice(1,3), 16);
+  const g2 = parseInt(c2.slice(3,5), 16);
+  const b2 = parseInt(c2.slice(5,7), 16);
+  
+  return Math.hypot(r1 - r2, g1 - g2, b1 - b2);
+}
+
+function calculateInkRatio() {
+  if (!sharedFloorCanvas || !sharedFloorCtx) return null;
+  const ctx = sharedFloorCtx;
+  let imgData;
+  try {
+    imgData = ctx.getImageData(0, 0, 1024, 1024).data;
+  } catch (e) {
+    console.error("바닥 스캔 실패:", e);
+    return null;
+  }
+  
+  const activeTeams = [];
+  const settingsCount = (Net.meta && Net.meta.settings && Net.meta.settings.teamCount) || 2;
+  for (let i = 1; i <= settingsCount; i++) {
+    const tId = "team" + i;
+    activeTeams.push({ id: tId, color: TEAM_COLORS[tId].color, name: TEAM_COLORS[tId].name, count: 0 });
+  }
+  
+  let totalSampled = 0;
+  for (let y = 16; y < 1024; y += 32) {
+    for (let x = 16; x < 1024; x += 32) {
+      const idx = (y * 1024 + x) * 4;
+      const r = imgData[idx];
+      const g = imgData[idx+1];
+      const b = imgData[idx+2];
+      const hex = rgbToHex(r, g, b);
+      
+      let matched = null;
+      let minDistance = 50.0; 
+      
+      activeTeams.forEach(t => {
+        const dist = hexColorDistance(t.color, hex);
+        if (dist < minDistance) {
+          minDistance = dist;
+          matched = t;
+        }
+      });
+      
+      if (matched) {
+        matched.count++;
+      }
+      totalSampled++;
+    }
+  }
+  
+  activeTeams.forEach(t => {
+    t.percentage = totalSampled > 0 ? (t.count / totalSampled) * 100 : 0;
+  });
+  
+  activeTeams.sort((a, b) => b.count - a.count);
+  return activeTeams;
+}
+
 let embedTime=0;
 function checkEmbedded(dt){
   const active=(Net.mode==="online"&&G.role==="hider"&&!G.found&&!G.spectating&&!G.lobbyPractice
@@ -6354,6 +7005,25 @@ function loop(){
   updateDayNightCycle(dt);
   updateZombieLogic(dt);
   updateFlyGaugeAndFeathers(dt);
+  
+  if (isInkMode()) {
+    updateInkProjectiles(dt);
+    updateWeaponBoxes(dt);
+    updateSplatAndInvincible(dt);
+    
+    // 붓(Roller) 이동 칠하기 기믹
+    if (G.screen === "GAME" && G.role === "hider" && !G.found && G.inkWeapon === "roller" && G.grounded && (!G.splatTimer || G.splatTimer <= 0)) {
+      const speed = Math.hypot(G.moveIn.x, G.moveIn.z);
+      if (speed > 0.05) {
+        paintInkOnFloor(G.pos.x, G.pos.z, 2.0, G.teamColor);
+        const now = performance.now();
+        if (!G.lastRollerSent || now - G.lastRollerSent > 150) {
+          G.lastRollerSent = now;
+          sendSplatEvent(G.pos.x, G.pos.z, 2.0, G.teamColor);
+        }
+      }
+    }
+  }
 
   if(G.screen==="GAME"){
     readKeys();
