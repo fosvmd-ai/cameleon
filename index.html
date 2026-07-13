@@ -3426,6 +3426,12 @@ function updateMovement(dt){
         while(diff < -Math.PI) diff += Math.PI * 2;
         while(diff > Math.PI) diff -= Math.PI * 2;
         G.fairyYaw += diff * dt * 8.5; // 자연스러운 보간 속도
+      }else{
+        // 정지 시 마우스 드래그(G.yaw)에 맞춰 몸을 스무스하게 시선 정면으로 회전 정렬
+        let diff = G.yaw - G.fairyYaw;
+        while(diff < -Math.PI) diff += Math.PI * 2;
+        while(diff > Math.PI) diff -= Math.PI * 2;
+        G.fairyYaw += diff * dt * 8.5;
       }
     } else {
       // 1인칭 뷰에서는 시선 방향과 일치
