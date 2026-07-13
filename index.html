@@ -822,6 +822,31 @@ function buildTextures(){
     g.fillText("서로 도와요",w/2,h/2+14);});
   TEX.plaster=canvasTex(128,128,(g,w,h)=>{ g.fillStyle="#f2ecd8";g.fillRect(0,0,w,h);
     for(let i=0;i<60;i++){g.fillStyle="rgba(200,190,160,.3)";g.fillRect(R()*w,R()*h,2,2);}},4,2);
+  
+  // 운동장 맵용 텍스처 추가
+  TEX.grass=canvasTex(256,256,(g,w,h)=>{ // 잔디밭
+    g.fillStyle="#5da050";g.fillRect(0,0,w,h);
+    for(let i=0;i<800;i++){
+      g.fillStyle=`rgba(${70+R()*40|0},${140+R()*50|0},${50+R()*30|0},.6)`;
+      const size=1+R()*3; g.fillRect(R()*w,R()*h,size,size+R()*4);
+    }
+  },8,8);
+  
+  TEX.dirt=canvasTex(256,256,(g,w,h)=>{ // 황토색 트랙/흙
+    g.fillStyle="#d58f5c";g.fillRect(0,0,w,h);
+    for(let i=0;i<1200;i++){
+      g.fillStyle=`rgba(${160+R()*40|0},${100+R()*30|0},${60+R()*20|0},.4)`;
+      g.fillRect(R()*w,R()*h,1+R()*2,1+R()*2);
+    }
+  },6,6);
+  
+  TEX.sand=canvasTex(128,128,(g,w,h)=>{ // 모래놀이터
+    g.fillStyle="#e3c79a";g.fillRect(0,0,w,h);
+    for(let i=0;i<900;i++){
+      g.fillStyle=`rgba(${200+R()*30|0},${170+R()*30|0},${120+R()*20|0},.5)`;
+      g.fillRect(R()*w,R()*h,1+R()*2,1+R()*2);
+    }
+  },4,4);
 }
 
 /* ================= 렌더러 / 씬 ================= */
@@ -1896,9 +1921,313 @@ function buildLibrary(){
                .map(p=>new THREE.Vector3(p[0],0,p[1]));
 
   // 움직이는 책수레 2대(결정론 경로 = f(서버시간))
+  // 움직이는 책수레 2대(결정론 경로 = f(서버시간))
   buildCart({seed:501,color:0x9a6b3f,path:(t)=>({x:-40,z:pingpong(t,24,-26,26)})}); // A: 좌측 세로 통로
   buildCart({seed:777,color:0x8a5a33,path:(t)=>({x:pingpong(t,20,-16,16),z:34})});   // B: 뒤쪽 가로 통로
 }
+
+/* ================================================================
+   🛝 맵 4. 운동장 — buildPlayground + updatePlaygroundGimmick(스프링클러)
+   ================================================================ */
+let Sprinklers = [];
+
+function buildPlayground(){
+  WALL_H=40;
+  
+  // 1) 바닥 (잔디)
+  const floor=new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W,ROOM_D),lambert({map:TEX.grass}));
+  floor.rotation.x=-Math.PI/2; mapRoot.add(floor); samplables.push(floor);
+  
+  // 2) 천장 (하늘)
+  const ceil=new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W,ROOM_D),lambert({color:0x8fd4ff}));
+  ceil.rotation.x=Math.PI/2; ceil.position.y=WALL_H; mapRoot.add(ceil);
+  
+  // 3) 보이지 않는 방 벽 (경계 탈출 방지용 AABB 충돌체)
+  addAABBCollider(0, WALL_H/2, -ROOM_D/2-1, ROOM_W, WALL_H, 2);
+  addAABBCollider(0, WALL_H/2, ROOM_D/2+1, ROOM_W, WALL_H, 2);
+  addAABBCollider(-ROOM_W/2-1, WALL_H/2, 0, 2, WALL_H, ROOM_D);
+  addAABBCollider(ROOM_W/2+1, WALL_H/2, 0, 2, WALL_H, ROOM_D);
+  
+  // 4) 나무 펜스 (시각적 울타리)
+  const fenceMat=lambert({color:0xd5b08c});
+  const postMat=lambert({color:0xa5805c});
+  for(let x=-ROOM_W/2; x<=ROOM_W/2; x+=8){
+    addBox(0.6, 6, 0.6, postMat, x, 3, -ROOM_D/2+0.5, {collide:true});
+    addBox(0.6, 6, 0.6, postMat, x, 3, ROOM_D/2-0.5, {collide:true});
+    if(x < ROOM_W/2) {
+      addBox(8, 0.4, 0.2, fenceMat, x+4, 4.5, -ROOM_D/2+0.5, {collide:true});
+      addBox(8, 0.4, 0.2, fenceMat, x+4, 2.0, -ROOM_D/2+0.5, {collide:true});
+      addBox(8, 0.4, 0.2, fenceMat, x+4, 4.5, ROOM_D/2-0.5, {collide:true});
+      addBox(8, 0.4, 0.2, fenceMat, x+4, 2.0, ROOM_D/2-0.5, {collide:true});
+    }
+  }
+  for(let z=-ROOM_D/2; z<=ROOM_D/2; z+=8){
+    addBox(0.6, 6, 0.6, postMat, -ROOM_W/2+0.5, 3, z, {collide:true});
+    addBox(0.6, 6, 0.6, postMat, ROOM_W/2-0.5, 3, z, {collide:true});
+    if(z < ROOM_D/2) {
+      addBox(0.2, 0.4, 8, fenceMat, -ROOM_W/2+0.5, 4.5, z+4, {collide:true});
+      addBox(0.2, 0.4, 8, fenceMat, -ROOM_W/2+0.5, 2.0, z+4, {collide:true});
+      addBox(0.2, 0.4, 8, fenceMat, ROOM_W/2-0.5, 4.5, z+4, {collide:true});
+      addBox(0.2, 0.4, 8, fenceMat, ROOM_W/2-0.5, 2.0, z+4, {collide:true});
+    }
+  }
+
+  // 5) 구조물 배치
+  // 🌳 나무 4그루
+  const leavesMat=lambert({color:0x3f8a4f});
+  const trunkMat=lambert({color:0x80593f});
+  const treePositions = [
+    [-40, -25], [40, -25], [-40, 25], [40, 25]
+  ];
+  treePositions.forEach(([tx, tz]) => {
+    addCyl(1.2, 10, trunkMat, tx, 5, tz, {rt:0.8, collide:true});
+    addBox(7, 5, 7, leavesMat, tx, 12, tz, {collide:true});
+    addBox(5, 4, 5, leavesMat, tx, 16, tz, {collide:true});
+    addBox(3, 3, 3, leavesMat, tx, 19, tz, {collide:true});
+  });
+
+  // ⚽ 축구 골대 2개 (좌우)
+  const goalFrameMat=lambert({color:0xffffff});
+  const goalNetMat=lambert({color:0xdddddd, transparent:true, opacity:0.45});
+  // 왼쪽 골대
+  addCyl(0.3, 7, goalFrameMat, -50, 3.5, -6, {collide:true});
+  addCyl(0.3, 7, goalFrameMat, -50, 3.5, 6, {collide:true});
+  addCyl(0.3, 12.6, goalFrameMat, -50, 7, 0, {rx:Math.PI/2, collide:true});
+  addBox(4, 0.1, 12, goalNetMat, -52, 7, 0, {collide:true});
+  addBox(0.1, 7, 12, goalNetMat, -54, 3.5, 0, {collide:true});
+  addBox(4, 7, 0.1, goalNetMat, -52, 3.5, -6, {collide:true});
+  addBox(4, 7, 0.1, goalNetMat, -52, 3.5, 6, {collide:true});
+
+  // 오른쪽 골대
+  addCyl(0.3, 7, goalFrameMat, 50, 3.5, -6, {collide:true});
+  addCyl(0.3, 7, goalFrameMat, 50, 3.5, 6, {collide:true});
+  addCyl(0.3, 12.6, goalFrameMat, 50, 7, 0, {rx:Math.PI/2, collide:true});
+  addBox(4, 0.1, 12, goalNetMat, 52, 7, 0, {collide:true});
+  addBox(0.1, 7, 12, goalNetMat, 54, 3.5, 0, {collide:true});
+  addBox(4, 7, 0.1, goalNetMat, 52, 3.5, -6, {collide:true});
+  addBox(4, 7, 0.1, goalNetMat, 52, 3.5, 6, {collide:true});
+
+  // 🏀 농구대
+  const hoopMat=lambert({color:0xff6600});
+  const ironMat=lambert({color:0x333333});
+  addCyl(0.5, 14, ironMat, 35, 7, -30, {collide:true});
+  addBox(0.2, 4, 6, goalFrameMat, 35, 13, -30, {collide:true});
+  addBox(1.5, 0.1, 1.5, hoopMat, 34, 11.5, -30, {collide:true});
+
+  // 🛝 미끄럼틀
+  const slideFrameMat=lambert({color:0x4a7fb5});
+  const slidePlateMat=lambert({color:0xe64545});
+  for(let i=0; i<5; i++){
+    addBox(3, 1, 1, slideFrameMat, 0, 0.5+i, -10-i, {collide:true});
+  }
+  addBox(3.2, 0.4, 3.2, slideFrameMat, 0, 5, -15, {collide:true});
+  addCyl(0.2, 5, ironMat, -1.4, 2.5, -16.4, {collide:true});
+  addCyl(0.2, 5, ironMat, 1.4, 2.5, -16.4, {collide:true});
+  for(let i=0; i<6; i++){
+    addBox(2.8, 0.5, 2, slidePlateMat, 0, 4.5-i*0.75, -17.5-i*1.8, {collide:true});
+  }
+
+  // 🧗 정글짐
+  const jgymMat=lambert({color:0xdcf5d9});
+  for(let x=-31; x<=-22; x+=3){
+    for(let z=9; z<=18; z+=3){
+      addCyl(0.12, 7.5, ironMat, x, 3.75, z, {collide:true});
+    }
+  }
+  for(let y=2.5; y<=7.5; y+=2.5){
+    for(let x=-31; x<=-22; x+=3){
+      addCyl(0.1, 9, ironMat, x, y, 13.5, {rx:Math.PI/2, collide:true});
+    }
+    for(let z=9; z<=18; z+=3){
+      addCyl(0.1, 9, ironMat, -26.5, y, z, {rz:Math.PI/2, collide:true});
+    }
+  }
+  addBox(9.6, 0.2, 9.6, jgymMat, -26.5, 7.6, 13.5, {collide:true});
+
+  // 🪑 벤치 3개
+  const woodBenchMat=lambert({color:0xb58253});
+  const benchPositions = [
+    [0, 25], [-20, -30], [20, 30]
+  ];
+  benchPositions.forEach(([bx, bz]) => {
+    addBox(8, 0.4, 2.2, woodBenchMat, bx, 1.2, bz, {collide:true});
+    addBox(8, 1.8, 0.3, woodBenchMat, bx, 2.3, bz+0.9, {collide:true});
+    addBox(0.4, 1.2, 2.2, ironMat, bx-3.6, 0.6, bz, {collide:true});
+    addBox(0.4, 1.2, 2.2, ironMat, bx+3.6, 0.6, bz, {collide:true});
+  });
+
+  // 🏠 체육 창고
+  const houseWallMat=lambert({color:0xe5dec9});
+  const houseRoofMat=lambert({color:0x4a7fb5});
+  addBox(12, 10, 0.5, houseWallMat, -45, 5, 36, {collide:true});
+  addBox(0.5, 10, 12, houseWallMat, -51, 5, 30, {collide:true});
+  addBox(0.5, 10, 12, houseWallMat, -39, 5, 30, {collide:true});
+  addBox(4.5, 10, 0.5, houseWallMat, -48.75, 5, 24, {collide:true});
+  addBox(4.5, 10, 0.5, houseWallMat, -41.25, 5, 24, {collide:true});
+  addBox(13, 1, 13, houseRoofMat, -45, 10.5, 30, {collide:true});
+  addBox(2.2, 3, 3.6, woodBenchMat, -45, 1.5, 30, {collide:true});
+
+  // 🏗️ 타이어 장애물
+  const tireMat=lambert({color:0x2b2b2b});
+  addCyl(2, 1.2, tireMat, 25, 0.6, 15, {collide:true});
+  addCyl(2, 1.2, tireMat, 27, 0.6, 17, {collide:true});
+  addCyl(2, 1.2, tireMat, 26, 1.8, 16, {collide:true});
+
+  // 🚰 음수대 (refillZone 1)
+  const fountainMat=lambert({color:0x8a9ba8});
+  addBox(2.5, 2.5, 2.5, fountainMat, -15, 1.25, -10, {collide:true});
+  addCyl(0.1, 0.5, ironMat, -15, 2.7, -10, {collide:true});
+  refillZones.push({x:-15, z:-10, r:6, yMin:0, yMax:6, label:"음수대"});
+
+  // 🏖️ 모래 놀이터 + 리필존 2
+  const sandBorderMat=lambert({color:0xa5704c});
+  const sandMesh=new THREE.Mesh(new THREE.PlaneGeometry(16, 16), lambert({map:TEX.sand}));
+  sandMesh.rotation.x=-Math.PI/2;
+  sandMesh.position.set(15, 0.05, -15);
+  mapRoot.add(sandMesh);
+  samplables.push(sandMesh);
+  
+  addBox(17, 0.8, 0.8, sandBorderMat, 15, 0.4, -23.4, {collide:true});
+  addBox(17, 0.8, 0.8, sandBorderMat, 15, 0.4, -6.6, {collide:true});
+  addBox(0.8, 0.8, 16, sandBorderMat, 6.6, 0.4, -15, {collide:true});
+  addBox(0.8, 0.8, 16, sandBorderMat, 23.4, 0.4, -15, {collide:true});
+  
+  refillZones.push({x:15, z:-15, r:8, yMin:0, yMax:4, label:"모래 놀이터"});
+
+  // 🏃 육상 트랙 라인 장식
+  const trackMat=lambert({color:0xffffff});
+  const trackW=1.2;
+  const drawTrackRect = (cx, cz, w, d) => {
+    const t1=new THREE.Mesh(new THREE.PlaneGeometry(w, trackW), trackMat);
+    t1.rotation.x=-Math.PI/2; t1.position.set(cx, 0.02, cz-d/2); mapRoot.add(t1);
+    const t2=new THREE.Mesh(new THREE.PlaneGeometry(w, trackW), trackMat);
+    t2.rotation.x=-Math.PI/2; t2.position.set(cx, 0.02, cz+d/2); mapRoot.add(t2);
+    const t3=new THREE.Mesh(new THREE.PlaneGeometry(trackW, d), trackMat);
+    t3.rotation.x=-Math.PI/2; t3.position.set(cx-w/2, 0.02, cz); mapRoot.add(t3);
+    const t4=new THREE.Mesh(new THREE.PlaneGeometry(trackW, d), trackMat);
+    t4.rotation.x=-Math.PI/2; t4.position.set(cx+w/2, 0.02, cz); mapRoot.add(t4);
+  };
+  drawTrackRect(0, 0, 96, 68);
+  drawTrackRect(0, 0, 92, 64);
+
+  // 6) 스폰 위치 설정
+  seekerSpawns.push(
+    new THREE.Vector3(0, 0, 10),
+    new THREE.Vector3(-15, 0, 15),
+    new THREE.Vector3(15, 0, 15)
+  );
+
+  hiderSpawns = [
+    [-45, -30], [-35, -30], [45, -30], [35, -30],
+    [-45, 20], [-45, 30], [45, 20], [45, 30],
+    [0, 20], [-20, 20], [20, 20],
+    [-25, 12], [25, 12],
+    [0, -18], [-15, -12], [15, -18]
+  ].map(p => new THREE.Vector3(p[0], 0, p[1]));
+  
+  // 7) 스프링클러 기믹 빌드
+  buildSprinklerMeshes();
+}
+
+function buildSprinklerMeshes(){
+  Sprinklers = [];
+  const nozzleMat = lambert({color: 0x555555});
+  const waterColorMat = lambert({color: 0x4aa8ff, transparent: true, opacity: 0.6});
+  
+  const posList = [
+    {x: 0, z: 0},
+    {x: -30, z: -5},
+    {x: 30, z: 5}
+  ];
+  
+  posList.forEach(pos => {
+    addCyl(0.6, 0.4, nozzleMat, pos.x, 0.2, pos.z, {collide: true});
+    addCyl(0.3, 0.5, nozzleMat, pos.x, 0.65, pos.z, {collide: false});
+    
+    const waterGroup = new THREE.Group();
+    waterGroup.position.set(pos.x, 0.8, pos.z);
+    
+    const streams = [];
+    for(let i=0; i<4; i++){
+      const stream = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.3, 15, 6), waterColorMat);
+      stream.rotation.z = Math.PI/2.5;
+      stream.rotation.y = (Math.PI/2) * i;
+      stream.translateY(7.5);
+      waterGroup.add(stream);
+      streams.push(stream);
+    }
+    
+    waterGroup.visible = false;
+    mapRoot.add(waterGroup);
+    
+    Sprinklers.push({
+      x: pos.x,
+      z: pos.z,
+      waterGroup,
+      streams
+    });
+  });
+}
+
+function updatePlaygroundGimmick(dt){
+  if(!Sprinklers.length) return;
+  
+  const cycle = 60;
+  const t = (Net.now ? Net.now() : Date.now()) / 1000;
+  const sec = t % cycle;
+  
+  const warningTime = 27;
+  const activeTime = 30;
+  
+  if(sec >= warningTime && sec < activeTime) {
+    const timeRemain = Math.ceil(activeTime - sec);
+    if(G.screen === "GAME") {
+      const alertDiv = $("centerAlert");
+      if(alertDiv) {
+        alertDiv.textContent = `💧 스프링클러 가동 ${timeRemain}초 전!`;
+        alertDiv.classList.remove("hidden");
+      }
+    }
+  } else {
+    if(currentMapId === "playground" && G.screen === "GAME") {
+      const alertDiv = $("centerAlert");
+      if(alertDiv && !alertDiv.classList.contains("hidden") && !alertDiv.textContent.includes("정전")) {
+        alertDiv.classList.add("hidden");
+      }
+    }
+  }
+  
+  const isActive = sec >= activeTime;
+  let amISprinkled = false;
+  
+  Sprinklers.forEach(sp => {
+    if(isActive) {
+      sp.waterGroup.visible = true;
+      sp.waterGroup.rotation.y += dt * 1.5;
+      
+      const dx = G.pos.x - sp.x;
+      const dz = G.pos.z - sp.z;
+      const dist = Math.hypot(dx, dz);
+      if(dist < 15 && G.pos.y < 5) {
+        amISprinkled = true;
+        if(Math.random() < 0.2) {
+          Audio2.sfxSpray();
+          burst(new THREE.Vector3(G.pos.x, G.pos.y + 1, G.pos.z), "#4aa8ff", 2, 2.5, 0.4);
+        }
+      }
+    } else {
+      sp.waterGroup.visible = false;
+    }
+  });
+  
+  G.onSprinkler = amISprinkled;
+}
+
+function playgroundCleanup(){
+  Sprinklers = [];
+  G.onSprinkler = false;
+}
+
 function pingpong(t,period,lo,hi){
   const half=period/2, ph=((t%period)+period)%period, span=hi-lo;
   return ph<half ? lo+span*(ph/half) : hi-span*((ph-half)/half);
@@ -1989,6 +2318,7 @@ function updateMapGimmicks(dt){
   if(currentMapId==="science") updateScienceLabGimmick(dt); else sciCleanup();
   if(currentMapId==="cafeteria"){ updateSlipZones(dt); updateConveyor(dt); updateSteam(dt); } else steamCleanup();
   if(currentMapId!=="library") cartCleanup(); else updateBookCarts(dt);
+  if(currentMapId==="playground") updatePlaygroundGimmick(dt); else playgroundCleanup();
 }
 
 /* ================= v2: 멀티 맵 레지스트리 ================= */
@@ -1999,6 +2329,7 @@ const MAPS={
   science:{ id:"science", name:"과학실", icon:"🧪", type:"canvas", build:buildScienceLab },
   cafeteria:{ id:"cafeteria", name:"급식실", icon:"🍚", type:"canvas", build:buildCafeteria },
   library:{ id:"library", name:"도서관", icon:"📚", type:"canvas", build:buildLibrary },
+  playground:{ id:"playground", name:"운동장", icon:"🛝", type:"canvas", build:buildPlayground },
 };
 function mapIsReady(id){ const m=MAPS[id]; if(!m)return false; return m.type==="canvas"?true:!!(m.glbBase64&&m.glbBase64.length>100); }
 let currentMapId="classroom";
@@ -2365,6 +2696,7 @@ const G={
   remainMs:0, phaseEndsAt:0, serverOffset:0,
   tvMode:false,                                   // v2: 선생님 TV 전체 조망 모드
   joinedMidgame:false,                            // v2: 게임 도중 합류(재입장) 시 스폰 재배치 표시
+  onSprinkler:false,                              // 운동장 스프링클러 적용 여부
 };
 let foundLog=[];  // v2: TV HUD용 최근 발견 로그 (최대 5개)
 let tvYaw=0, tvDragActive=false, tvDragStartX=0, tvDragStartYaw=0;
@@ -2834,7 +3166,8 @@ function updateMovement(dt){
     }
     return;
   }
-  const baseSpeed=G.role==="seeker"?7.2:(G.pose==="lie"?2.8:5.6);
+  let baseSpeed=G.role==="seeker"?7.2:(G.pose==="lie"?2.8:5.6);
+  if(G.onSprinkler) baseSpeed *= 0.5;
   const speed=ghost?13.5:baseSpeed;
   const f=new THREE.Vector3(-Math.sin(G.yaw),0,-Math.cos(G.yaw));
   const rgt=new THREE.Vector3(-f.z,0,f.x);
@@ -4291,11 +4624,26 @@ function describeLibraryPosition(p){
   if(Math.abs(p.x)<12&&Math.abs(p.z)<20)return "열람 테이블 근처"+high;
   return "도서관 한쪽 구석"+high;
 }
+function describePlaygroundPosition(p){
+  const high=p.y>15?" · 높은 곳":p.y>6?" · 놀이기구 위":"";
+  if(p.x<-39&&p.z>24)return "체육 창고 안"+high;
+  if(p.x<-35&&p.z<-15)return "서쪽 나무 그늘 근처"+high;
+  if(p.x>35&&p.z<-15)return "동쪽 농구대와 나무 근처"+high;
+  if(p.x<-42&&Math.abs(p.z)<=15)return "서쪽 축구 골대 근처"+high;
+  if(p.x>42&&Math.abs(p.z)<=15)return "동쪽 축구 골대 근처"+high;
+  if(Math.abs(p.x)<10&&p.z<-6)return "미끄럼틀 주변"+high;
+  if(p.x>18&&p.x<32&&p.z>10&&p.z<22)return "타이어 장애물 사이"+high;
+  if(p.x>-32&&p.x<-20&&p.z>8&&p.z<20)return "정글짐 안쪽"+high;
+  if(Math.abs(p.x-15)<9&&Math.abs(p.z+15)<9)return "모래 놀이터 안"+high;
+  if(Math.abs(p.x)<5&&Math.abs(p.z-25)<5)return "벤치 쉼터 근처"+high;
+  return "운동장 한쪽 구석"+high;
+}
 /* 결과 화면 위치 설명 — 현재 맵에 맞는 설명 함수로 분기(전엔 항상 교실 기준으로 설명되던 문제 수정) */
 function describeHidePosition(p){
   if(currentMapId==="science")return describeSciencePosition(p);
   if(currentMapId==="cafeteria")return describeCafeteriaPosition(p);
   if(currentMapId==="library")return describeLibraryPosition(p);
+  if(currentMapId==="playground")return describePlaygroundPosition(p);
   return describeClassroomPosition(p);
 }
 function buildResultRevealList(){
