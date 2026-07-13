@@ -2920,7 +2920,7 @@ const G={
   pose:"stand", mirror:false,
   paint:1000, brush:10, color:"#4A7FB5",
   found:false, texUploaded:false,
-  yaw:0, pitch:0,
+  yaw:0, pitch:0, fairyYaw:0,
   pos:new THREE.Vector3(0,0,0), vy:0, grounded:false,
   moveIn:{x:0,z:0}, jumpReq:false, flying:false, flyUp:false, flyDown:false,
   lastJumpTap:0,lastFlyDownTap:0,lobbyPractice:false,
@@ -3046,7 +3046,7 @@ function syncLocalFairy(){
 
   // 자유 관전 중에는 지우개 본체의 위치·회전·포즈를 입장 순간 값으로 완전히 고정합니다.
   const p=G.spectating?G.specAnchorPos:G.pos;
-  const yaw=G.spectating?G.specAnchorYaw:G.yaw;
+  const yaw=G.spectating?G.specAnchorYaw:G.fairyYaw;
   const pose=G.spectating?G.specAnchorPose:G.pose;
   myFairy.group.position.set(p.x,p.y,p.z);
   myFairy.group.userData.baseY=p.y;
@@ -3415,6 +3415,22 @@ function updateMovement(dt){
   const rgt=new THREE.Vector3(-f.z,0,f.x);
   const dir=new THREE.Vector3().addScaledVector(f,G.moveIn.z).addScaledVector(rgt,G.moveIn.x);
   if(dir.lengthSq()>0)dir.normalize();
+
+  // 움직일 때 몸 방향(fairyYaw) 자연스럽게 보간
+  if(!G.spectating){
+    if(isHiderThirdPerson()){
+      if(dir.lengthSq() > 0.01 && speed > 0){
+        const targetYaw = Math.atan2(-dir.x, -dir.z);
+        let diff = targetYaw - G.fairyYaw;
+        while(diff < -Math.PI) diff += Math.PI * 2;
+        while(diff > Math.PI) diff -= Math.PI * 2;
+        G.fairyYaw += diff * dt * 8.5; // 자연스러운 보간 속도
+      }
+    } else {
+      // 1인칭 뷰에서는 시선 방향과 일치
+      G.fairyYaw = G.yaw;
+    }
+  }
 
   if(G.spectating){
     const specSpeed=10.5;
@@ -4368,7 +4384,7 @@ const Net={
     if(G.lobbyPractice||G.role==="ghost"||G.spectating)return;
     if(G.role==="seeker"&&G.phase==="PAINT")return; // 술래는 숨는 시간에 스폰 전
     const pi=["stand","lie","lean","roll","fold","roll_lie"].indexOf(G.pose);
-    const str=[G.pos.x.toFixed(2),G.pos.y.toFixed(2),G.pos.z.toFixed(2),(G.yaw%(Math.PI*2)).toFixed(2),pi,G.flying?1:0,G.zombieState||0].join(",");
+    const str=[G.pos.x.toFixed(2),G.pos.y.toFixed(2),G.pos.z.toFixed(2),(G.fairyYaw%(Math.PI*2)).toFixed(2),pi,G.flying?1:0,G.zombieState||0].join(",");
     if(str===G.lastPosSent)return;
     G.lastPosSent=str;
     this.positions[this.uid]=str;
