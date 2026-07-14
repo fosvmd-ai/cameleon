@@ -456,13 +456,13 @@ if (typeof window.TEACHER_CODE === "undefined" || !window.TEACHER_CODE) window.T
     <div id="mapCardBox" class="mapCardBox"></div>
 
     <div id="settingsBox" class="settingsBox">
-      <div class="settingsRow">
-        <label>🙈 숨는 시간</label>
+      <div class="settingsRow" id="paintSecRow">
+        <label id="paintSecLabel">🙈 숨는 시간</label>
         <input type="range" id="paintSecSlider" min="30" max="180" step="10" value="60">
         <span id="paintSecVal" class="settingsVal">1분</span>
       </div>
-      <div class="settingsRow">
-        <label>🔍 찾는 시간</label>
+      <div class="settingsRow" id="seekSecRow">
+        <label id="seekSecLabel">🔍 찾는 시간</label>
         <input type="range" id="seekSecSlider" min="60" max="300" step="10" value="180">
         <span id="seekSecVal" class="settingsVal">3분</span>
       </div>
@@ -5141,18 +5141,29 @@ function enterPaint(){
   [...remotes.keys()].forEach(removeRemote); // 라운드 리셋
   const me=Net.mode==="online"?Net.players[Net.uid]:{role:G.role};
   G.role=me.role||"hider";
+
+  const gm = Net.meta?.settings?.gameMode || "hide";
+
   if(G.role==="hider"){
     const idx=Math.abs(hashUid(Net.uid||"p"))%hiderSpawns.length;
     G.pos.copy(hiderSpawns[idx]); G.vy=0;
-    showRoleCard("🧼 당신은 지우개!","몸에 물감을 칠하고 교실에 숨자!");
+    if (gm === "zombie") {
+      showRoleCard("🏃 준비 시간","잠시 후 좀비가 선정됩니다! 도망갈 준비를 하세요!");
+    } else if (gm === "splatoon") {
+      showRoleCard("🎨 팀 배정 완료!","곧 색칠 배틀이 시작됩니다!");
+    } else {
+      showRoleCard("🧼 당신은 지우개!","몸에 물감을 칠하고 교실에 숨자!");
+    }
     $("paintPanel").classList.remove("hidden");
     $("blockOverlay").classList.add("hidden");
     stopCaseGame();
   }else if(G.role==="seeker"){
-    showRoleCard("✏️ 당신은 술래 연필!","지우개들이 숨는 동안 필통에서 대기!");
-    $("blockOverlay").classList.remove("hidden");
-    $("paintPanel").classList.add("hidden");
-    startCaseGame();
+    if (gm === "hide") {
+      showRoleCard("✏️ 당신은 술래 연필!","지우개들이 숨는 동안 필통에서 대기!");
+    }
+    $("blockOverlay").classList.toggle("hidden", gm !== "hide");
+    $("paintPanel").classList.toggle("hidden", gm === "hide");
+    if (gm === "hide") startCaseGame(); else stopCaseGame();
   }else{ // ghost
     G.pos.set(0,20,20);
     $("blockOverlay").classList.add("hidden");
@@ -5160,7 +5171,15 @@ function enterPaint(){
     stopCaseGame();
     showRoleCard("👀 참관 모드","WASD로 이동 · Space 상승 · Shift 하강! 자유롭게 둘러보세요.");
   }
-  $("phaseLabel").textContent=G.role==="seeker"?"숨는 중...":"🎨 칠하고 숨기!";
+
+  if (gm === "zombie") {
+    $("phaseLabel").textContent = "🏃 준비 시간 — 좀비 선정 대기 중...";
+  } else if (gm === "splatoon") {
+    $("phaseLabel").textContent = "🎨 팀 배정 중...";
+  } else {
+    $("phaseLabel").textContent=G.role==="seeker"?"숨는 중...":"🎨 칠하고 숨기!";
+  }
+
   Music.start("PAINT");
   G.joinedMidgame=false;  // 숨는 시간엔 항상 정상 스폰되므로 도중합류 표시 해제
   syncLocalFairy();
@@ -5173,6 +5192,9 @@ function enterSeek(){
   $("blockOverlay").classList.add("hidden");
   $("paintPanel").classList.toggle("hidden",G.role!=="hider"||G.found);
   G.lastPosSent="";
+
+  const gm = Net.meta?.settings?.gameMode || "hide";
+
   if(G.role==="seeker"){
     // v2: 다중 술래 — seekerOrder 내 내 순서에 맞는 스폰 지점에 겹치지 않게 배치
     const order=(Net.mode==="online"&&Net.meta.seekerOrder)||[];
@@ -5180,7 +5202,10 @@ function enterSeek(){
     if(idx<0)idx=Math.abs(hashUid(Net.uid||"s"))%Math.max(1,seekerSpawns.length);
     const sp=seekerSpawns[idx%Math.max(1,seekerSpawns.length)]||seekerSpawns[0]||new THREE.Vector3(50,0,0);
     G.pos.copy(sp); G.vy=0; G.yaw=Math.PI;
-    showRoleCard("🔍 찾아라!",IS_TOUCH?"연필로 콕 찍어 지우개를 찾자! (다른 술래와 힘을 합치자)":"마우스 커서 = 조준점! 누른 채 드래그하면 회전, 그대로 떼면 콕! 다른 술래와 협동하자!"); }
+    if (gm === "hide") {
+      showRoleCard("🔍 찾아라!",IS_TOUCH?"연필로 콕 찍어 지우개를 찾자! (다른 술래와 힘을 합치자)":"마우스 커서 = 조준점! 누른 채 드래그하면 회전, 그대로 떼면 콕! 다른 술래와 협동하자!");
+    }
+  }
   else if(G.role==="hider"){
     // 도중 합류한 지우개(재입장 등)는 아직 교실에 자리가 없으므로 숨는 스폰 지점에 새로 배치합니다.
     if(G.joinedMidgame){
@@ -5188,9 +5213,23 @@ function enterSeek(){
       G.pos.copy(hiderSpawns[idx]); G.vy=0; G.pose="stand";
       G.joinedMidgame=false;
     }
-    showRoleCard("🤫 들키지 마!","게임 도중 합류! 얼른 숨을 곳을 찾자!");
+    if (gm === "zombie") {
+      showRoleCard("🧟 좀비 출현!","좀비에게 잡히지 않게 도망치세요!");
+    } else if (gm === "splatoon") {
+      showRoleCard("🎨 색칠 시작!","팀 색으로 맵을 최대한 많이 칠하세요!");
+    } else {
+      showRoleCard("🤫 들키지 마!","게임 도중 합류! 얼른 숨을 곳을 찾자!");
+    }
   }
-  $("phaseLabel").textContent="🔍 술래가 찾는 중!";
+
+  if (gm === "zombie") {
+    $("phaseLabel").textContent = "🧟 좀비 생존 시간!";
+  } else if (gm === "splatoon") {
+    $("phaseLabel").textContent = "🎨 색칠 배틀 진행 중!";
+  } else {
+    $("phaseLabel").textContent="🔍 술래가 찾는 중!";
+  }
+
   Music.start("SEEK"); Music.up=false;
   syncLocalFairy();
   updateMobileButtons();
@@ -5483,9 +5522,9 @@ function refreshLobbyGrid(){
     const pr=Net.presence[u];return u===Net.uid||(pr&&pr.online!==false&&typeof pr.lastSeen==="number"&&now-pr.lastSeen<20000);
   });
   const manualSeekers=Net.meta.manualSeekers||{};
+  const gameMode = Net.meta.settings?.gameMode || "hide";
   entries.forEach(([u,p])=>{
     const d=document.createElement("div");
-    const gameMode = Net.meta.settings?.gameMode || "hide";
     const isSeekerPick=gameMode === "hide" && !!manualSeekers[u];
     const pickable=G.isHost&&u!==Net.uid&&gameMode==="hide";
     d.className="pchip"+(u===Net.meta.host?" host":"")+(isSeekerPick?" seeker":"")+(pickable?" pickable":"");
@@ -5493,6 +5532,12 @@ function refreshLobbyGrid(){
     if(pickable){
       d.title="눌러서 술래 지정/해제";
       d.onclick=()=>{Audio2.resume();Net.toggleManualSeeker(u);};
+      const kick=document.createElement("button");
+      kick.className="kickBtn";kick.textContent="강퇴";kick.title=`${p.nick||"참가자"} 내보내기`;
+      kick.onclick=e=>{e.stopPropagation();Net.kickPlayer(u);};
+      d.appendChild(kick);
+    } else if(G.isHost&&u!==Net.uid) {
+      // 좀비/스플래툰 모드에서도 강퇴 버튼은 표시
       const kick=document.createElement("button");
       kick.className="kickBtn";kick.textContent="강퇴";kick.title=`${p.nick||"참가자"} 내보내기`;
       kick.onclick=e=>{e.stopPropagation();Net.kickPlayer(u);};
@@ -5520,6 +5565,23 @@ function refreshLobbySettingsUI(){
   $("selInkTeams").value=settings.teamCount||2;
   $("selInkTeams").disabled=!G.isHost;
   $("inkTeamRow").classList.toggle("hidden",gameMode!=="splatoon");
+
+  // ── 게임모드별 슬라이더 레이블 및 표시/숨김 분기 ──
+  if (gameMode === "hide") {
+    $("paintSecRow").classList.remove("hidden");
+    $("seekSecRow").classList.remove("hidden");
+    $("paintSecLabel").textContent = "🙈 숨는 시간";
+    $("seekSecLabel").textContent = "🔍 찾는 시간";
+  } else if (gameMode === "zombie") {
+    $("paintSecRow").classList.remove("hidden");
+    $("seekSecRow").classList.remove("hidden");
+    $("paintSecLabel").textContent = "🏃 준비 시간";
+    $("seekSecLabel").textContent = "🧟 생존 시간";
+  } else if (gameMode === "splatoon") {
+    $("paintSecRow").classList.add("hidden");
+    $("seekSecRow").classList.remove("hidden");
+    $("seekSecLabel").textContent = "🎨 색칠 시간";
+  }
 
   $("paintSecVal").textContent=fmtMinSec(+$("paintSecSlider").value);
   $("seekSecVal").textContent=fmtMinSec(+$("seekSecSlider").value);
@@ -5587,10 +5649,22 @@ function updateHUD(){
   if(G.tvMode){
     $("tvTimer").textContent=(G.phase==="PAINT"||G.phase==="SEEK")?fmtTime(G.remainMs):"--:--";
     const hidersArr=Object.values(Net.players||{}).filter(p=>p.role==="hider");
-    const remainN=hidersArr.filter(p=>!p.found).length;
-    $("tvRemain").textContent=`남은 요정: ${remainN} / ${hidersArr.length}`;
+    const tvGm = Net.meta?.settings?.gameMode || "hide";
+    if (tvGm === "zombie") {
+      const aliveN=hidersArr.filter(p=>(p.zombieState||0)===0).length;
+      $("tvRemain").textContent=`생존자: ${aliveN} / ${hidersArr.length}`;
+    } else if (tvGm === "splatoon") {
+      $("tvRemain").textContent=`참가자: ${hidersArr.length}명`;
+    } else {
+      const remainN=hidersArr.filter(p=>!p.found).length;
+      $("tvRemain").textContent=`남은 요정: ${remainN} / ${hidersArr.length}`;
+    }
     const logBox=$("tvLog"); logBox.innerHTML="";
-    foundLog.forEach(nm=>{ const d=document.createElement("div"); d.textContent=`🔎 ${nm} 발견!`; logBox.appendChild(d); });
+    if (tvGm === "hide") {
+      foundLog.forEach(nm=>{ const d=document.createElement("div"); d.textContent=`🔎 ${nm} 발견!`; logBox.appendChild(d); });
+    } else if (tvGm === "zombie") {
+      foundLog.forEach(nm=>{ const d=document.createElement("div"); d.textContent=`🧟 ${nm} 감염!`; logBox.appendChild(d); });
+    }
   }
   // 타이머
   let remain=0;
@@ -5999,6 +6073,25 @@ $("tvFollowWide").onclick=()=>{Audio2.resume();tvCycleFollow(0);};
 function updateTeacherPanelUI(){
   const show=G.isHost&&G.screen==="GAME"&&Net.mode==="online";
   $("teacherPanel").classList.toggle("hidden",!show);
+
+  // ── 게임모드별 선생님 패널 버튼 레이블 동적 갱신 ──
+  const tpGm = Net.meta?.settings?.gameMode || "hide";
+  const bpn = $("btnEndPaintNow");
+  const bsn = $("btnEndSeekNow");
+  if (bpn && bsn) {
+    if (tpGm === "zombie") {
+      bpn.textContent = "🏃 준비 시간 즉시 종료";
+      bsn.textContent = "🧟 생존 시간 즉시 종료";
+    } else if (tpGm === "splatoon") {
+      bpn.style.display = "none";
+      bsn.textContent = "🎨 색칠 시간 즉시 종료";
+    } else {
+      bpn.style.display = "";
+      bpn.textContent = "🙈 숨는 시간 즉시 종료";
+      bsn.textContent = "🔍 찾는 시간 즉시 종료";
+    }
+  }
+
   // 얼음 버튼 상태 반영
   const fb=$("btnFreeze");
   if(fb){
@@ -6032,7 +6125,19 @@ function updateTeacherPanelUI(){
     }
     $("tvFollowName").textContent=label;
     // 숨는 시간(찾는 시간이 아닐 때)엔 위치가 드러나지 않도록 일부러 벽 밖 조망만 보여줍니다.
-    $("tvBlockedNotice").classList.toggle("hidden",G.phase==="SEEK");
+    const tvBn = $("tvBlockedNotice");
+    const tvBnGm = Net.meta?.settings?.gameMode || "hide";
+    if (tvBnGm === "zombie") {
+      tvBn.classList.toggle("hidden", G.phase==="SEEK");
+      tvBn.querySelector(".big").innerHTML = "🏃 준비 시간<br>좀비 선정 대기 중...";
+      tvBn.querySelector(".small").textContent = "곧 좀비가 선정되고 생존 게임이 시작됩니다!";
+    } else if (tvBnGm === "splatoon") {
+      tvBn.classList.toggle("hidden", G.phase==="SEEK");
+      tvBn.querySelector(".big").innerHTML = "🎨 팀 배정 중...";
+      tvBn.querySelector(".small").textContent = "곧 색칠 배틀이 시작됩니다!";
+    } else {
+      tvBn.classList.toggle("hidden", G.phase==="SEEK");
+    }
   }
 }
 function updateTVCamera(){
