@@ -2789,7 +2789,11 @@ function buildFairy(canvas,isPencil=false){
     new THREE.MeshBasicMaterial({map:shTex,transparent:true,depthWrite:false}));
   sh.rotation.x=-Math.PI/2; sh.position.y=0.02; sh.visible=false;
   // 위장 플레이에서 위치가 드러나지 않도록 캐릭터 그림자는 씬에 추가하지 않습니다.
-  return {group,parts,tex,mat,canvas,bodyM,arms:[aL,aR],legs:[lL,lR],shadow:sh,hitbox,nameLabel,zomEyes:zomEyesGroup,wings:{group:wingGroup,left:wingL,right:wingR},walkPhase:Math.random()*Math.PI*2};
+  const weaponHolder = new THREE.Group();
+  weaponHolder.position.set(0, -0.25, -0.1);
+  aR.add(weaponHolder);
+  
+  return {group,parts,tex,mat,canvas,bodyM,arms:[aL,aR],legs:[lL,lR],shadow:sh,hitbox,nameLabel,zomEyes:zomEyesGroup,wings:{group:wingGroup,left:wingL,right:wingR},weaponHolder,currentWeaponType:null,walkPhase:Math.random()*Math.PI*2};
 }
 function applyPoseToFairy(f,pose){
   f.group.rotation.x=0;
@@ -3126,6 +3130,7 @@ function updateRemotes(dt){
     applyZombieSkinToFairy(r.fairy,r.target.zombieState||0); // 좀비 스킨 적용
     const remoteSpeed=dt>0?Math.hypot(r.cur.x-oldX,r.cur.z-oldZ)/dt:0;
     animateFairyMovement(r.fairy,dt,remoteSpeed,r.target.pose,true,r.target.flying,r.target.zombieState||0);
+    updateFairyWeaponVisual(r.fairy, r.info.role, r.info.inkWeapon);
     if(r.fairy.nameLabel){
       r.fairy.nameLabel.visible=G.spectating&&r.info.role==="hider";
     }
@@ -3166,6 +3171,7 @@ function syncLocalFairy(){
   const showLocalNameLabel = (G.role === "hider" && !G.found && !G.spectating) && (!isSeeker && (G.flying || flyEnergy < 100));
   setFairyNameLabel(myFairy.nameLabel, G.nick||Net.nick||"나", flyEnergy, !isSeeker);
   myFairy.nameLabel.visible = showLocalNameLabel || (G.spectating && G.role === "hider" && !G.found);
+  updateFairyWeaponVisual(myFairy, G.role, G.inkWeapon);
 }
 function updateThirdPersonCamera(){
   syncLocalFairy();
@@ -5022,9 +5028,9 @@ const Net={
 
 /* ================= 페이즈 처리 ================= */
 async function onPhaseChange(phase,prev){
+  resetMovementInputs();
   if(G.lobbyPractice){
     G.lobbyPractice=false;
-    resetMovementInputs();
     $("btnPracticeReturn").classList.add("hidden");
     Music.stop();
   }
@@ -6842,6 +6848,9 @@ function updateWeaponBoxes(dt) {
         const newWep = filtered[Math.floor(Math.random() * filtered.length)];
         
         G.inkWeapon = newWep;
+        if (Net.mode === "online" && Net.db && Net.uid) {
+          Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/players/${Net.uid}/inkWeapon`), newWep).catch(()=>{});
+        }
         const wepInfo = INK_WEAPONS[newWep];
         toast(`🔫 무기 획득! [${wepInfo.name}]로 무기가 변경되었습니다!`);
         
@@ -6882,6 +6891,114 @@ function initWeaponBoxGame() {
   weaponBoxSpawns = [];
   weaponBoxSpawnTimer = 0;
   G.inkWeapon = "shooter"; 
+  if (Net.mode === "online" && Net.db && Net.uid) {
+    Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/players/${Net.uid}/inkWeapon`), "shooter").catch(()=>{});
+  }
+}
+
+/* ================================================================
+   🔫 3인칭 3D 무기 메쉬 빌더 및 갱신 시스템
+   ================================================================ */
+function buildThirdPersonWeaponMesh(weaponType) {
+  const group = new THREE.Group();
+  
+  if (weaponType === "seeker_pencil") {
+    const shaftMat = lambert({color: 0xF5C518, flatShading: true});
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.6, 6), shaftMat);
+    shaft.rotation.x = Math.PI / 2;
+    shaft.position.z = -0.2;
+    group.add(shaft);
+    const ferrule = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.1, 6), lambert({color: 0xe6e6ec}));
+    ferrule.rotation.x = Math.PI / 2;
+    ferrule.position.z = -0.55;
+    group.add(ferrule);
+    const eraser = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.12, 6), lambert({color: 0xff9fc0}));
+    eraser.rotation.x = Math.PI / 2;
+    eraser.position.z = -0.66;
+    group.add(eraser);
+    const tip = new THREE.Mesh(new THREE.CylinderGeometry(0.001, 0.08, 0.15, 6), lambert({color: 0xd9ab7e}));
+    tip.rotation.x = Math.PI / 2;
+    tip.position.z = 0.175;
+    group.add(tip);
+    const lead = new THREE.Mesh(new THREE.CylinderGeometry(0.001, 0.03, 0.05, 6), lambert({color: 0x222222}));
+    lead.rotation.x = Math.PI / 2;
+    lead.position.z = 0.25;
+    group.add(lead);
+  } else if (weaponType === "shooter") {
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 0.35), lambert({color: 0x4aa8ff}));
+    body.position.z = -0.1;
+    group.add(body);
+    const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.22, 8), lambert({color: 0xff7a00}));
+    tank.position.set(0, 0.11, -0.05);
+    tank.rotation.x = Math.PI / 2;
+    group.add(tank);
+  } else if (weaponType === "bomb") {
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), lambert({color: 0x22262a}));
+    body.position.z = -0.05;
+    group.add(body);
+    const pin = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.08, 0.04), lambert({color: 0xff3b30}));
+    pin.position.set(0, 0.14, -0.05);
+    group.add(pin);
+  } else if (weaponType === "slosher") {
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.09, 0.32, 8), lambert({color: 0x22262a}));
+    barrel.rotation.x = Math.PI / 2;
+    barrel.position.z = -0.12;
+    group.add(barrel);
+    const trim = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.05, 8), lambert({color: 0x4aa8ff}));
+    trim.rotation.x = Math.PI / 2;
+    trim.position.z = -0.27;
+    group.add(trim);
+  } else if (weaponType === "buckshot") {
+    const barrel1 = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.38, 6), lambert({color: 0x555555}));
+    barrel1.rotation.x = Math.PI / 2;
+    barrel1.position.set(-0.045, 0, -0.15);
+    group.add(barrel1);
+    const barrel2 = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.38, 6), lambert({color: 0x555555}));
+    barrel2.rotation.x = Math.PI / 2;
+    barrel2.position.set(0.045, 0, -0.15);
+    group.add(barrel2);
+    const stock = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.09, 0.15), lambert({color: 0x8b5a2b}));
+    stock.position.set(0, -0.03, 0.05);
+    group.add(stock);
+  } else if (weaponType === "roller") {
+    const cylinder = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.75, 8), lambert({color: 0x4aa8ff}));
+    cylinder.rotation.z = Math.PI / 2;
+    cylinder.position.set(0, 0, -0.45);
+    group.add(cylinder);
+    const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.45, 6), lambert({color: 0xcccccc}));
+    rod.rotation.x = Math.PI / 2;
+    rod.position.set(0, 0, -0.22);
+    group.add(rod);
+  }
+  
+  return group;
+}
+
+function updateFairyWeaponVisual(fairyObj, role, weaponType) {
+  if (!fairyObj.weaponHolder) return;
+  
+  let targetWeapon = null;
+  if (role === "seeker") {
+    targetWeapon = "seeker_pencil";
+  } else if (isInkMode()) {
+    targetWeapon = weaponType || "shooter";
+  }
+  
+  if (fairyObj.currentWeaponType === targetWeapon) return;
+  
+  while (fairyObj.weaponHolder.children.length > 0) {
+    fairyObj.weaponHolder.remove(fairyObj.weaponHolder.children[0]);
+  }
+  
+  fairyObj.currentWeaponType = targetWeapon;
+  
+  if (targetWeapon) {
+    const mesh = buildThirdPersonWeaponMesh(targetWeapon);
+    fairyObj.weaponHolder.add(mesh);
+    fairyObj.arms[1].rotation.x = -Math.PI / 2.5; 
+  } else {
+    fairyObj.arms[1].rotation.x = 0;
+  }
 }
 
 /* ================================================================
