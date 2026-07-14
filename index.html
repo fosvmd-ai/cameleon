@@ -428,6 +428,14 @@ if (typeof window.TEACHER_CODE === "undefined" || !window.TEACHER_CODE) window.T
     </div>
     <div class="row"><button id="btnPractice" class="secondary" style="font-size:14px;">🎨 혼자 연습 모드 (오프라인)</button></div>
     <div id="practiceBox" class="hidden" style="margin-top:12px;">
+      <div class="note" style="margin-bottom:2px;">연습할 게임 모드를 선택해 주세요</div>
+      <div class="row" style="margin-bottom:10px;">
+        <select id="selPracticeGameMode" style="padding:6px 10px; border:2px solid var(--ink); border-radius:6px; font-family:inherit; font-weight:bold; width:100%;">
+          <option value="hide">🙈 숨바꼭질 모드</option>
+          <option value="zombie">🧟 좀비 추격 모드</option>
+          <option value="splatoon">🎨 스플래툰 색칠 모드</option>
+        </select>
+      </div>
       <div class="note" style="margin-bottom:2px;">연습할 맵을 골라주세요</div>
       <div id="practiceMapBox" class="mapCardBox"></div>
       <div class="row" style="margin-top:10px;"><button id="btnPracticeStart" class="blue">▶ 이 맵으로 연습 시작</button></div>
@@ -988,10 +996,12 @@ function buildMap(){
   WALL_H=56;
   // 바닥
   let floorMat = lambert({map:TEX.floor});
-  if (isInkMode()) {
-    if (!sharedFloorTexture) initSharedFloorCanvas();
-    floorMat = lambert({map: sharedFloorTexture});
-  }
+  try {
+    if (typeof isInkMode === "function" && isInkMode()) {
+      if (!sharedFloorTexture) initSharedFloorCanvas();
+      floorMat = lambert({map: sharedFloorTexture});
+    }
+  } catch(e) { console.warn("buildMap isInkMode 안전 무시:",e); }
   const floor=new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W,ROOM_D),floorMat);
   floor.rotation.x=-Math.PI/2; mapRoot.add(floor); samplables.push(floor);
   // 천장
@@ -1235,10 +1245,12 @@ function buildMap(){
 /* 공통: 방 외피(바닥·천장·벽·걸레받이·형광등) — 테마 색만 바꿔 재사용 */
 function buildRoomShell(floorMat, wallColor, ceilColor, skirtColor){
   let mat = floorMat;
-  if (isInkMode()) {
-    if (!sharedFloorTexture) initSharedFloorCanvas();
-    mat = lambert({map: sharedFloorTexture});
-  }
+  try {
+    if (typeof isInkMode === "function" && isInkMode()) {
+      if (!sharedFloorTexture) initSharedFloorCanvas();
+      mat = lambert({map: sharedFloorTexture});
+    }
+  } catch(e) { console.warn("buildRoomShell isInkMode 안전 무시:",e); }
   const floor=new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W,ROOM_D),mat);
   floor.rotation.x=-Math.PI/2; mapRoot.add(floor); samplables.push(floor);
   const ceil=new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W,ROOM_D),lambert({color:ceilColor}));
@@ -5966,9 +5978,14 @@ async function startLobbyPractice(){
   const prev=btn?btn.textContent:""; if(btn)btn.textContent="맵 준비 중...";
   try{
     $("lobbyPracticeBox").classList.add("hidden");   // 모달 닫기
-    // 고른 맵으로 실제 씬을 준비(이미 그 맵이면 다시 짓지 않음)
-    if(currentMapId!==practiceMapId){ try{ await buildActiveMap(practiceMapId); }catch(e){ console.warn("맵 준비 실패, 교실로 진행",e); } }
-    G.lobbyPractice=true;G.phase="LOBBY_PRACTICE";G.role="hider";G.found=false;
+    G.lobbyPractice=true;
+    G.practiceGameMode = (Net.meta?.settings?.gameMode) || "hide";
+
+    // 대기 연습 모드에 맞게 맵을 강제로 완전 재건설합니다.
+    try{ await buildActiveMap(practiceMapId); }
+    catch(e){ console.warn("맵 준비 실패, 교실로 진행",e); }
+
+    G.phase="LOBBY_PRACTICE";G.role="hider";G.found=false;
     G.flying=false;G.flyUp=false;G.flyDown=false;G.lastJumpTap=0;G.lastFlyDownTap=0;G.vy=0;
     G.spectating=false;G.mirror&&setMirror(false);G.pose="stand";
     const sp=(hiderSpawns&&hiderSpawns.length)?hiderSpawns[0]:null;
@@ -5983,10 +6000,16 @@ async function startLobbyPractice(){
     Music.start("PAINT");syncLocalFairy();updateMobileButtons();
   }finally{ if(btn){btn.disabled=false;btn.textContent=prev;} }
 }
-function returnFromLobbyPractice(){
+async function returnFromLobbyPractice(){
   if(!G.lobbyPractice)return;
   G.lobbyPractice=false;resetMovementInputs();G.flying=false;G.spectating=false;setMirror(false);Music.stop();
   $("lobbyPracticeBox").classList.add("hidden");
+  
+  // 원래 로비에 설정된 맵으로 지형과 텍스처를 깨끗하게 복구합니다.
+  const originalMap = (Net.meta?.mapId) || "classroom";
+  try{ await buildActiveMap(originalMap); }
+  catch(e){ console.warn("로비 맵 복구 실패:",e); }
+
   G.phase=Net.meta.phase||"LOBBY";
   enterLobby();
 }
@@ -6293,13 +6316,13 @@ async function startOfflinePractice(){
   const btn=$("btnPracticeStart"); btn.disabled=true;
   const prev=btn.textContent; btn.textContent="맵 준비 중...";
   try{
-    // 고른 맵을 실제 씬으로 빌드합니다. (이미 그 맵이면 다시 짓지 않음)
-    if(currentMapId!==practiceMapId){
-      try{ await buildActiveMap(practiceMapId); }
-      catch(e){ console.warn("맵 준비 실패, 교실로 진행",e); }
-    }
     Net.mode="practice"; G.role="hider"; G.isHost=false; G.phase="PAINT";
-    G.practiceGameMode = $("selGameMode").value || "hide";
+    G.practiceGameMode = $("selPracticeGameMode").value || "hide";
+    
+    // 연습 모드 설정 상태에 맞춰 맵을 강제로 완전 재건설합니다.
+    try{ await buildActiveMap(practiceMapId); }
+    catch(e){ console.warn("맵 준비 실패, 교실로 진행",e); }
+    
     if (isInkMode()) {
       initSharedFloorCanvas();
     }
@@ -6363,10 +6386,15 @@ document.addEventListener("visibilitychange",()=>{
 addEventListener("online",()=>{ Net.resync&&Net.resync(); });   // 네트워크 복구 즉시 재동기화
 
 /* ================= 메인 루프 ================= */
-buildTextures(); buildActiveMap("classroom"); buildPresets(); drawWheel(); drawVal(); drawRecent();
-renderMapCards();
-setColor("#4A7FB5");
-showScreen("TITLE");
+try {
+  buildTextures(); buildActiveMap("classroom"); buildPresets(); drawWheel(); drawVal(); drawRecent();
+  renderMapCards();
+  setColor("#4A7FB5");
+  showScreen("TITLE");
+} catch(initErr) {
+  console.error("초기화 오류:", initErr);
+  alert("🚨 초기화 중 오류: " + initErr.message);
+}
 
 /* ================================================================
    🧟 좀비 모드 & 밤낮 주기 시스템 관련 기믹 함수들
