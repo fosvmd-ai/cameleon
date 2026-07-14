@@ -490,7 +490,7 @@ if (typeof window.TEACHER_CODE === "undefined" || !window.TEACHER_CODE) window.T
 
     <div id="hostRoleBox" class="hostRoleBox hidden">
       <div class="note" style="margin-top:0;">선생님도 이번 라운드에...</div>
-      <div class="row" style="margin-top:6px;">
+      <div id="hostRoleBtnRow" class="row" style="margin-top:6px;">
         <button id="btnHostRoleSeeker" class="secondary hostRoleBtn" data-role="seeker">✏️ 술래</button>
         <button id="btnHostRoleFairy" class="secondary hostRoleBtn" data-role="fairy">🧼 지우개 요정</button>
         <button id="btnHostRoleSpectate" class="secondary hostRoleBtn on" data-role="spectator">👀 관전</button>
@@ -5585,9 +5585,46 @@ function refreshLobbySettingsUI(){
 
   $("paintSecVal").textContent=fmtMinSec(+$("paintSecSlider").value);
   $("seekSecVal").textContent=fmtMinSec(+$("seekSecSlider").value);
-  $("hostRoleBox").classList.toggle("hidden", !(G.isHost && gameMode === "hide"));
+
+  // ── 게임모드별 방장 역할 선택 버튼 동적 교체 ──
+  $("hostRoleBox").classList.toggle("hidden", !G.isHost);
   const hostRole=Net.meta.hostRole||"spectator";
-  document.querySelectorAll(".hostRoleBtn").forEach(b=>b.classList.toggle("on",b.dataset.role===hostRole));
+  const btnRow=$("hostRoleBtnRow");
+  if (btnRow && G.isHost) {
+    let buttons = [];
+    if (gameMode === "zombie") {
+      buttons = [
+        {role:"seeker", label:"🧟 좀비"},
+        {role:"fairy",  label:"🏃 사람"},
+        {role:"spectator", label:"👀 관전"}
+      ];
+    } else if (gameMode === "splatoon") {
+      buttons = [
+        {role:"fairy",  label:"🎨 참여자"},
+        {role:"spectator", label:"👀 관전"}
+      ];
+    } else {
+      buttons = [
+        {role:"seeker", label:"✏️ 술래"},
+        {role:"fairy",  label:"🧼 지우개 요정"},
+        {role:"spectator", label:"👀 관전"}
+      ];
+    }
+    btnRow.innerHTML = "";
+    buttons.forEach(b => {
+      const el = document.createElement("button");
+      el.className = "secondary hostRoleBtn" + (b.role === hostRole ? " on" : "");
+      el.dataset.role = b.role;
+      el.textContent = b.label;
+      el.onclick = () => {
+        Audio2.resume();
+        btnRow.querySelectorAll(".hostRoleBtn").forEach(x => x.classList.remove("on"));
+        el.classList.add("on");
+        Net.setHostRole(b.role);
+      };
+      btnRow.appendChild(el);
+    });
+  }
 }
 $("paintSecSlider").addEventListener("input",e=>{
   $("paintSecVal").textContent=fmtMinSec(+e.target.value);
