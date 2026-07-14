@@ -5485,8 +5485,9 @@ function refreshLobbyGrid(){
   const manualSeekers=Net.meta.manualSeekers||{};
   entries.forEach(([u,p])=>{
     const d=document.createElement("div");
-    const isSeekerPick=!!manualSeekers[u];
-    const pickable=G.isHost&&u!==Net.uid;
+    const gameMode = Net.meta.settings?.gameMode || "hide";
+    const isSeekerPick=gameMode === "hide" && !!manualSeekers[u];
+    const pickable=G.isHost&&u!==Net.uid&&gameMode==="hide";
     d.className="pchip"+(u===Net.meta.host?" host":"")+(isSeekerPick?" seeker":"")+(pickable?" pickable":"");
     d.innerHTML=`<span class="er"></span><span>${isSeekerPick?"✏️ ":""}${escapeHtml(p.nick||"?")}${u===Net.meta.host?" 👑":""}</span>`;
     if(pickable){
@@ -5500,7 +5501,7 @@ function refreshLobbyGrid(){
     grid.appendChild(d);
   });
   $("waitMsg").textContent=G.isHost?`${entries.length}명 실시간 접속 중`:"선생님이 시작하기를 기다리는 중...";
-  $("seekerPickNote").classList.toggle("hidden",!G.isHost);
+  $("seekerPickNote").classList.toggle("hidden",!(G.isHost && gameMode === "hide"));
 }
 /* v2: 게임 설정 슬라이더 표시/동기화 */
 function fmtMinSec(sec){ const m=Math.floor(sec/60),s=sec%60; return s?`${m}분 ${s}초`:`${m}분`; }
@@ -5522,7 +5523,7 @@ function refreshLobbySettingsUI(){
 
   $("paintSecVal").textContent=fmtMinSec(+$("paintSecSlider").value);
   $("seekSecVal").textContent=fmtMinSec(+$("seekSecSlider").value);
-  $("hostRoleBox").classList.toggle("hidden",!G.isHost);
+  $("hostRoleBox").classList.toggle("hidden", !(G.isHost && gameMode === "hide"));
   const hostRole=Net.meta.hostRole||"spectator";
   document.querySelectorAll(".hostRoleBtn").forEach(b=>b.classList.toggle("on",b.dataset.role===hostRole));
 }
