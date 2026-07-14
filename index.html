@@ -395,6 +395,10 @@ const TEACHER_CODE = "김지훈";
 
 window.FIREBASE_CONFIG = firebaseConfig;
 window.TEACHER_CODE = TEACHER_CODE;
+window.onerror = function(msg, url, line, col, error) {
+  alert("🚨 런타임 오류 발생: " + msg + "\n위치: " + url + ":" + line + ":" + col + "\n에러 상세: " + error);
+  return false;
+};
 </script>
 <script>
 /* 위 설정 구역에 문법 오류(붙여넣기 실수 등)가 있어도
