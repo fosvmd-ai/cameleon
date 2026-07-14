@@ -6414,7 +6414,6 @@ function updateZombieLogic(dt) {
   }
   
   // 치료제 스피닝/둥실 오르내림 애니메이션
-  const time = performance.now() / 1000;
   cureSpawns.forEach(item => {
     item.mesh.rotation.y += dt * 1.5;
     item.mesh.position.y = 1.0 + Math.sin(time * 3.5) * 0.15;
