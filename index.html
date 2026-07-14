@@ -5369,6 +5369,7 @@ function enterResult(){
   let body="";
   if(Net.mode==="online"){
     const hiders=Object.entries(Net.players).filter(([u,p])=>p.role==="hider");
+    let survivors = [];
     if (isZMode) {
       const humanSurvivors = hiders.filter(([u,p])=>p.zombieState === 0).map(([u,p])=>p.nick);
       if(humanSurvivors.length) {
@@ -5377,14 +5378,17 @@ function enterResult(){
         body += `생존한 인간이 아무도 없습니다. 모두 좀비로 감염되었습니다.<br>`;
       }
     } else {
-      const survivors=hiders.filter(([u,p])=>!p.found).map(([u,p])=>p.nick);
+      survivors=hiders.filter(([u,p])=>!p.found).map(([u,p])=>p.nick);
       if(survivors.length) body+=`끝까지 살아남은 지우개: <b>${survivors.join(", ")}</b><br>`;
     }
-    let best=null;
-    if(survivors.length===0&&hiders.length){
-      best=hiders.reduce((a,b)=>((a[1].foundAt||0)>(b[1].foundAt||0)?a:b))[1].nick;
-    }else if(survivors.length) best=survivors.join(", ");
-    if(best) body+=`<span class="best">🏆 최고의 지우개: ${best}</span>`;
+    
+    if (!isZMode) {
+      let best=null;
+      if(survivors.length===0&&hiders.length){
+        best=hiders.reduce((a,b)=>((a[1].foundAt||0)>(b[1].foundAt||0)?a:b))[1].nick;
+      }else if(survivors.length) best=survivors.join(", ");
+      if(best) body+=`<span class="best">🏆 최고의 지우개: ${best}</span>`;
+    }
   }
   $("resultBody").innerHTML=body||"수고했어요!";
   $("btnNextRound").classList.toggle("hidden",!G.isHost);
