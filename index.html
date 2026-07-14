@@ -462,14 +462,15 @@ if (typeof window.TEACHER_CODE === "undefined" || !window.TEACHER_CODE) window.T
         <input type="range" id="seekSecSlider" min="60" max="300" step="10" value="180">
         <span id="seekSecVal" class="settingsVal">3분</span>
       </div>
-      <div class="settingsRow" style="display:flex; flex-direction:column; gap:4px; margin-top:2px;">
-        <label class="chk" style="margin-top:0; justify-content:flex-start; width:100%; font-size:14px;">
-          <input type="checkbox" id="chkZombieMode"> 🧟 좀비 모드 활성화
-        </label>
-        <label class="chk" style="margin-top:4px; justify-content:flex-start; width:100%; font-size:14px;">
-          <input type="checkbox" id="chkInkMode"> 🎨 스플래툰 색칠 배틀 활성화
-        </label>
-        <div id="inkTeamRow" class="hidden" style="display:flex; align-items:center; gap:8px; font-size:13px; margin-left:22px; color:var(--ink);">
+      <div class="settingsRow" style="display:flex; flex-direction:column; gap:4px; margin-top:4px;">
+        <label style="font-weight:bold; font-size:14px; margin-bottom:2px; display:block; color:#181e26;">🎮 게임 모드</label>
+        <select id="selGameMode" style="padding:4px 8px; border:2px solid var(--ink); border-radius:6px; font-family:inherit; font-weight:bold; width:100%;">
+          <option value="hide">🙈 숨바꼭질 모드</option>
+          <option value="zombie">🧟 좀비 추격 모드</option>
+          <option value="splatoon">🎨 스플래툰 색칠 모드</option>
+        </select>
+        
+        <div id="inkTeamRow" class="hidden" style="display:flex; align-items:center; gap:8px; font-size:13px; margin-top:6px; color:var(--ink); font-weight:bold;">
           <span>👥 팀 개수:</span>
           <select id="selInkTeams" style="padding:2px 6px; border:2px solid var(--ink); border-radius:6px; font-family:inherit; font-weight:bold;">
             <option value="2">2팀 (레드 vs 블루)</option>
@@ -4792,6 +4793,10 @@ const Net={
     const m=this.meta;if(!m.phase)return;
     const now=this.now();
     const settings=m.settings||{paintSec:60,seekSec:180};
+    const gameMode = settings.gameMode || "hide";
+    const zombieMode = (gameMode === "zombie");
+    const inkMode = (gameMode === "splatoon");
+
     if(m.phase==="ROULETTE"&&m.roulette){
       const total=(m.roulette.startAt||now)+(m.roulette.perMs||1400)*((m.roulette.final||[]).length)+900;
       if(now>=total){
@@ -4800,13 +4805,57 @@ const Net={
       }
     }else if(m.phase==="PAINT"&&now>=m.phaseEndsAt){
       this.phaseAdvanceLock=true;
-      this.setPhase("SEEK",(settings.seekSec||180)*1000).finally(()=>{this.phaseAdvanceLock=false;});
+      if (inkMode) {
+        // 스플래툰 색칠 모드: 대기/색칠 시간이 끝나면 곧바로 결과(RESULT) 페이즈로 전환
+        this.setPhase("RESULT",0,{winner:"hider"}).finally(()=>{this.phaseAdvanceLock=false;});
+      } else if (zombieMode) {
+        // 좀비 모드: 대기 시간이 끝나면 5초 좀비 선정 단계(ZOMBIE_CHOOSE)로 전환
+        this.setPhase("ZOMBIE_CHOOSE",5000).finally(()=>{this.phaseAdvanceLock=false;});
+      } else {
+        // 숨바꼭질 모드: 대기(숨기) 시간이 끝나면 찾는 단계(SEEK)로 전환
+        this.setPhase("SEEK",(settings.seekSec||180)*1000).finally(()=>{this.phaseAdvanceLock=false;});
+      }
+    }else if(m.phase==="ZOMBIE_CHOOSE"&&now>=m.phaseEndsAt){
+      this.phaseAdvanceLock=true;
+      const extraUpd = {};
+      const hostRole = m.hostRole || "spectator";
+      const ids = Object.keys(this.players).filter(u => u !== this.uid || hostRole !== "spectator");
+      if (ids.length > 0) {
+        const shuffled = ids.slice();
+        for (let i = shuffled.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        const numZombies = Math.max(1, Math.floor(ids.length * 0.25));
+        for (let i = 0; i < ids.length; i++) {
+          const isHostZombie = i < numZombies;
+          extraUpd[`rooms/${this.code}/players/${shuffled[i]}/zombieState`] = isHostZombie ? 2 : 0;
+        }
+      }
+      this.setPhase("SEEK",(settings.seekSec||180)*1000).then(async () => {
+        if (Object.keys(extraUpd).length > 0) {
+          await this.fb.update(this.fb.ref(this.db), extraUpd);
+        }
+      }).finally(()=>{this.phaseAdvanceLock=false;});
     }else if(m.phase==="SEEK"){
       const hiders=Object.entries(this.players).filter(([u,p])=>p.role==="hider");
-      const allFound=hiders.length>0&&hiders.every(([u,p])=>p.found);
-      if(allFound||now>=m.phaseEndsAt){
+      let gameOver = false;
+      let winner = "hider";
+      if (zombieMode) {
+        const allInfected = hiders.length > 0 && hiders.every(([u,p])=>p.zombieState > 0);
+        if (allInfected || now >= m.phaseEndsAt) {
+          gameOver = true;
+          winner = allInfected ? "seeker" : "hider";
+        }
+      } else {
+        const allFound=hiders.length>0&&hiders.every(([u,p])=>p.found);
+        if(allFound||now>=m.phaseEndsAt){
+          gameOver = true;
+          winner = allFound ? "seeker" : "hider";
+        }
+      }
+      if (gameOver) {
         this.phaseAdvanceLock=true;
-        const winner=allFound?"seeker":"hider";
         this.setPhase("RESULT",0,{winner}).then(()=>this.recordRoundStats(winner)).finally(()=>{this.phaseAdvanceLock=false;});
       }
     }
@@ -4884,20 +4933,6 @@ const Net={
         seekerOrder=[...seekers];
       }
 
-      // 좀비 모드일 때 숙주 좀비 비율 선출 (최소 1명 이상)
-      const zombieSet = new Set();
-      if (zombieMode) {
-        const studentPool = ids.slice();
-        for (let i = studentPool.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [studentPool[i], studentPool[j]] = [studentPool[j], studentPool[i]];
-        }
-        const numZombies = Math.max(1, Math.floor(ids.length * 0.25));
-        for (let i = 0; i < numZombies; i++) {
-          zombieSet.add(studentPool[i]);
-        }
-      }
-
       // 1단계: 역할을 먼저 확정합니다. 술래가 지우개로 잠깐 스폰되는 경쟁 상태를 막습니다.
       const roleUpd={};
       roleUpd[`rooms/${this.code}/cures`]=null; // 라운드 시작 시 이전 치료제 삭제
@@ -4934,7 +4969,8 @@ const Net={
         roleUpd[`rooms/${this.code}/players/${u}/foundAt`]=null;
         roleUpd[`rooms/${this.code}/players/${u}/foundBy`]=null;
         
-        const zState = zombieMode ? (zombieSet.has(u) ? 2 : 0) : 0;
+        // 좀비 모드이더라도 시작 대기시간 동안은 좀비 상태 0(인간)으로 설정
+        const zState = 0;
         roleUpd[`rooms/${this.code}/players/${u}/zombieState`]=zState;
         
         // 스플래툰 팀 할당
@@ -4953,9 +4989,11 @@ const Net={
         seekerIds:zombieMode ? {} : Object.fromEntries(seekerOrder.map(u=>[u,true])),
         seekerOrder:zombieMode ? [] : seekerOrder,
         winner:null,
-        frozen:false   // v2: 새 라운드 시작 시 얼음 해제
+        frozen:false   
       };
-      if (zombieMode) {
+      
+      const skipRoulette = zombieMode || inkMode;
+      if (skipRoulette) {
         metaPatch.phase="PAINT";
         metaPatch.phaseEndsAt=this.now()+(settings.paintSec||60)*1000;
         metaPatch.roulette=null;
@@ -5298,18 +5336,39 @@ function enterResult(){
     $("btnNextRound").classList.toggle("hidden",!G.isHost);
     $("btnToLobby").classList.toggle("hidden",!G.isHost);
     showScreen("RESULT");
+    finishResultReveal();
     return;
   }
 
   const winner=(Net.mode==="online"?Net.meta.winner:G.practiceWinner)||"hider";
   const seekWin=winner==="seeker";
-  $("resultTitle").textContent=seekWin?"✏️ 술래 연필 팀 승리!":"🧼 지우개 팀 승리!";
+  const isZMode = isZombieMode();
+  
+  if (isZMode) {
+    if (winner === "seeker") {
+      $("resultTitle").textContent = "🧟 좀비 군단 최종 승리 (인간 전멸)!";
+    } else {
+      $("resultTitle").textContent = "🛡️ 인간 생존자 최종 승리!";
+    }
+  } else {
+    $("resultTitle").textContent=seekWin?"✏️ 술래 연필 팀 승리!":"🧼 지우개 팀 승리!";
+  }
+  
   Audio2.sfxFanfare();
   let body="";
   if(Net.mode==="online"){
     const hiders=Object.entries(Net.players).filter(([u,p])=>p.role==="hider");
-    const survivors=hiders.filter(([u,p])=>!p.found).map(([u,p])=>p.nick);
-    if(survivors.length) body+=`끝까지 살아남은 지우개: <b>${survivors.join(", ")}</b><br>`;
+    if (isZMode) {
+      const humanSurvivors = hiders.filter(([u,p])=>p.zombieState === 0).map(([u,p])=>p.nick);
+      if(humanSurvivors.length) {
+        body += `좀비 감염을 이겨낸 인간 생존자: <b>${humanSurvivors.join(", ")}</b><br>`;
+      } else {
+        body += `생존한 인간이 아무도 없습니다. 모두 좀비로 감염되었습니다.<br>`;
+      }
+    } else {
+      const survivors=hiders.filter(([u,p])=>!p.found).map(([u,p])=>p.nick);
+      if(survivors.length) body+=`끝까지 살아남은 지우개: <b>${survivors.join(", ")}</b><br>`;
+    }
     let best=null;
     if(survivors.length===0&&hiders.length){
       best=hiders.reduce((a,b)=>((a[1].foundAt||0)>(b[1].foundAt||0)?a:b))[1].nick;
@@ -5320,7 +5379,11 @@ function enterResult(){
   $("btnNextRound").classList.toggle("hidden",!G.isHost);
   $("btnToLobby").classList.toggle("hidden",!G.isHost);
   showScreen("RESULT");
-  startResultReveal();
+  if (isZMode) {
+    finishResultReveal();
+  } else {
+    startResultReveal();
+  }
 }
 function onSomeoneFound(uid,p){
   const r=remotes.get(uid);
@@ -5418,22 +5481,20 @@ function refreshLobbyGrid(){
 /* v2: 게임 설정 슬라이더 표시/동기화 */
 function fmtMinSec(sec){ const m=Math.floor(sec/60),s=sec%60; return s?`${m}분 ${s}초`:`${m}분`; }
 function refreshLobbySettingsUI(){
-  const settings=Object.assign({paintSec:60,seekSec:180,zombieMode:false,inkMode:false,teamCount:2},Net.meta.settings||{});
+  const settings=Object.assign({paintSec:60,seekSec:180,gameMode:"hide",teamCount:2},Net.meta.settings||{});
   const box=$("settingsBox");
   box.classList.toggle("readonly",!G.isHost);
   if(document.activeElement!==$("paintSecSlider")){ $("paintSecSlider").value=settings.paintSec; }
   if(document.activeElement!==$("seekSecSlider")){ $("seekSecSlider").value=settings.seekSec; }
   $("paintSecSlider").disabled=!G.isHost;
   $("seekSecSlider").disabled=!G.isHost;
-  $("chkZombieMode").checked=!!settings.zombieMode;
-  $("chkZombieMode").disabled=!G.isHost;
   
-  const inkMode=!!settings.inkMode;
-  $("chkInkMode").checked=inkMode;
-  $("chkInkMode").disabled=!G.isHost;
+  const gameMode=settings.gameMode||"hide";
+  $("selGameMode").value=gameMode;
+  $("selGameMode").disabled=!G.isHost;
   $("selInkTeams").value=settings.teamCount||2;
   $("selInkTeams").disabled=!G.isHost;
-  $("inkTeamRow").classList.toggle("hidden",!inkMode);
+  $("inkTeamRow").classList.toggle("hidden",gameMode!=="splatoon");
 
   $("paintSecVal").textContent=fmtMinSec(+$("paintSecSlider").value);
   $("seekSecVal").textContent=fmtMinSec(+$("seekSecSlider").value);
@@ -5449,14 +5510,18 @@ $("seekSecSlider").addEventListener("input",e=>{
   $("seekSecVal").textContent=fmtMinSec(+e.target.value);
   if(G.isHost)Net.updateSettings({seekSec:+e.target.value});
 });
-$("chkZombieMode").addEventListener("change",e=>{
-  if(G.isHost)Net.updateSettings({zombieMode:e.target.checked,inkMode:false});
-});
-$("chkInkMode").addEventListener("change",e=>{
-  if(G.isHost)Net.updateSettings({inkMode:e.target.checked,zombieMode:false});
+$("selGameMode").addEventListener("change",e=>{
+  if(G.isHost) {
+    const val = e.target.value;
+    Net.updateSettings({
+      gameMode: val,
+      zombieMode: val === "zombie",
+      inkMode: val === "splatoon"
+    });
+  }
 });
 $("selInkTeams").addEventListener("change",e=>{
-  if(G.isHost)Net.updateSettings({teamCount:+e.target.value});
+  if(G.isHost) Net.updateSettings({teamCount:+e.target.value});
 });
 document.querySelectorAll(".hostRoleBtn").forEach(b=>b.onclick=()=>{
   Audio2.resume();
@@ -6141,7 +6206,8 @@ let cureSpawns = [];
 let cureSpawnTimer = 0;
 
 function isZombieMode() {
-  return !!(Net.mode === "online" && Net.meta && Net.meta.settings && Net.meta.settings.zombieMode);
+  if (Net.mode !== "online" || !Net.meta || !Net.meta.settings) return false;
+  return Net.meta.settings.gameMode === "zombie" || !!Net.meta.settings.zombieMode;
 }
 
 function buildCureMesh() {
@@ -6182,55 +6248,35 @@ function spawnCureOnFirebase() {
 
 function updateDayNightCycle(dt) {
   if (!isZombieMode()) {
-    if(sun.intensity !== SUN_BASE) {
-      sun.intensity = SUN_BASE;
-      ambientLight.color.setHex(0xffffff);
-      ambientLight.intensity = AMB_BASE;
-    }
+    isNight = false;
+    sun.intensity = lerp(sun.intensity, SUN_BASE, dt * 1.5);
+    ambientLight.intensity = lerp(ambientLight.intensity, AMB_BASE, dt * 1.5);
+    ambientLight.color.lerp(new THREE.Color(0xffffff), dt * 1.5);
     return;
   }
-  
-  const cycle = 60;
-  const t = (Net.now ? Net.now() : Date.now()) / 1000;
-  const sec = t % cycle;
-  const nightStart = 30;
-  const transition = 3;
   
   let targetIntensity = SUN_BASE;
   let targetAmbientIntensity = AMB_BASE;
   let targetAmbientColor = 0xffffff;
   
-  if (sec >= nightStart) {
-    isNight = true;
-    targetIntensity = 0.05;
-    targetAmbientIntensity = 0.15;
-    targetAmbientColor = 0x1b2c3f;
+  if (G.phase === "SEEK") {
+    // 본게임 단계: 60초 주기(낮 30초, 밤 30초)로 밤과 낮이 번갈아 변경됨
+    const cycle = 60;
+    const t = (Net.now ? Net.now() : Date.now()) / 1000;
+    const sec = t % cycle;
+    const nightStart = 30;
+    const isNightTime = (sec >= nightStart);
     
-    if (sec < nightStart + transition && G.screen === "GAME") {
-      const alertDiv = $("centerAlert");
-      if(alertDiv) {
-        alertDiv.textContent = `🌙 밤이 찾아옵니다! 좀비 폭주 주의!`;
-        alertDiv.classList.remove("hidden");
-      }
-    }
+    isNight = isNightTime;
+    targetIntensity = isNightTime ? 0.05 : SUN_BASE;
+    targetAmbientIntensity = isNightTime ? 0.15 : AMB_BASE;
+    targetAmbientColor = isNightTime ? 0x1b2c3f : 0xffffff;
   } else {
+    // 대기시간(PAINT) 또는 기타 단계: 항상 대낮으로 고정
     isNight = false;
     targetIntensity = SUN_BASE;
     targetAmbientIntensity = AMB_BASE;
     targetAmbientColor = 0xffffff;
-    
-    if (sec >= nightStart - transition && G.screen === "GAME") {
-      const alertDiv = $("centerAlert");
-      if(alertDiv) {
-        alertDiv.textContent = `☀️ 곧 낮이 됩니다! 좀비가 약해집니다.`;
-        alertDiv.classList.remove("hidden");
-      }
-    } else {
-      const alertDiv = $("centerAlert");
-      if(alertDiv && !alertDiv.classList.contains("hidden") && !alertDiv.textContent.includes("스프링클러") && !alertDiv.textContent.includes("진행")) {
-        alertDiv.classList.add("hidden");
-      }
-    }
   }
   
   sun.intensity = lerp(sun.intensity, targetIntensity, dt * 1.5);
@@ -6492,7 +6538,8 @@ function initFeatherGame() {
    🎨 스플래툰 색칠 배틀 모드 관련 기믹 및 캔버스 드로잉 시스템
    ================================================================ */
 function isInkMode() {
-  return !!(Net.mode === "online" && Net.meta && Net.meta.settings && Net.meta.settings.inkMode);
+  if (Net.mode !== "online" || !Net.meta || !Net.meta.settings) return false;
+  return Net.meta.settings.gameMode === "splatoon" || !!Net.meta.settings.inkMode;
 }
 
 let sharedFloorCanvas = null;
@@ -6512,20 +6559,23 @@ function initSharedFloorCanvas() {
   sharedFloorCanvas.height = 1024;
   sharedFloorCtx = sharedFloorCanvas.getContext("2d");
   
-  // 연한 회색 기본 바닥 배경
-  sharedFloorCtx.fillStyle = "#e5e7eb";
-  sharedFloorCtx.fillRect(0, 0, 1024, 1024);
-  
-  // 격자 타일무늬 그리기
-  sharedFloorCtx.strokeStyle = "#d1d5db";
-  sharedFloorCtx.lineWidth = 4;
-  for (let i = 0; i <= 1024; i += 64) {
-    sharedFloorCtx.beginPath();
-    sharedFloorCtx.moveTo(i, 0); sharedFloorCtx.lineTo(i, 1024);
-    sharedFloorCtx.stroke();
-    sharedFloorCtx.beginPath();
-    sharedFloorCtx.moveTo(0, i); sharedFloorCtx.lineTo(1024, i);
-    sharedFloorCtx.stroke();
+  if (isInkMode()) {
+    sharedFloorCtx.fillStyle = "#ffffff";
+    sharedFloorCtx.fillRect(0, 0, 1024, 1024);
+  } else {
+    sharedFloorCtx.fillStyle = "#e5e7eb";
+    sharedFloorCtx.fillRect(0, 0, 1024, 1024);
+    
+    sharedFloorCtx.strokeStyle = "#d1d5db";
+    sharedFloorCtx.lineWidth = 4;
+    for (let i = 0; i <= 1024; i += 64) {
+      sharedFloorCtx.beginPath();
+      sharedFloorCtx.moveTo(i, 0); sharedFloorCtx.lineTo(i, 1024);
+      sharedFloorCtx.stroke();
+      sharedFloorCtx.beginPath();
+      sharedFloorCtx.moveTo(0, i); sharedFloorCtx.lineTo(1024, i);
+      sharedFloorCtx.stroke();
+    }
   }
   
   sharedFloorTexture = new THREE.CanvasTexture(sharedFloorCanvas);
