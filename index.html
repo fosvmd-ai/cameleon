@@ -904,6 +904,7 @@ function clearMap(){
   while(mapRoot.children.length) mapRoot.remove(mapRoot.children[0]);
   colliders.length=0; samplables.length=0; refillZones.length=0;
   hiderSpawns=[]; seekerSpawns.length=0;
+  clearAllSplatDecals();
 }
 
 function lambert(opt){ return new THREE.MeshLambertMaterial(opt); }
@@ -3089,9 +3090,11 @@ function ensureRemote(uid,info){
     remotes.set(uid,r);
   }
   r.info=info;
+  updateFairyWeaponVisual(r.fairy, info.role, info.inkWeapon);
   if(info.role==="ghost"){ r.fairy.group.visible=false; return r; }
   
-  if (isInkMode() && !isSeeker) {
+  const isSeek = info.role === "seeker";
+  if (isInkMode() && !isSeek) {
     const tName = TEAM_COLORS[info.teamId || "team1"]?.name || "레드팀";
     setFairyNameLabel(r.fairy.nameLabel, `${info.nick || "지우개"} (${tName})`, 100, false);
   } else {
@@ -4491,6 +4494,7 @@ const Net={
     onChildAdded(splatsRef, s => {
       const data = s.val(); if(!data) return;
       paintInkOnFloor(data.x, data.z, data.r, data.color);
+      spawnSplatDecal(data.x, data.y || 0.05, data.z, data.color, data.r);
     });
 
     // 무기 상자 동기화 리스너 추가
@@ -6138,6 +6142,10 @@ async function startOfflinePractice(){
       catch(e){ console.warn("맵 준비 실패, 교실로 진행",e); }
     }
     Net.mode="practice"; G.role="hider"; G.isHost=false; G.phase="PAINT";
+    G.practiceGameMode = $("selGameMode").value || "hide";
+    if (isInkMode()) {
+      initSharedFloorCanvas();
+    }
     G.found=false; G.spectating=false; G.lobbyPractice=false; G.pose="stand"; G.vy=0;
     // 고른 맵의 안전한 숨는 자리에서 시작합니다. (없으면 교실 기본 위치)
     const sp=(hiderSpawns&&hiderSpawns.length)?hiderSpawns[0]:null;
@@ -6212,6 +6220,9 @@ let cureSpawns = [];
 let cureSpawnTimer = 0;
 
 function isZombieMode() {
+  if (Net.mode === "practice" || G.lobbyPractice) {
+    return G.practiceGameMode === "zombie";
+  }
   if (Net.mode !== "online" || !Net.meta || !Net.meta.settings) return false;
   return Net.meta.settings.gameMode === "zombie" || !!Net.meta.settings.zombieMode;
 }
@@ -6291,6 +6302,17 @@ function updateDayNightCycle(dt) {
 }
 
 function updateZombieLogic(dt) {
+  const time = performance.now() / 1000;
+  cureSpawns.forEach(item => {
+    if (item.mesh) {
+      item.mesh.rotation.y += dt * 1.5;
+      item.mesh.position.y = item.y + Math.sin(time * 3.0) * 0.08;
+      if (Math.random() < 0.12) {
+        burst(new THREE.Vector3(item.x, item.y + 0.3, item.z), "#4aa8ff", 1, 1.2, 0.2, true, 0.08);
+      }
+    }
+  });
+
   if (!isZombieMode()) return;
   
   // 1) 감염 전파 검사 (로컬 인간이 리모트 좀비와 만남)
@@ -6544,6 +6566,9 @@ function initFeatherGame() {
    🎨 스플래툰 색칠 배틀 모드 관련 기믹 및 캔버스 드로잉 시스템
    ================================================================ */
 function isInkMode() {
+  if (Net.mode === "practice" || G.lobbyPractice) {
+    return G.practiceGameMode === "splatoon";
+  }
   if (Net.mode !== "online" || !Net.meta || !Net.meta.settings) return false;
   return Net.meta.settings.gameMode === "splatoon" || !!Net.meta.settings.inkMode;
 }
@@ -6705,9 +6730,10 @@ function updateInkProjectiles(dt) {
     
     if (hit || p.age >= p.maxAge) {
       paintInkOnFloor(hitX, hitZ, p.radius, p.color);
+      spawnSplatDecal(hitX, hitY, hitZ, p.color, p.radius);
       burst(new THREE.Vector3(hitX, hitY, hitZ), p.color, p.type === "grenade" ? 16 : 8, 2.5, 0.4, false, 0.35);
       
-      sendSplatEvent(hitX, hitZ, p.radius, p.color);
+      sendSplatEvent(hitX, hitY, hitZ, p.radius, p.color);
       
       if (G.screen === "GAME" && G.role === "hider" && !G.found && !G.spectating && (!G.invincibleTimer || G.invincibleTimer <= 0) && (!G.splatTimer || G.splatTimer <= 0)) {
         if (p.teamId !== G.teamId) {
@@ -6787,10 +6813,10 @@ function fireInkWeapon() {
   }
 }
 
-function sendSplatEvent(x, z, r, color) {
+function sendSplatEvent(x, y, z, r, color) {
   if (Net.mode === "online") {
     const id = "splat_" + Math.floor(Math.random() * 10000000);
-    Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/splats/${id}`), { x, z, r, color }).catch(()=>{});
+    Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/splats/${id}`), { x, y, z, r, color }).catch(()=>{});
   }
 }
 
@@ -6882,6 +6908,9 @@ function updateWeaponBoxes(dt) {
     if (boxObj.topMark) {
       boxObj.topMark.rotation.x += dt * 2.0;
       boxObj.topMark.position.y = 0.95 + Math.sin(time * 3.5) * 0.12;
+    }
+    if (Math.random() < 0.12) {
+      burst(new THREE.Vector3(boxObj.x, boxObj.y + 0.4, boxObj.z), "#ffffff", 1, 1.2, 0.2, true, 0.08);
     }
   });
 }
@@ -6999,6 +7028,42 @@ function updateFairyWeaponVisual(fairyObj, role, weaponType) {
   } else {
     fairyObj.arms[1].rotation.x = 0;
   }
+}
+
+/* ================================================================
+   🎨 3D 착탄 물감 패치(Decal Mesh) 시스템
+   ================================================================ */
+let splatDecals = [];
+function spawnSplatDecal(worldX, worldY, worldZ, color, radius) {
+  const size = radius * (1.1 + Math.random() * 0.4);
+  const geo = new THREE.PlaneGeometry(size, size);
+  const mat = lambert({
+    color: color,
+    transparent: true,
+    opacity: 0.92,
+    depthWrite: false,
+    side: THREE.DoubleSide
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(worldX, worldY, worldZ);
+  if (worldY > 0.15) {
+    mesh.position.y += 0.01;
+    mesh.rotation.y = Math.random() * Math.PI * 2;
+  } else {
+    mesh.position.y = 0.03 + Math.random() * 0.01;
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.rotation.z = Math.random() * Math.PI * 2;
+  }
+  scene.add(mesh);
+  splatDecals.push(mesh);
+  if (splatDecals.length > 100) {
+    const old = splatDecals.shift();
+    scene.remove(old);
+  }
+}
+function clearAllSplatDecals() {
+  splatDecals.forEach(m => scene.remove(m));
+  splatDecals = [];
 }
 
 /* ================================================================
@@ -7183,10 +7248,11 @@ function loop(){
       const speed = Math.hypot(G.moveIn.x, G.moveIn.z);
       if (speed > 0.05) {
         paintInkOnFloor(G.pos.x, G.pos.z, 2.0, G.teamColor);
+        spawnSplatDecal(G.pos.x, G.pos.y || 0.05, G.pos.z, G.teamColor, 2.0);
         const now = performance.now();
         if (!G.lastRollerSent || now - G.lastRollerSent > 150) {
           G.lastRollerSent = now;
-          sendSplatEvent(G.pos.x, G.pos.z, 2.0, G.teamColor);
+          sendSplatEvent(G.pos.x, G.pos.y || 0.05, G.pos.z, 2.0, G.teamColor);
         }
       }
     }
