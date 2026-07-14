@@ -4354,14 +4354,15 @@ const Net={
     ]);
     await set(ref(this.db,`rooms/${code}/meta`),{host:this.uid,phase:"LOBBY",phaseEndsAt:0,round:0,
       settings:{paintSec:60,seekSec:180},hostRole:"spectator",manualSeekers:null,mapId:"classroom"});
-    await set(ref(this.db,`rooms/${code}/players/${this.uid}`),
-      {nick,role:"ghost",found:false,lastSeen:serverTimestamp()});
-    await set(ref(this.db,`rooms/${code}/presence/${this.uid}`),{online:true,lastSeen:serverTimestamp()});
-    onDisconnect(ref(this.db,`rooms/${code}/players/${this.uid}`)).remove();
-    onDisconnect(ref(this.db,`rooms/${code}/pos/${this.uid}`)).remove();
-    onDisconnect(ref(this.db,`rooms/${code}/presence/${this.uid}`)).remove();
-    set(ref(this.db,`presence/${this.uid}`),{online:true,lastSeen:serverTimestamp()}).catch(()=>{}); // 서버 전체 인원 집계용
-    onDisconnect(ref(this.db,`presence/${this.uid}`)).remove();
+    await Promise.all([
+      set(ref(this.db,`rooms/${code}/players/${this.uid}`), {nick,role:"ghost",found:false,lastSeen:serverTimestamp()}),
+      set(ref(this.db,`rooms/${code}/presence/${this.uid}`), {online:true,lastSeen:serverTimestamp()}),
+      set(ref(this.db,`presence/${this.uid}`), {online:true,lastSeen:serverTimestamp()}).catch(()=>{}),
+      onDisconnect(ref(this.db,`rooms/${code}/players/${this.uid}`)).remove(),
+      onDisconnect(ref(this.db,`rooms/${code}/pos/${this.uid}`)).remove(),
+      onDisconnect(ref(this.db,`rooms/${code}/presence/${this.uid}`)).remove(),
+      onDisconnect(ref(this.db,`presence/${this.uid}`)).remove()
+    ]);
     this.attach(); this.startHostLoop();
     return true;
   },
@@ -4392,15 +4393,15 @@ const Net={
     const myRole=rejoin?rejoin.role:"hider";
     this._kicked=false;
     set(ref(this.db,`rooms/${code}/kicks/${this.uid}`),null).catch(()=>{}); // 정식 재입장이면 이전 강퇴 기록 해제
-    await set(ref(this.db,`rooms/${code}/players/${this.uid}`),
-      {nick,role:myRole,found:rejoin?!!rejoin.found:false,lastSeen:serverTimestamp()});
-    this.players[this.uid]={nick,role:myRole,found:rejoin?!!rejoin.found:false};
-    await set(ref(this.db,`rooms/${code}/presence/${this.uid}`),{online:true,lastSeen:serverTimestamp()});
-    onDisconnect(ref(this.db,`rooms/${code}/players/${this.uid}`)).remove();
-    onDisconnect(ref(this.db,`rooms/${code}/pos/${this.uid}`)).remove();
-    onDisconnect(ref(this.db,`rooms/${code}/presence/${this.uid}`)).remove();
-    set(ref(this.db,`presence/${this.uid}`),{online:true,lastSeen:serverTimestamp()}).catch(()=>{}); // 서버 전체 인원 집계용
-    onDisconnect(ref(this.db,`presence/${this.uid}`)).remove();
+    await Promise.all([
+      set(ref(this.db,`rooms/${code}/players/${this.uid}`), {nick,role:myRole,found:rejoin?!!rejoin.found:false,lastSeen:serverTimestamp()}),
+      set(ref(this.db,`rooms/${code}/presence/${this.uid}`), {online:true,lastSeen:serverTimestamp()}),
+      set(ref(this.db,`presence/${this.uid}`), {online:true,lastSeen:serverTimestamp()}).catch(()=>{}),
+      onDisconnect(ref(this.db,`rooms/${code}/players/${this.uid}`)).remove(),
+      onDisconnect(ref(this.db,`rooms/${code}/pos/${this.uid}`)).remove(),
+      onDisconnect(ref(this.db,`rooms/${code}/presence/${this.uid}`)).remove(),
+      onDisconnect(ref(this.db,`presence/${this.uid}`)).remove()
+    ]);
     // 입장 직후 발생하는 최초 meta 콜백이 화면 전환을 중복으로 일으키지 않도록 한 번 무시합니다.
     this._suppressInitialPhase=true;
     this.attach(); if(G.isHost)this.startHostLoop();
