@@ -987,7 +987,12 @@ let WALL_H=56;   // 맵마다 다르게 쓸 수 있도록 가변값(각 build*()
 function buildMap(){
   WALL_H=56;
   // 바닥
-  const floor=new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W,ROOM_D),lambert({map:TEX.floor}));
+  let floorMat = lambert({map:TEX.floor});
+  if (isInkMode()) {
+    if (!sharedFloorTexture) initSharedFloorCanvas();
+    floorMat = lambert({map: sharedFloorTexture});
+  }
+  const floor=new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W,ROOM_D),floorMat);
   floor.rotation.x=-Math.PI/2; mapRoot.add(floor); samplables.push(floor);
   // 천장
   const ceil=new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W,ROOM_D),lambert({color:0xf5f2e8}));
