@@ -3156,7 +3156,7 @@ function updateRemotes(dt){
     animateFairyMovement(r.fairy,dt,remoteSpeed,r.target.pose,true,r.target.flying,r.target.zombieState||0);
     updateFairyWeaponVisual(r.fairy, r.info.role, r.info.inkWeapon);
     if(r.fairy.nameLabel){
-      r.fairy.nameLabel.visible=G.spectating&&r.info.role==="hider";
+      r.fairy.nameLabel.visible=isInkMode() || (G.spectating&&r.info.role==="hider");
     }
     // 시야 밖/원거리 간소화
     const d=camera.position.distanceTo(r.fairy.group.position);
@@ -3178,7 +3178,7 @@ function isHiderThirdPerson(){
   return G.screen==="GAME"&&G.role==="hider"&&!G.found&&!G.spectating;
 }
 function syncLocalFairy(){
-  const show=G.screen==="GAME"&&(G.mirror||(G.role==="hider"&&!G.found));
+  const show=G.screen==="GAME"&&(G.mirror||(isInkMode()&&!G.spectating)||(G.role==="hider"&&!G.found));
   myFairy.group.visible=show;
   if(!show)return;
 
@@ -4991,6 +4991,8 @@ const Net={
       Object.keys(latestPlayers).forEach(u=>{
         let role;
         if (zombieMode) {
+          role = (u===this.uid&&hostRole==="spectator")?"ghost":"hider";
+        } else if (inkMode) {
           role = (u===this.uid&&hostRole==="spectator")?"ghost":"hider";
         } else {
           role = (u===this.uid&&hostRole==="spectator")?"ghost":(seekers.has(u)?"seeker":"hider");
