@@ -6354,7 +6354,7 @@ async function startOfflinePractice(){
     if (typeof initOfflinePracticeObjects === "function") {
       initOfflinePracticeObjects();
     }
-    G.found=false; G.spectating=false; G.lobbyPractice=false; G.pose="stand"; G.vy=0;
+    G.zombieState=0; G.found=false; G.spectating=false; G.lobbyPractice=false; G.pose="stand"; G.vy=0;
     // 고른 맵의 안전한 숨는 자리에서 시작합니다. (없으면 교실 기본 위치)
     const sp=(hiderSpawns&&hiderSpawns.length)?hiderSpawns[0]:null;
     if(sp) G.pos.set(sp.x,0,sp.z); else G.pos.set(0,0,10);
@@ -6489,8 +6489,8 @@ function updateDayNightCycle(dt) {
   let targetAmbientIntensity = AMB_BASE;
   let targetAmbientColor = 0xffffff;
   
-  if (G.phase === "SEEK") {
-    // 본게임 단계: 60초 주기(낮 30초, 밤 30초)로 밤과 낮이 번갈아 변경됨
+  if (G.phase === "SEEK" || Net.mode === "practice") {
+    // 본게임 단계 또는 혼자 연습모드: 60초 주기(낮 30초, 밤 30초)로 밤과 낮이 번갈아 변경됨
     const cycle = 60;
     const t = (Net.now ? Net.now() : Date.now()) / 1000;
     const sec = t % cycle;
@@ -7571,7 +7571,7 @@ function spawnCureLocally() {
   const rz = (Math.random() - 0.5) * 42;
   const ry = 0.5;
   const id = "local_cure_" + Math.floor(Math.random() * 1000000);
-  const mesh = buildVaccineMesh();
+  const mesh = buildCureMesh();
   mesh.position.set(rx, ry, rz);
   scene.add(mesh);
   cureSpawns.push({ id, x: rx, y: ry, z: rz, mesh });
