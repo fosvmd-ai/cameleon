@@ -917,6 +917,7 @@ function clearMap(){
   colliders.length=0; samplables.length=0; refillZones.length=0;
   hiderSpawns=[]; seekerSpawns.length=0;
   clearAllSplatDecals();
+  if (typeof clearPracticeAI === "function") clearPracticeAI();
 }
 
 function lambert(opt){ return new THREE.MeshLambertMaterial(opt); }
@@ -3993,8 +3994,30 @@ addEventListener("keydown",e=>{
   if(e.code==="Digit1")setPose("stand");
   if(e.code==="Digit2")setPose("lie");
   if(e.code==="Digit3")setPose("lean");
-  if(e.code==="Digit4")setPose("roll");
-  if(e.code==="Digit5")setPose("fold");
+  if(e.code==="Digit4") {
+    if (Net.mode === "practice" && isInkMode()) {
+      G.inkWeapon = "shooter"; toast("🔫 무기 교체: 물총");
+    } else {
+      setPose("roll");
+    }
+  }
+  if(e.code==="Digit5") {
+    if (Net.mode === "practice" && isInkMode()) {
+      G.inkWeapon = "grenade"; toast("💣 무기 교체: 수류탄");
+    } else {
+      setPose("fold");
+    }
+  }
+  if(Net.mode === "practice") {
+    if(e.code==="KeyZ") {
+      G.zombieState = (G.zombieState === 2) ? 0 : 2;
+      applyZombieSkinToFairy(myFairy, G.zombieState);
+      toast(G.zombieState === 2 ? "🧟 좀비로 상태가 변환되었습니다!" : "🏃 인간으로 상태가 변환되었습니다!");
+    }
+    if(e.code==="Digit6" && isInkMode()) { G.inkWeapon = "cannon"; toast("💥 무기 교체: 대포"); }
+    if(e.code==="Digit7" && isInkMode()) { G.inkWeapon = "shotgun"; toast("🔥 무기 교체: 샷건"); }
+    if(e.code==="Digit8" && isInkMode()) { G.inkWeapon = "roller"; toast("🧹 무기 교체: 롤러"); }
+  }
   if(e.code==="KeyM")Audio2.toggleMute();
 });
 addEventListener("keyup",e=>{
@@ -6328,6 +6351,9 @@ async function startOfflinePractice(){
     if (isInkMode()) {
       initSharedFloorCanvas();
     }
+    if (typeof initOfflinePracticeObjects === "function") {
+      initOfflinePracticeObjects();
+    }
     G.found=false; G.spectating=false; G.lobbyPractice=false; G.pose="stand"; G.vy=0;
     // 고른 맵의 안전한 숨는 자리에서 시작합니다. (없으면 교실 기본 위치)
     const sp=(hiderSpawns&&hiderSpawns.length)?hiderSpawns[0]:null;
@@ -7449,6 +7475,7 @@ function loop(){
     const blocked=(G.role==="seeker"&&G.phase==="PAINT");
     if(!blocked)updateMovement(dt);
     checkEmbedded(dt);
+    if (typeof updatePracticeAI === "function") updatePracticeAI(dt);
     updateRemotes(dt);updateParticles(dt);updatePencil(dt);updateHUD();
   }else if(G.screen==="RESULT"){
     updateRemotes(dt);updateParticles(dt);updateResultReveal();
@@ -7463,6 +7490,236 @@ function loop(){
   if(G.spectating){ G.specAnchorPos.add(_specGimmickDelta.copy(G.pos).sub(_specGimmickPrev)); syncLocalFairy(); }
   renderer.render(scene,camera);
 }
+
+/* ================================================================
+   🤖 오프라인 연습 모드 AI 봇 및 로컬 테스트 시스템 (좀비 / 스플래툰 지원)
+   ================================================================ */
+let practiceAIList = [];
+let localCureTimer = 0;
+let localWeaponBoxTimer = 0;
+
+function clearPracticeAI() {
+  practiceAIList.forEach(bot => {
+    if (bot.fairy && bot.fairy.group) {
+      scene.remove(bot.fairy.group);
+    }
+  });
+  practiceAIList = [];
+}
+
+function spawnPracticeAI(role, zombieState, teamId, inkWeapon) {
+  const rx = (Math.random() - 0.5) * 60;
+  const rz = (Math.random() - 0.5) * 44;
+  const ry = 0.5;
+  
+  const isPencil = (role === "seeker" || zombieState === 2);
+  const canvas = isPencil ? makePencilCanvas() : makeEraserCanvas();
+  const fairy = buildFairy(canvas, isPencil);
+  fairy.group.position.set(rx, ry, rz);
+  fairy.group.visible = true;
+  scene.add(fairy.group);
+  
+  const botId = "bot_" + Math.floor(Math.random() * 1000000);
+  const tColor = TEAM_COLORS[teamId]?.color || "#007AFF";
+  const tName = TEAM_COLORS[teamId]?.name || "상대팀";
+  
+  setFairyNameLabel(fairy.nameLabel, `봇_${botId.slice(4, 8)} (${tName})`, 100, false);
+  updateFairyWeaponVisual(fairy, role, inkWeapon);
+  applyZombieSkinToFairy(fairy, zombieState);
+  
+  practiceAIList.push({
+    id: botId,
+    fairy,
+    pos: new THREE.Vector3(rx, ry, rz),
+    yaw: Math.random() * Math.PI * 2,
+    role,
+    zombieState,
+    teamId,
+    teamColor: tColor,
+    inkWeapon,
+    vy: 0,
+    changeDirTimer: 0,
+    moveDir: new THREE.Vector2(0, 0),
+    shootTimer: Math.random() * 2.0
+  });
+}
+
+function initOfflinePracticeObjects() {
+  clearPracticeAI();
+  localCureTimer = 0;
+  localWeaponBoxTimer = 0;
+  
+  const gm = G.practiceGameMode || "hide";
+  if (gm === "zombie") {
+    // 인간 봇 2마리, 좀비 봇 1마리 스폰
+    spawnPracticeAI("hider", 0, "team1", "none");
+    spawnPracticeAI("hider", 0, "team1", "none");
+    spawnPracticeAI("hider", 2, "team1", "none");
+    spawnCureLocally();
+  } else if (gm === "splatoon") {
+    // 블루팀 봇 2마리, 우리 레드팀 봇 1마리 스폰
+    spawnPracticeAI("hider", 0, "team2", "shooter");
+    spawnPracticeAI("hider", 0, "team2", "roller");
+    spawnPracticeAI("hider", 0, "team1", "shooter");
+    spawnWeaponBoxLocally();
+    spawnWeaponBoxLocally();
+  }
+}
+
+function spawnCureLocally() {
+  const rx = (Math.random() - 0.5) * 58;
+  const rz = (Math.random() - 0.5) * 42;
+  const ry = 0.5;
+  const id = "local_cure_" + Math.floor(Math.random() * 1000000);
+  const mesh = buildVaccineMesh();
+  mesh.position.set(rx, ry, rz);
+  scene.add(mesh);
+  cureSpawns.push({ id, x: rx, y: ry, z: rz, mesh });
+}
+
+function spawnWeaponBoxLocally() {
+  const rx = (Math.random() - 0.5) * 58;
+  const rz = (Math.random() - 0.5) * 42;
+  const ry = 0.5;
+  const id = "local_weaponbox_" + Math.floor(Math.random() * 10000000);
+  const buildResult = buildWeaponBoxMesh();
+  buildResult.group.position.set(rx, ry, rz);
+  scene.add(buildResult.group);
+  weaponBoxSpawns.push({ id, x: rx, y: ry, z: rz, group: buildResult.group });
+}
+
+function updatePracticeAI(dt) {
+  if (Net.mode !== "practice" || G.screen !== "GAME") return;
+  const gm = G.practiceGameMode || "hide";
+  const nowTime = performance.now() / 1000;
+  
+  practiceAIList.forEach(bot => {
+    bot.changeDirTimer -= dt;
+    if (bot.changeDirTimer <= 0) {
+      bot.changeDirTimer = 1.5 + Math.random() * 2.0;
+      
+      if (gm === "zombie") {
+        if (bot.zombieState === 2) {
+          if (G.zombieState === 0) {
+            const dir = new THREE.Vector2(G.pos.x - bot.pos.x, G.pos.z - bot.pos.z).normalize();
+            bot.moveDir.copy(dir);
+          } else {
+            bot.moveDir.set((Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2).normalize();
+          }
+        } else {
+          let dangerSource = null;
+          if (G.zombieState === 2) dangerSource = G.pos;
+          else {
+            const zBot = practiceAIList.find(b => b.zombieState === 2);
+            if (zBot) dangerSource = zBot.pos;
+          }
+          
+          if (dangerSource) {
+            const dir = new THREE.Vector2(bot.pos.x - dangerSource.x, bot.pos.z - dangerSource.z).normalize();
+            bot.moveDir.copy(dir);
+          } else {
+            bot.moveDir.set((Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2).normalize();
+          }
+        }
+      } else {
+        bot.moveDir.set((Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2).normalize();
+      }
+    }
+    
+    const speed = bot.zombieState === 2 ? 6.8 : 5.0;
+    const dx = bot.moveDir.x * speed * dt;
+    const dz = bot.moveDir.y * speed * dt;
+    
+    const nextX = clamp(bot.pos.x + dx, -ROOM_W/2 + 2.5, ROOM_W/2 - 2.5);
+    const nextZ = clamp(bot.pos.z + dz, -ROOM_D/2 + 2.5, ROOM_D/2 - 2.5);
+    
+    let collided = false;
+    const botBox = new THREE.Box3(
+      new THREE.Vector3(nextX - 0.6, bot.pos.y - 0.6, nextZ - 0.6),
+      new THREE.Vector3(nextX + 0.6, bot.pos.y + 0.6, nextZ + 0.6)
+    );
+    
+    for (let c of colliders) {
+      if (botBox.intersectsBox(c)) {
+        collided = true;
+        break;
+      }
+    }
+    
+    if (!collided) {
+      bot.pos.x = nextX;
+      bot.pos.z = nextZ;
+    } else {
+      bot.moveDir.negate();
+      bot.changeDirTimer = 0.5;
+    }
+    
+    bot.fairy.group.position.copy(bot.pos);
+    if (bot.moveDir.lengthSq() > 0.01) {
+      bot.yaw = Math.atan2(-bot.moveDir.y, bot.moveDir.x);
+    }
+    bot.fairy.group.rotation.y = bot.yaw + Math.PI;
+    
+    const speedVal = collided ? 0 : speed;
+    animateFairyMovement(bot.fairy, dt, speedVal, "stand", true, false, bot.zombieState);
+    
+    if (gm === "zombie") {
+      if (bot.zombieState === 2 && G.zombieState === 0 && !G.found) {
+        const dist = bot.pos.distanceTo(G.pos);
+        if (dist < 1.6) {
+          G.zombieState = 1;
+          infectionTimer = 5.0;
+          Audio2.sfxBreak();
+          toast("🧟 으악! 좀비 봇에게 물리셨습니다! 5초 뒤 좀비로 변합니다!");
+        }
+      }
+      if (G.zombieState === 2 && bot.zombieState === 0) {
+        const dist = bot.pos.distanceTo(G.pos);
+        if (dist < 1.6) {
+          bot.zombieState = 2;
+          applyZombieSkinToFairy(bot.fairy, 2);
+          Audio2.sfxFound();
+          burst(bot.pos.clone().add(new THREE.Vector3(0, 0.5, 0)), "#3f8a4f", 12, 3.5, 0.5);
+          toast(`🧟 성공! 인간 봇을 좀비로 감염시켰습니다!`);
+        }
+      }
+    }
+    
+    if (gm === "splatoon") {
+      bot.shootTimer -= dt;
+      if (bot.shootTimer <= 0) {
+        bot.shootTimer = 0.5 + Math.random() * 0.9;
+        
+        const vx = Math.cos(bot.yaw) * 22;
+        const vz = -Math.sin(bot.yaw) * 22;
+        
+        if (bot.inkWeapon === "roller") {
+          paintInkOnFloor(bot.pos.x, bot.pos.z, 2.3, bot.teamColor);
+          if (Math.random() < 0.25) {
+            spawnSplatDecal(bot.pos.x, 0.05, bot.pos.z, bot.teamColor, 2.3);
+          }
+        } else {
+          spawnInkProjectile(bot.pos.x, bot.pos.y + 0.6, bot.pos.z, vx, 1.5, vz, bot.teamId, bot.teamColor, bot.inkWeapon, 2.0);
+        }
+      }
+    }
+  });
+  
+  if (gm === "zombie") {
+    localCureTimer += dt;
+    if (localCureTimer >= 15.0) {
+      localCureTimer = 0;
+      if (cureSpawns.length < 3) spawnCureLocally();
+    }
+  } else if (gm === "splatoon") {
+    localWeaponBoxTimer += dt;
+    if (localWeaponBoxTimer >= 12.0) {
+      localWeaponBoxTimer = 0;
+      if (weaponBoxSpawns.length < 4) spawnWeaponBoxLocally();
+    }
+  }
+}
+
 loop();
 </script>
 </body>
