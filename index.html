@@ -581,6 +581,25 @@ if (typeof window.TEACHER_CODE === "undefined" || !window.TEACHER_CODE) window.T
     <div id="timer">3:00</div>
     <div id="phaseLabel"></div>
     <div id="iconRow"></div>
+    <div id="inkScoreBoard" class="hidden" style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 5px; padding: 4px 10px; background: rgba(0,0,0,0.6); border-radius: 12px; pointer-events: none;">
+      <div style="font-size: 11px; font-weight: bold; color: #fff; text-shadow: 0 1px 2px #000; margin-right: 2px;">🎨 점유율:</div>
+      <div id="inkScoreBoardTeams" style="display: flex; gap: 8px; align-items: center;"></div>
+    </div>
+    <div id="zombieScoreBoard" class="hidden" style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 5px; padding: 4px 10px; background: rgba(0,0,0,0.6); border-radius: 12px; pointer-events: none;">
+      <div style="font-size: 11px; font-weight: bold; color: #fff; text-shadow: 0 1px 2px #000; margin-right: 2px;">🧟 좀비 현황:</div>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 4px;">
+          <span style="display: inline-block; width: 6px; height: 6px; background: #34C759; border-radius: 50%;"></span>
+          <span style="font-size: 11px; font-weight: bold; color: #eee;">생존자:</span>
+          <span id="zombieScoreBoardHumans" style="font-size: 11px; font-weight: bold; color: #fff; text-shadow: 0 0 1px #000;">0명</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 4px;">
+          <span style="display: inline-block; width: 6px; height: 6px; background: #FF3B30; border-radius: 50%;"></span>
+          <span style="font-size: 11px; font-weight: bold; color: #eee;">좀비:</span>
+          <span id="zombieScoreBoardZombies" style="font-size: 11px; font-weight: bold; color: #fff; text-shadow: 0 0 1px #000;">0명</span>
+        </div>
+      </div>
+    </div>
   </div>
   <div id="gaugeBox">
     <div class="pal"></div>
@@ -2580,10 +2599,10 @@ function remapUVRange(geo,start,count,rc){
     uv.setXY(i, rc[0]+uv.getX(i)*(rc[2]-rc[0]), rc[1]+uv.getY(i)*(rc[3]-rc[1]));
   uv.needsUpdate=true;
 }
-function makeEraserCanvas(){
+function makeEraserCanvas(bgColor = "#FFFFFF"){
   const c=document.createElement("canvas");c.width=256;c.height=256;
   const g=c.getContext("2d");
-  g.fillStyle="#FFFFFF";g.fillRect(0,0,256,256);
+  g.fillStyle=bgColor;g.fillRect(0,0,256,256);
   // 눈 2개 — 앞면 영역(캔버스 x0-128, y0-128 / y는 v반전이라 위쪽=작은 y)
   g.fillStyle="#2B2B2B";
   g.beginPath();g.arc(46,34,6,0,7);g.fill();
@@ -3101,17 +3120,28 @@ function ensureRemote(uid,info){
   let r=remotes.get(uid);
   if(!r){
     const isPencil=info.role==="seeker";
-    const canvas=isPencil?makePencilCanvas():makeEraserCanvas();
+    let bgColor = "#FFFFFF";
+    if (isInkMode()) {
+      bgColor = TEAM_COLORS[info.teamId || "team1"]?.color || "#FF3B30";
+    }
+    const canvas=isPencil?makePencilCanvas():makeEraserCanvas(bgColor);
     const fairy=buildFairy(canvas,isPencil);
     fairy.group.userData.baseY=0;
     // 선생님(참관/ghost)은 그냥 관찰자일 뿐 교실에 몸을 갖지 않습니다.
     fairy.group.visible=(info.role!=="ghost");
     scene.add(fairy.group);
     r={fairy,info,foundApplied:false,
-       target:{x:0,y:0,z:0,ry:0,pose:"stand",flying:false},cur:{x:0,y:0,z:0,ry:0},prevX:0,prevZ:0};
+       target:{x:0,y:0,z:0,ry:0,pose:"stand",flying:false},cur:{x:0,y:0,z:0,ry:0},prevX:0,prevZ:0,lastTeamId:info.teamId};
     remotes.set(uid,r);
   }
   r.info=info;
+  if (isInkMode() && info.teamId !== r.lastTeamId) {
+    r.lastTeamId = info.teamId;
+    const g = r.fairy.canvas.getContext("2d");
+    const bg = TEAM_COLORS[info.teamId || "team1"]?.color || "#FF3B30";
+    g.drawImage(makeEraserCanvas(bg),0,0);
+    r.fairy.tex.needsUpdate = true;
+  }
   updateFairyWeaponVisual(r.fairy, info.role, info.inkWeapon);
   if(info.role==="ghost"){ r.fairy.group.visible=false; return r; }
   
@@ -3996,7 +4026,7 @@ addEventListener("keydown",e=>{
   if(e.code==="Digit3")setPose("lean");
   if(e.code==="Digit4") {
     if (Net.mode === "practice" && isInkMode()) {
-      G.inkWeapon = "shooter"; toast("🔫 무기 교체: 물총");
+      G.inkWeapon = "rifle"; toast("🔫 무기 교체: 물총");
     } else {
       setPose("roll");
     }
@@ -4080,7 +4110,10 @@ renderer.domElement.addEventListener("mousedown",e=>{
     }
     return;
   }
-  if(e.button===2||e.altKey){ if(G.role==="hider"&&(G.phase==="PAINT"||G.phase==="SEEK"))trySample(e.clientX,e.clientY); return; }
+  if(e.button===2||e.altKey){
+    if(G.role==="hider"&&(G.phase==="PAINT"||G.phase==="SEEK"))trySample(e.clientX,e.clientY);
+    return;
+  }
   if(e.button===0){
     if(G.role==="seeker"&&G.phase==="SEEK"){
       if(IS_TOUCH){ tryJudge(); return; } // 모바일은 기존 중앙 조준 유지
@@ -4090,12 +4123,16 @@ renderer.domElement.addEventListener("mousedown",e=>{
     }
     if(!pointerLocked&&!IS_TOUCH) {
       renderer.domElement.requestPointerLock();
-    } else if (pointerLocked && !IS_TOUCH) {
+    }
+    if(!IS_TOUCH) {
       if (isInkMode() && G.role === "hider" && !G.found) {
         fireInkWeapon();
       }
     }
   }
+});
+window.addEventListener("contextmenu",e=>{
+  e.preventDefault();
 });
 addEventListener("mousemove",e=>{
   if(!G.mirror)return;
@@ -4547,10 +4584,10 @@ const Net={
     onChildAdded(boxesRef, s => {
       const data = s.val(); if(!data) return;
       if (weaponBoxSpawns.some(item => item.id === data.id)) return;
-      const meshObj = buildWeaponBoxMesh();
+      const meshObj = buildWeaponBoxMesh(data.weaponType);
       meshObj.group.position.set(data.x, data.y, data.z);
       scene.add(meshObj.group);
-      weaponBoxSpawns.push({ id: data.id, x: data.x, y: data.y, z: data.z, group: meshObj.group, topMark: meshObj.topMark });
+      weaponBoxSpawns.push({ id: data.id, x: data.x, y: data.y, z: data.z, weaponType: data.weaponType, group: meshObj.group, topMark: meshObj.topMark });
     });
     onChildRemoved(boxesRef, s => {
       const id = s.key;
@@ -5174,7 +5211,8 @@ function enterPaint(){
   G.vy=0; G.spectating=false;G.lobbyPractice=false; G.mirror&&setMirror(false);
   // 내 캔버스 초기화
   const g=myFairy.canvas.getContext("2d");
-  g.drawImage(makeEraserCanvas(),0,0); myFairy.tex.needsUpdate=true;
+  const bgColor = isInkMode() ? G.teamColor : "#FFFFFF";
+  g.drawImage(makeEraserCanvas(bgColor),0,0); myFairy.tex.needsUpdate=true;
   [...remotes.keys()].forEach(removeRemote); // 라운드 리셋
   const me=Net.mode==="online"?Net.players[Net.uid]:{role:G.role};
   G.role=me.role||"hider";
@@ -5537,6 +5575,8 @@ function showScreen(name){
   $("screenRoulette").classList.toggle("hidden",name!=="ROULETTE");
   $("screenResult").classList.toggle("hidden",name!=="RESULT");
   $("hud").classList.toggle("hidden",name!=="GAME");
+  $("inkScoreBoard").classList.toggle("hidden", name!=="GAME" || !isInkMode());
+  $("zombieScoreBoard").classList.toggle("hidden", name!=="GAME" || !(Net.meta?.settings?.gameMode === "zombie" || !!G.lobbyPracticeZombie));
   $("mobileUI").classList.toggle("hidden",!(IS_TOUCH&&name==="GAME"));
   $("btnPracticeReturn").classList.toggle("hidden",!(name==="GAME"&&G.lobbyPractice));
   if(name!=="GAME"){ $("paintPanel").classList.add("hidden"); $("blockOverlay").classList.add("hidden");
@@ -6015,7 +6055,9 @@ async function startLobbyPractice(){
     G.spectating=false;G.mirror&&setMirror(false);G.pose="stand";
     const sp=(hiderSpawns&&hiderSpawns.length)?hiderSpawns[0]:null;
     if(sp)G.pos.set(sp.x,0,sp.z); else G.pos.set(0,0,10);
-    const ctx=myFairy.canvas.getContext("2d");ctx.drawImage(makeEraserCanvas(),0,0);myFairy.tex.needsUpdate=true;
+    const ctx=myFairy.canvas.getContext("2d");
+    const bgColor = isInkMode() ? G.teamColor : "#FFFFFF";
+    ctx.drawImage(makeEraserCanvas(bgColor),0,0);myFairy.tex.needsUpdate=true;
     showScreen("GAME");
     $("paintPanel").classList.remove("hidden");
     $("btnPracticeReturn").classList.remove("hidden");
@@ -6359,7 +6401,9 @@ async function startOfflinePractice(){
     const sp=(hiderSpawns&&hiderSpawns.length)?hiderSpawns[0]:null;
     if(sp) G.pos.set(sp.x,0,sp.z); else G.pos.set(0,0,10);
     G.paint=1000; G.flying=false; G.flyUp=false; G.flyDown=false;
-    const g=myFairy.canvas.getContext("2d"); g.drawImage(makeEraserCanvas(),0,0); myFairy.tex.needsUpdate=true;
+    const g=myFairy.canvas.getContext("2d");
+    const bgColor = isInkMode() ? G.teamColor : "#FFFFFF";
+    g.drawImage(makeEraserCanvas(bgColor),0,0); myFairy.tex.needsUpdate=true;
     showScreen("GAME");
     $("paintPanel").classList.remove("hidden");
     const mapName=(MAPS[practiceMapId]&&MAPS[practiceMapId].name)||"교실";
@@ -6871,11 +6915,14 @@ const TEAM_COLORS = {
   team4: { color: "#34C759", name: "그린팀" }
 };
 const INK_WEAPONS = {
-  shooter: { name: "물총", type: "shooter", cooldown: 180, radius: 1.5 },
-  grenade: { name: "페인트 수류탄", type: "grenade", cooldown: 1200, radius: 3.5 },
-  slosher: { name: "대포", type: "slosher", cooldown: 700, radius: 2.8 },
-  buckshot: { name: "샷건", type: "buckshot", cooldown: 450, radius: 1.2 },
-  roller: { name: "붓", type: "roller", cooldown: 0, radius: 1.8 }
+  rifle: { name: "물총", type: "rifle", cooldown: 160, radius: 1.5 },
+  shooter: { name: "물총", type: "rifle", cooldown: 160, radius: 1.5 }, // 구형 호환
+  grenade: { name: "페인트 수류탄", type: "grenade", cooldown: 1200, radius: 3.8 },
+  cannon: { name: "대포", type: "cannon", cooldown: 750, radius: 2.6 },
+  slosher: { name: "대포", type: "cannon", cooldown: 750, radius: 2.6 }, // 구형 호환
+  shotgun: { name: "샷건", type: "shotgun", cooldown: 500, radius: 1.1 },
+  buckshot: { name: "샷건", type: "shotgun", cooldown: 500, radius: 1.1 }, // 구형 호환
+  roller: { name: "붓(롤러)", type: "roller", cooldown: 0, radius: 1.15 }
 };
 
 let inkProjectiles = [];
@@ -6883,13 +6930,13 @@ let lastFireTime = 0;
 
 G.teamId = "team1";
 G.teamColor = "#FF3B30";
-G.inkWeapon = "shooter";
+G.inkWeapon = "rifle";
 G.inkPercent = 0; 
 G.splatTimer = 0; 
 G.invincibleTimer = 0; 
 
 function spawnInkProjectile(x, y, z, vx, vy, vz, teamId, color, type, radius) {
-  const geo = new THREE.SphereGeometry(type === "slosher" ? 0.22 : 0.12, 8, 8);
+  const geo = new THREE.SphereGeometry(type === "cannon" ? 0.22 : 0.12, 8, 8);
   const mat = lambert({color: color});
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.set(x, y, z);
@@ -6974,7 +7021,7 @@ function fireInkWeapon() {
   if (G.screen !== "GAME" || G.found || G.spectating) return;
   if (G.splatTimer && G.splatTimer > 0) return;
   
-  const w = INK_WEAPONS[G.inkWeapon || "shooter"];
+  const w = INK_WEAPONS[G.inkWeapon || "rifle"];
   if (!w) return;
   
   const now = performance.now();
@@ -6989,13 +7036,13 @@ function fireInkWeapon() {
   
   const myColor = G.teamColor || "#FF3B30";
   
-  if (w.type === "shooter") {
+  if (w.type === "rifle" || w.type === "shooter") {
     const speed = 16.0;
     const spread = 0.05;
     const vx = dir.x * speed + (Math.random() - 0.5) * spread;
     const vy = dir.y * speed + 2.5;
     const vz = dir.z * speed + (Math.random() - 0.5) * spread;
-    spawnInkProjectile(startPos.x, startPos.y, startPos.z, vx, vy, vz, G.teamId, myColor, "shooter", w.radius);
+    spawnInkProjectile(startPos.x, startPos.y, startPos.z, vx, vy, vz, G.teamId, myColor, "rifle", w.radius);
     
   } else if (w.type === "grenade") {
     const speed = 10.0;
@@ -7004,14 +7051,14 @@ function fireInkWeapon() {
     const vz = dir.z * speed;
     spawnInkProjectile(startPos.x, startPos.y, startPos.z, vx, vy, vz, G.teamId, myColor, "grenade", w.radius);
     
-  } else if (w.type === "slosher") {
+  } else if (w.type === "cannon" || w.type === "slosher") {
     const speed = 12.0;
     const vx = dir.x * speed;
     const vy = dir.y * speed + 3.0;
     const vz = dir.z * speed;
-    spawnInkProjectile(startPos.x, startPos.y, startPos.z, vx, vy, vz, G.teamId, myColor, "slosher", w.radius);
+    spawnInkProjectile(startPos.x, startPos.y, startPos.z, vx, vy, vz, G.teamId, myColor, "cannon", w.radius);
     
-  } else if (w.type === "buckshot") {
+  } else if (w.type === "shotgun" || w.type === "buckshot") {
     const speed = 14.0;
     for (let i = 0; i < 5; i++) {
       const spreadX = (Math.random() - 0.5) * 0.22;
@@ -7020,7 +7067,7 @@ function fireInkWeapon() {
       const vx = dir.x * speed + spreadX;
       const vy = dir.y * speed + 1.5 + spreadY;
       const vz = dir.z * speed + spreadZ;
-      spawnInkProjectile(startPos.x, startPos.y, startPos.z, vx, vy, vz, G.teamId, myColor, "buckshot", w.radius);
+      spawnInkProjectile(startPos.x, startPos.y, startPos.z, vx, vy, vz, G.teamId, myColor, "shotgun", w.radius);
     }
   }
 }
@@ -7038,22 +7085,39 @@ function sendSplatEvent(x, y, z, r, color) {
 let weaponBoxSpawns = [];
 let weaponBoxSpawnTimer = 0;
 
-function buildWeaponBoxMesh() {
+function buildWeaponBoxMesh(weaponType) {
   const group = new THREE.Group();
+  
+  const colors = {
+    rifle: 0x4aa8ff,
+    shooter: 0x4aa8ff,
+    grenade: 0xff7a00,
+    cannon: 0x9b51e0,
+    slosher: 0x9b51e0,
+    shotgun: 0xff4d6d,
+    buckshot: 0xff4d6d,
+    roller: 0x27ae60
+  };
+  const themeColor = colors[weaponType] || 0xF5C518;
   
   const boxMat = lambert({color: 0x22262a});
   const box = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.7), boxMat);
   box.position.y = 0.35;
   group.add(box);
   
-  const inkMat = lambert({color: 0xF5C518});
-  const topMark = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.35, 0.35), inkMat);
-  topMark.position.y = 0.95;
+  const inkMat = lambert({color: themeColor});
+  const topMark = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), inkMat);
+  topMark.position.y = 0.8;
   topMark.rotation.set(Math.PI/4, Math.PI/4, 0);
   group.add(topMark);
   
+  const weaponMini = buildThirdPersonWeaponMesh(weaponType || "rifle");
+  weaponMini.scale.set(1.5, 1.5, 1.5);
+  weaponMini.position.y = 1.15;
+  group.add(weaponMini);
+  
   group.position.y = 0.5;
-  return { group, topMark };
+  return { group, topMark: weaponMini };
 }
 
 function spawnWeaponBoxOnFirebase() {
@@ -7062,7 +7126,10 @@ function spawnWeaponBoxOnFirebase() {
   const rz = (Math.random() - 0.5) * 38;
   const ry = 0.5; 
   
-  const boxData = { id, x: rx, y: ry, z: rz };
+  const types = ["rifle", "grenade", "cannon", "shotgun", "roller"];
+  const rType = types[Math.floor(Math.random() * types.length)];
+  
+  const boxData = { id, x: rx, y: ry, z: rz, weaponType: rType };
   Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/weaponBoxes/${id}`), boxData).catch(()=>{});
 }
 
@@ -7081,15 +7148,18 @@ function updateWeaponBoxes(dt) {
       if (dist < 1.3 && Math.abs(G.pos.y - boxObj.y) < 1.6) {
         Audio2.sfxRefill(); 
         
-        const weapons = Object.keys(INK_WEAPONS);
-        const filtered = weapons.filter(w => w !== G.inkWeapon);
-        const newWep = filtered[Math.floor(Math.random() * filtered.length)];
+        let newWep = boxObj.weaponType;
+        if (!newWep) {
+          const weapons = Object.keys(INK_WEAPONS);
+          const filtered = weapons.filter(w => w !== G.inkWeapon);
+          newWep = filtered[Math.floor(Math.random() * filtered.length)];
+        }
         
         G.inkWeapon = newWep;
         if (Net.mode === "online" && Net.db && Net.uid) {
           Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/players/${Net.uid}/inkWeapon`), newWep).catch(()=>{});
         }
-        const wepInfo = INK_WEAPONS[newWep];
+        const wepInfo = INK_WEAPONS[newWep] || INK_WEAPONS.rifle;
         toast(`🔫 무기 획득! [${wepInfo.name}]로 무기가 변경되었습니다!`);
         
         burst(new THREE.Vector3(boxObj.x, boxObj.y + 0.5, boxObj.z), G.teamColor, 10, 2.5, 0.4, false, 0.25);
@@ -7118,8 +7188,8 @@ function updateWeaponBoxes(dt) {
   weaponBoxSpawns.forEach(boxObj => {
     boxObj.group.rotation.y += dt * 1.5;
     if (boxObj.topMark) {
-      boxObj.topMark.rotation.x += dt * 2.0;
-      boxObj.topMark.position.y = 0.95 + Math.sin(time * 3.5) * 0.12;
+      boxObj.topMark.rotation.y += dt * 2.5;
+      boxObj.topMark.position.y = 1.15 + Math.sin(time * 3.5 + boxObj.x) * 0.12;
     }
     if (Math.random() < 0.12) {
       burst(new THREE.Vector3(boxObj.x, boxObj.y + 0.4, boxObj.z), "#ffffff", 1, 1.2, 0.2, true, 0.08);
@@ -7131,9 +7201,9 @@ function initWeaponBoxGame() {
   weaponBoxSpawns.forEach(boxObj => { scene.remove(boxObj.group); });
   weaponBoxSpawns = [];
   weaponBoxSpawnTimer = 0;
-  G.inkWeapon = "shooter"; 
+  G.inkWeapon = "rifle"; 
   if (Net.mode === "online" && Net.db && Net.uid) {
-    Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/players/${Net.uid}/inkWeapon`), "shooter").catch(()=>{});
+    Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/players/${Net.uid}/inkWeapon`), "rifle").catch(()=>{});
   }
 }
 
@@ -7165,7 +7235,7 @@ function buildThirdPersonWeaponMesh(weaponType) {
     lead.rotation.x = Math.PI / 2;
     lead.position.z = 0.25;
     group.add(lead);
-  } else if (weaponType === "shooter") {
+  } else if (weaponType === "rifle" || weaponType === "shooter") {
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 0.35), lambert({color: 0x4aa8ff}));
     body.position.z = -0.1;
     group.add(body);
@@ -7173,14 +7243,14 @@ function buildThirdPersonWeaponMesh(weaponType) {
     tank.position.set(0, 0.11, -0.05);
     tank.rotation.x = Math.PI / 2;
     group.add(tank);
-  } else if (weaponType === "bomb") {
+  } else if (weaponType === "grenade") {
     const body = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), lambert({color: 0x22262a}));
     body.position.z = -0.05;
     group.add(body);
     const pin = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.08, 0.04), lambert({color: 0xff3b30}));
     pin.position.set(0, 0.14, -0.05);
     group.add(pin);
-  } else if (weaponType === "slosher") {
+  } else if (weaponType === "cannon" || weaponType === "slosher") {
     const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.09, 0.32, 8), lambert({color: 0x22262a}));
     barrel.rotation.x = Math.PI / 2;
     barrel.position.z = -0.12;
@@ -7189,7 +7259,7 @@ function buildThirdPersonWeaponMesh(weaponType) {
     trim.rotation.x = Math.PI / 2;
     trim.position.z = -0.27;
     group.add(trim);
-  } else if (weaponType === "buckshot") {
+  } else if (weaponType === "shotgun" || weaponType === "buckshot") {
     const barrel1 = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.38, 6), lambert({color: 0x555555}));
     barrel1.rotation.x = Math.PI / 2;
     barrel1.position.set(-0.045, 0, -0.15);
@@ -7222,7 +7292,7 @@ function updateFairyWeaponVisual(fairyObj, role, weaponType) {
   if (role === "seeker") {
     targetWeapon = "seeker_pencil";
   } else if (isInkMode()) {
-    targetWeapon = weaponType || "shooter";
+    targetWeapon = weaponType || "rifle";
   }
   
   if (fairyObj.currentWeaponType === targetWeapon) return;
@@ -7268,7 +7338,7 @@ function spawnSplatDecal(worldX, worldY, worldZ, color, radius) {
   }
   scene.add(mesh);
   splatDecals.push(mesh);
-  if (splatDecals.length > 100) {
+  if (splatDecals.length > 3000) {
     const old = splatDecals.shift();
     scene.remove(old);
   }
@@ -7277,6 +7347,124 @@ function clearAllSplatDecals() {
   splatDecals.forEach(m => scene.remove(m));
   splatDecals = [];
 }
+
+let lastScoreBoardCalcTime = 0;
+function updateInkScoreBoard() {
+  if (!isInkMode() || !sharedFloorCtx) return;
+  
+  const canvasWidth = 1024;
+  const canvasHeight = 1024;
+  const step = 16;
+  
+  let imgData;
+  try {
+    imgData = sharedFloorCtx.getImageData(0, 0, canvasWidth, canvasHeight);
+  } catch (e) {
+    return;
+  }
+  
+  const data = imgData.data;
+  
+  const teamTargets = [
+    { id: "team1", name: "레드", r: 255, g: 59, b: 48, count: 0 },
+    { id: "team2", name: "블루", r: 0, g: 122, b: 255, count: 0 },
+    { id: "team3", name: "옐로", r: 255, g: 204, b: 0, count: 0 },
+    { id: "team4", name: "그린", r: 52, g: 199, b: 89, count: 0 }
+  ];
+  
+  let totalSampled = 0;
+  
+  for (let y = 0; y < canvasHeight; y += step) {
+    for (let x = 0; x < canvasWidth; x += step) {
+      const idx = (y * canvasWidth + x) * 4;
+      const r = data[idx];
+      const g = data[idx+1];
+      const b = data[idx+2];
+      const a = data[idx+3];
+      
+      if (a < 50) continue;
+      if (r > 220 && g > 220 && b > 220) continue;
+      
+      totalSampled++;
+      
+      let minDist = 999999;
+      let matchedTeam = null;
+      for (const team of teamTargets) {
+        const dist = Math.hypot(r - team.r, g - team.g, b - team.b);
+        if (dist < minDist) {
+          minDist = dist;
+          matchedTeam = team;
+        }
+      }
+      
+      if (matchedTeam && minDist < 120) {
+        matchedTeam.count++;
+      }
+    }
+  }
+  
+  const totalPoints = (canvasWidth / step) * (canvasHeight / step);
+  const container = document.getElementById("inkScoreBoardTeams");
+  if (!container) return;
+  
+  let html = "";
+  teamTargets.forEach(t => {
+    const pct = ((t.count / totalPoints) * 100).toFixed(1);
+    const hexColor = t.id === "team1" ? "#FF3B30" : (t.id === "team2" ? "#007AFF" : (t.id === "team3" ? "#FFCC00" : "#34C759"));
+    html += `
+      <div style="display: flex; align-items: center; gap: 4px;">
+        <span style="display: inline-block; width: 8px; height: 8px; background: ${hexColor}; border-radius: 50%;"></span>
+        <span style="font-size: 11px; font-weight: bold; color: #eee;">${t.name}:</span>
+        <span style="font-size: 11px; font-weight: bold; color: #fff; text-shadow: 0 0 1px #000;">${pct}%</span>
+      </div>
+    `;
+  });
+  container.innerHTML = html;
+}
+
+let lastZombieCalcTime = 0;
+function updateZombieScoreBoard() {
+  const isZombie = (Net.meta?.settings?.gameMode === "zombie" || !!G.lobbyPracticeZombie);
+  if (!isZombie || G.screen !== "GAME") return;
+  
+  let humanCount = 0;
+  let zombieCount = 0;
+  
+  if (G.role === "hider" && !G.spectating) {
+    if (G.zombieState === 2) {
+      zombieCount++;
+    } else {
+      humanCount++;
+    }
+  }
+  
+  if (Net.mode === "practice") {
+    practiceAIList.forEach(bot => {
+      if (bot.zombieState === 2) {
+        zombieCount++;
+      } else {
+        humanCount++;
+      }
+    });
+  } else if (Net.mode === "online" && Net.players) {
+    Object.entries(Net.players).forEach(([uid, info]) => {
+      if (uid === Net.uid) return;
+      if (info.role === "hider" && !info.spectating) {
+        if (info.zombieState === 2) {
+          zombieCount++;
+        } else {
+          humanCount++;
+        }
+      }
+    });
+  }
+  
+  const hEl = document.getElementById("zombieScoreBoardHumans");
+  const zEl = document.getElementById("zombieScoreBoardZombies");
+  if (hEl) hEl.textContent = humanCount + "명";
+  if (zEl) zEl.textContent = zombieCount + "명";
+}
+
 
 /* ================================================================
    💀 스플래툰 피격 물듦 및 아웃(Splat) / 부활 / 무적 보호막 시스템
@@ -7448,6 +7636,15 @@ function loop(){
   // 좀비 모드 및 밤낮 주기 갱신
   updateDayNightCycle(dt);
   updateZombieLogic(dt);
+  
+  const isZombie = (Net.meta?.settings?.gameMode === "zombie" || !!G.lobbyPracticeZombie);
+  if (isZombie) {
+    const nowTime = performance.now();
+    if (nowTime - lastZombieCalcTime > 500) {
+      lastZombieCalcTime = nowTime;
+      updateZombieScoreBoard();
+    }
+  }
   updateFlyGaugeAndFeathers(dt);
   
   if (isInkMode()) {
@@ -7455,16 +7652,24 @@ function loop(){
     updateWeaponBoxes(dt);
     updateSplatAndInvincible(dt);
     
+    const nowTime = performance.now();
+    if (nowTime - lastScoreBoardCalcTime > 500) {
+      lastScoreBoardCalcTime = nowTime;
+      updateInkScoreBoard();
+    }
+    
     // 붓(Roller) 이동 칠하기 기믹
     if (G.screen === "GAME" && G.role === "hider" && !G.found && G.inkWeapon === "roller" && G.grounded && (!G.splatTimer || G.splatTimer <= 0)) {
       const speed = Math.hypot(G.moveIn.x, G.moveIn.z);
       if (speed > 0.05) {
-        paintInkOnFloor(G.pos.x, G.pos.z, 2.0, G.teamColor);
-        spawnSplatDecal(G.pos.x, G.pos.y || 0.05, G.pos.z, G.teamColor, 2.0);
+        const rVal = INK_WEAPONS.roller.radius;
+        const cooldownMs = INK_WEAPONS.roller.cooldown * 1000;
+        paintInkOnFloor(G.pos.x, G.pos.z, rVal, G.teamColor);
+        spawnSplatDecal(G.pos.x, G.pos.y || 0.05, G.pos.z, G.teamColor, rVal);
         const now = performance.now();
-        if (!G.lastRollerSent || now - G.lastRollerSent > 150) {
+        if (!G.lastRollerSent || now - G.lastRollerSent > cooldownMs) {
           G.lastRollerSent = now;
-          sendSplatEvent(G.pos.x, G.pos.y || 0.05, G.pos.z, 2.0, G.teamColor);
+          sendSplatEvent(G.pos.x, G.pos.y || 0.05, G.pos.z, rVal, G.teamColor);
         }
       }
     }
@@ -7513,7 +7718,11 @@ function spawnPracticeAI(role, zombieState, teamId, inkWeapon) {
   const ry = 0.5;
   
   const isPencil = (role === "seeker" || zombieState === 2);
-  const canvas = isPencil ? makePencilCanvas() : makeEraserCanvas();
+  let bgColor = "#FFFFFF";
+  if (isInkMode()) {
+    bgColor = TEAM_COLORS[teamId || "team1"]?.color || "#FF3B30";
+  }
+  const canvas = isPencil ? makePencilCanvas() : makeEraserCanvas(bgColor);
   const fairy = buildFairy(canvas, isPencil);
   fairy.group.position.set(rx, ry, rz);
   fairy.group.visible = true;
@@ -7582,10 +7791,14 @@ function spawnWeaponBoxLocally() {
   const rz = (Math.random() - 0.5) * 42;
   const ry = 0.5;
   const id = "local_weaponbox_" + Math.floor(Math.random() * 10000000);
-  const buildResult = buildWeaponBoxMesh();
+  
+  const types = ["rifle", "grenade", "cannon", "shotgun", "roller"];
+  const rType = types[Math.floor(Math.random() * types.length)];
+  
+  const buildResult = buildWeaponBoxMesh(rType);
   buildResult.group.position.set(rx, ry, rz);
   scene.add(buildResult.group);
-  weaponBoxSpawns.push({ id, x: rx, y: ry, z: rz, group: buildResult.group });
+  weaponBoxSpawns.push({ id, x: rx, y: ry, z: rz, weaponType: rType, group: buildResult.group, topMark: buildResult.topMark });
 }
 
 function updatePracticeAI(dt) {
