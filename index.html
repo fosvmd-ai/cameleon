@@ -4124,8 +4124,14 @@ renderer.domElement.addEventListener("mousedown",e=>{
     if(!pointerLocked&&!IS_TOUCH) {
       renderer.domElement.requestPointerLock();
     }
-    if(!IS_TOUCH) {
-      if (isInkMode() && G.role === "hider" && !G.found) {
+  }
+});
+window.addEventListener("mousedown", e => {
+  if (G.screen !== "GAME" || (G.tvMode && G.isHost)) return;
+  if (e.button === 0 && !IS_TOUCH) {
+    if (isInkMode() && G.role === "hider" && !G.found) {
+      const isInteractive = e.target.closest("button, input, select, textarea, a, .mbtn, #paintPanel, #lobbyPracticeBox, #statsModal");
+      if (!isInteractive) {
         fireInkWeapon();
       }
     }
@@ -5576,7 +5582,7 @@ function showScreen(name){
   $("screenResult").classList.toggle("hidden",name!=="RESULT");
   $("hud").classList.toggle("hidden",name!=="GAME");
   $("inkScoreBoard").classList.toggle("hidden", name!=="GAME" || !isInkMode());
-  $("zombieScoreBoard").classList.toggle("hidden", name!=="GAME" || !(Net.meta?.settings?.gameMode === "zombie" || !!G.lobbyPracticeZombie));
+  $("zombieScoreBoard").classList.toggle("hidden", name!=="GAME" || !isZombieMode());
   $("mobileUI").classList.toggle("hidden",!(IS_TOUCH&&name==="GAME"));
   $("btnPracticeReturn").classList.toggle("hidden",!(name==="GAME"&&G.lobbyPractice));
   if(name!=="GAME"){ $("paintPanel").classList.add("hidden"); $("blockOverlay").classList.add("hidden");
@@ -6392,6 +6398,7 @@ async function startOfflinePractice(){
     
     if (isInkMode()) {
       initSharedFloorCanvas();
+      G.inkWeapon = "rifle";
     }
     if (typeof initOfflinePracticeObjects === "function") {
       initOfflinePracticeObjects();
@@ -7424,7 +7431,7 @@ function updateInkScoreBoard() {
 
 let lastZombieCalcTime = 0;
 function updateZombieScoreBoard() {
-  const isZombie = (Net.meta?.settings?.gameMode === "zombie" || !!G.lobbyPracticeZombie);
+  const isZombie = isZombieMode();
   if (!isZombie || G.screen !== "GAME") return;
   
   let humanCount = 0;
@@ -7637,7 +7644,7 @@ function loop(){
   updateDayNightCycle(dt);
   updateZombieLogic(dt);
   
-  const isZombie = (Net.meta?.settings?.gameMode === "zombie" || !!G.lobbyPracticeZombie);
+  const isZombie = isZombieMode();
   if (isZombie) {
     const nowTime = performance.now();
     if (nowTime - lastZombieCalcTime > 500) {
