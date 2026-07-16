@@ -7123,57 +7123,65 @@ function updateInkProjectiles(dt) {
 }
 
 function fireInkWeapon() {
-  if (G.screen !== "GAME" || G.found || G.spectating) return;
-  if (G.splatTimer && G.splatTimer > 0) return;
-  
-  const w = INK_WEAPONS[G.inkWeapon || "rifle"];
-  if (!w) return;
-  
-  const now = performance.now();
-  if (w.cooldown > 0 && now - lastFireTime < w.cooldown) return;
-  lastFireTime = now;
-  
-  const dir = new THREE.Vector3();
-  camera.getWorldDirection(dir);
-  
-  const startPos = new THREE.Vector3(G.pos.x, G.pos.y + 0.8, G.pos.z);
-  Audio2.sfxSpray();
-  
-  const myColor = G.teamColor || "#FF3B30";
-  
-  if (w.type === "rifle" || w.type === "shooter") {
-    const speed = 16.0;
-    const spread = 0.05;
-    const vx = dir.x * speed + (Math.random() - 0.5) * spread;
-    const vy = dir.y * speed + 2.5;
-    const vz = dir.z * speed + (Math.random() - 0.5) * spread;
-    spawnInkProjectile(startPos.x, startPos.y, startPos.z, vx, vy, vz, G.teamId, myColor, "rifle", w.radius);
+  try {
+    if (G.screen !== "GAME" || G.found || G.spectating) return;
+    if (G.splatTimer && G.splatTimer > 0) return;
     
-  } else if (w.type === "grenade") {
-    const speed = 10.0;
-    const vx = dir.x * speed;
-    const vy = dir.y * speed + 5.0;
-    const vz = dir.z * speed;
-    spawnInkProjectile(startPos.x, startPos.y, startPos.z, vx, vy, vz, G.teamId, myColor, "grenade", w.radius);
+    const w = INK_WEAPONS[G.inkWeapon || "rifle"];
+    if (!w) return;
     
-  } else if (w.type === "cannon" || w.type === "slosher") {
-    const speed = 12.0;
-    const vx = dir.x * speed;
-    const vy = dir.y * speed + 3.0;
-    const vz = dir.z * speed;
-    spawnInkProjectile(startPos.x, startPos.y, startPos.z, vx, vy, vz, G.teamId, myColor, "cannon", w.radius);
+    const now = performance.now();
+    if (w.cooldown > 0 && now - lastFireTime < w.cooldown) return;
+    lastFireTime = now;
     
-  } else if (w.type === "shotgun" || w.type === "buckshot") {
-    const speed = 14.0;
-    for (let i = 0; i < 5; i++) {
-      const spreadX = (Math.random() - 0.5) * 0.22;
-      const spreadY = (Math.random() - 0.5) * 0.15;
-      const spreadZ = (Math.random() - 0.5) * 0.22;
-      const vx = dir.x * speed + spreadX;
-      const vy = dir.y * speed + 1.5 + spreadY;
-      const vz = dir.z * speed + spreadZ;
-      spawnInkProjectile(startPos.x, startPos.y, startPos.z, vx, vy, vz, G.teamId, myColor, "shotgun", w.radius);
+    const dir = new THREE.Vector3();
+    camera.getWorldDirection(dir);
+    
+    const startPos = new THREE.Vector3(G.pos.x, G.pos.y + 0.8, G.pos.z);
+    try {
+      Audio2.sfxSpray();
+    } catch (ae) {
+      console.warn("Audio sfxSpray error:", ae);
     }
+    
+    const myColor = G.teamColor || "#FF3B30";
+    
+    if (w.type === "rifle" || w.type === "shooter") {
+      const speed = 16.0;
+      const spread = 0.05;
+      const vx = dir.x * speed + (Math.random() - 0.5) * spread;
+      const vy = dir.y * speed + 2.5;
+      const vz = dir.z * speed + (Math.random() - 0.5) * spread;
+      spawnInkProjectile(startPos.x, startPos.y, startPos.z, vx, vy, vz, G.teamId, myColor, "rifle", w.radius);
+      
+    } else if (w.type === "grenade") {
+      const speed = 10.0;
+      const vx = dir.x * speed;
+      const vy = dir.y * speed + 5.0;
+      const vz = dir.z * speed;
+      spawnInkProjectile(startPos.x, startPos.y, startPos.z, vx, vy, vz, G.teamId, myColor, "grenade", w.radius);
+      
+    } else if (w.type === "cannon" || w.type === "slosher") {
+      const speed = 12.0;
+      const vx = dir.x * speed;
+      const vy = dir.y * speed + 3.0;
+      const vz = dir.z * speed;
+      spawnInkProjectile(startPos.x, startPos.y, startPos.z, vx, vy, vz, G.teamId, myColor, "cannon", w.radius);
+      
+    } else if (w.type === "shotgun" || w.type === "buckshot") {
+      const speed = 14.0;
+      for (let i = 0; i < 5; i++) {
+        const spreadX = (Math.random() - 0.5) * 0.22;
+        const spreadY = (Math.random() - 0.5) * 0.15;
+        const spreadZ = (Math.random() - 0.5) * 0.22;
+        const vx = dir.x * speed + spreadX;
+        const vy = dir.y * speed + 1.5 + spreadY;
+        const vz = dir.z * speed + spreadZ;
+        spawnInkProjectile(startPos.x, startPos.y, startPos.z, vx, vy, vz, G.teamId, myColor, "shotgun", w.radius);
+      }
+    }
+  } catch (err) {
+    console.error("Error in fireInkWeapon:", err);
   }
 }
 
