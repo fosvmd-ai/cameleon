@@ -4149,6 +4149,7 @@ window.addEventListener("pointerdown", e => {
     }
     if (isInkMode() && G.role === "hider" && !G.found) {
       if (!isInteractive) {
+        window.firedCount = (window.firedCount || 0) + 1;
         fireInkWeapon();
       }
     }
