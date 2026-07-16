@@ -2650,17 +2650,24 @@ function makeFairyNameLabel(){
   sprite.userData.labelText="";
   return sprite;
 }
-function setFairyNameLabel(sprite,name,fuelVal=100,showFuel=false){
+function setFairyNameLabel(sprite,name,fuelVal=100,showFuel=false, hp=3){
   if(!sprite)return;
   const safe=String(name||"지우개").slice(0,10);
-  const cacheKey = safe + "_" + Math.floor(fuelVal) + "_" + showFuel;
+  const cacheKey = safe + "_" + Math.floor(fuelVal) + "_" + showFuel + "_" + hp;
   if(sprite.userData.labelText===cacheKey)return;
   sprite.userData.labelText=cacheKey;
+  
+  let displayName = safe;
+  if (isInkMode()) {
+    const hearts = "❤️".repeat(Math.max(0, hp)) + "🖤".repeat(Math.max(0, 3 - hp));
+    displayName = safe + " " + hearts;
+  }
+  
   const c=sprite.userData.canvas,g=c.getContext("2d");
   g.clearRect(0,0,c.width,c.height);
   g.font='800 54px "Malgun Gothic",sans-serif';
   g.textAlign="center";g.textBaseline="middle";
-  const tw=Math.min(440,g.measureText(safe).width+76);
+  const tw=Math.min(440,g.measureText(displayName).width+76);
   const x=(c.width-tw)/2,y=6,w=tw,h=114,r=34;
   g.fillStyle="rgba(24,30,38,.84)";
   g.beginPath();
@@ -2670,7 +2677,7 @@ function setFairyNameLabel(sprite,name,fuelVal=100,showFuel=false){
   g.lineTo(x,y+r);g.quadraticCurveTo(x,y,x+r,y);g.closePath();g.fill();
   g.strokeStyle="rgba(255,255,255,.9)";g.lineWidth=5;g.stroke();
   g.fillStyle="#fff";g.shadowColor="rgba(0,0,0,.7)";g.shadowBlur=5;
-  g.fillText(safe,c.width/2,c.height/2 - 12);
+  g.fillText(displayName,c.width/2,c.height/2 - 12);
   g.shadowBlur=0;
   
   if (showFuel) {
@@ -3131,7 +3138,7 @@ function ensureRemote(uid,info){
     fairy.group.visible=(info.role!=="ghost");
     scene.add(fairy.group);
     r={fairy,info,foundApplied:false,
-       target:{x:0,y:0,z:0,ry:0,pose:"stand",flying:false},cur:{x:0,y:0,z:0,ry:0},prevX:0,prevZ:0,lastTeamId:info.teamId};
+       target:{x:0,y:0,z:0,ry:0,pose:"stand",flying:false,hp:3},cur:{x:0,y:0,z:0,ry:0},prevX:0,prevZ:0,lastTeamId:info.teamId};
     remotes.set(uid,r);
   }
   r.info=info;
@@ -3148,9 +3155,9 @@ function ensureRemote(uid,info){
   const isSeek = info.role === "seeker";
   if (isInkMode() && !isSeek) {
     const tName = TEAM_COLORS[info.teamId || "team1"]?.name || "레드팀";
-    setFairyNameLabel(r.fairy.nameLabel, `${info.nick || "지우개"} (${tName})`, 100, false);
+    setFairyNameLabel(r.fairy.nameLabel, `${info.nick || "지우개"} (${tName})`, 100, false, r.target.hp !== undefined ? r.target.hp : 3);
   } else {
-    setFairyNameLabel(r.fairy.nameLabel, info.nick||"지우개");
+    setFairyNameLabel(r.fairy.nameLabel, info.nick||"지우개", 100, false, 3);
   }
   
   if(r.fairy.hitbox){
@@ -3223,8 +3230,8 @@ function syncLocalFairy(){
   applyPoseToFairy(myFairy,pose);
   applyZombieSkinToFairy(myFairy, G.zombieState || 0); // 로컬 좀비 도색
   const isSeeker = G.role === "seeker";
-  const showLocalNameLabel = (G.role === "hider" && !G.found && !G.spectating) && (!isSeeker && (G.flying || flyEnergy < 100));
-  setFairyNameLabel(myFairy.nameLabel, G.nick||Net.nick||"나", flyEnergy, !isSeeker);
+  const showLocalNameLabel = isInkMode() || ((G.role === "hider" && !G.found && !G.spectating) && (!isSeeker && (G.flying || flyEnergy < 100)));
+  setFairyNameLabel(myFairy.nameLabel, G.nick||Net.nick||"나", flyEnergy, !isSeeker, G.hp !== undefined ? G.hp : 3);
   myFairy.nameLabel.visible = showLocalNameLabel || (G.spectating && G.role === "hider" && !G.found);
   updateFairyWeaponVisual(myFairy, G.role, G.inkWeapon);
 }
@@ -3587,6 +3594,9 @@ function updateMovement(dt){
   if(G.onSprinkler) baseSpeed *= 0.5;
   if(isZombieMode() && G.zombieState === 2) {
     baseSpeed = isNight ? 7.8 : 4.2; // 밤에는 7.8로 빨라지고 낮에는 4.2로 느려짐
+  }
+  if(isInkMode() && G.speedBoostTimer > 0) {
+    baseSpeed *= 1.5;
   }
   const speed=ghost?13.5:baseSpeed;
   const f=new THREE.Vector3(-Math.sin(G.yaw),0,-Math.cos(G.yaw));
@@ -4603,6 +4613,35 @@ const Net={
         weaponBoxSpawns.splice(idx, 1);
       }
     });
+
+    // 아이템 상자 동기화 리스너 추가
+    const itemsRef = ref(this.db, `rooms/${this.code}/gameItems`);
+    onChildAdded(itemsRef, s => {
+      const data = s.val(); if(!data) return;
+      if (gameItems.some(item => item.id === data.id)) return;
+      const meshObj = buildGameItemMesh(data.itemType);
+      meshObj.group.position.set(data.x, data.y, data.z);
+      scene.add(meshObj.group);
+      gameItems.push({
+        id: data.id,
+        x: data.x,
+        y: data.y,
+        z: data.z,
+        itemType: data.itemType,
+        group: meshObj.group,
+        ring: meshObj.ring,
+        baseY: data.y,
+        floatOffset: Math.random() * Math.PI * 2
+      });
+    });
+    onChildRemoved(itemsRef, s => {
+      const id = s.key;
+      const idx = gameItems.findIndex(item => item.id === id);
+      if (idx !== -1) {
+        scene.remove(gameItems[idx].group);
+        gameItems.splice(idx, 1);
+      }
+    });
     // '진짜 강퇴' 신호: 선생님이 내보낸 경우에만 이 플래그가 켜집니다.
     onValue(ref(this.db,`rooms/${this.code}/kicks/${this.uid}`),s=>{
       if(!s.val()||G.isHost)return;
@@ -4661,6 +4700,7 @@ const Net={
     r.target.pose=["stand","lie","lean","roll","fold","roll_lie"][+a[4]||0];
     r.target.flying=a[5]==="1";
     r.target.zombieState=+a[6]||0;
+    r.target.hp=a[7] !== undefined ? +a[7] : 3;
     if(r.cur.x===0&&r.cur.y===0&&r.cur.z===0){Object.assign(r.cur,{x:r.target.x,y:r.target.y,z:r.target.z,ry:r.target.ry});}
   },
   sendPos(){
@@ -4668,7 +4708,7 @@ const Net={
     if(G.lobbyPractice||G.role==="ghost"||G.spectating)return;
     if(G.role==="seeker"&&G.phase==="PAINT")return; // 술래는 숨는 시간에 스폰 전
     const pi=["stand","lie","lean","roll","fold","roll_lie"].indexOf(G.pose);
-    const str=[G.pos.x.toFixed(2),G.pos.y.toFixed(2),G.pos.z.toFixed(2),(G.fairyYaw%(Math.PI*2)).toFixed(2),pi,G.flying?1:0,G.zombieState||0].join(",");
+    const str=[G.pos.x.toFixed(2),G.pos.y.toFixed(2),G.pos.z.toFixed(2),(G.fairyYaw%(Math.PI*2)).toFixed(2),pi,G.flying?1:0,G.zombieState||0,G.hp !== undefined ? G.hp : 3].join(",");
     if(str===G.lastPosSent)return;
     G.lastPosSent=str;
     this.positions[this.uid]=str;
@@ -5038,6 +5078,7 @@ const Net={
       roleUpd[`rooms/${this.code}/splats`]=null; // 이전 잉크 칠하기 삭제
       roleUpd[`rooms/${this.code}/splatOuts`]=null; // 이전 아웃로그 삭제
       roleUpd[`rooms/${this.code}/weaponBoxes`]=null; // 이전 무기상자 삭제
+      roleUpd[`rooms/${this.code}/gameItems`]=null; // 이전 게임아이템 삭제
 
       const inkMode = !!settings.inkMode;
       const teamCount = settings.teamCount || 2;
@@ -5156,6 +5197,7 @@ async function onPhaseChange(phase,prev){
     initZombieGame(); 
     initFeatherGame(); 
     initWeaponBoxGame();
+    initGameItems();
     if (isInkMode()) {
       initSharedFloorCanvas();
       if (G.role === "hider") {
@@ -5174,7 +5216,7 @@ async function onPhaseChange(phase,prev){
   }
   else if(phase==="SEEK")enterSeek();
   else if(phase==="RESULT")enterResult();
-  else if(phase==="LOBBY"){ initZombieGame(); initFeatherGame(); initWeaponBoxGame(); if(G.isHost)resetLobbyForNewRound(); showScreen("LOBBY"); }
+  else if(phase==="LOBBY"){ initZombieGame(); initFeatherGame(); initWeaponBoxGame(); initGameItems(); if(G.isHost)resetLobbyForNewRound(); showScreen("LOBBY"); }
   syncLocalFairy();
   updateMobileButtons();
 }
@@ -6747,7 +6789,11 @@ function updateFlyGaugeAndFeathers(dt) {
     const box = $("flyGaugeBox");
     if (G.flying) {
       if(box) box.classList.remove("hidden");
-      flyEnergy -= dt * 17.5; // 약 5.7초 비행 가능
+      if (isInkMode() && G.infiniteFlightTimer > 0) {
+        flyEnergy = 100;
+      } else {
+        flyEnergy -= dt * 17.5; // 약 5.7초 비행 가능
+      }
       if (flyEnergy <= 0) {
         flyEnergy = 0;
         G.flying = false;
@@ -7007,15 +7053,57 @@ function updateInkProjectiles(dt) {
           const dz = G.pos.z - hitZ;
           const dist = Math.hypot(dx, dz);
           if (dist < p.radius + 0.5 && Math.abs(G.pos.y - hitY) < 2.0) {
-            const damage = Math.max(5, (1 - dist / (p.radius + 0.5)) * (p.type === "grenade" ? 50 : 25));
-            G.inkPercent = Math.min(100, G.inkPercent + damage);
-            toast(`💥 피격됨! 오염도: ${Math.floor(G.inkPercent)}%`);
-            burst(G.pos, p.color, 5, 1.2, 0.2, false, 0.15);
-            if (G.inkPercent >= 50) {
+            G.hp = Math.max(0, (G.hp === undefined ? 3 : G.hp) - 1);
+            burst(G.pos, p.color, 12, 1.8, 0.3, false, 0.25);
+            Audio2.sfxBreak();
+            if (G.hp <= 0) {
               splatOutPlayer();
+              G.splatTimer = 10.0;
+              G.invincibleTimer = 10.0;
+              G.hp = 3;
+              toast("💀 생명력이 모두 소진되어 아웃되었습니다! 10초간 기절 및 무적 상태가 됩니다.");
+            } else {
+              G.invincibleTimer = 1.5;
+              toast(`💥 피격됨! 남은 생명력: ${"❤️".repeat(G.hp)}${"🖤".repeat(3 - G.hp)}`);
             }
           }
         }
+      }
+      
+      // 연습 모드 AI 봇 충돌 검사
+      if (Net.mode === "practice") {
+        practiceAIList.forEach(bot => {
+          if (bot.role === "hider" && (!bot.invincibleTimer || bot.invincibleTimer <= 0) && (!bot.splatTimer || bot.splatTimer <= 0)) {
+            if (p.teamId !== bot.teamId) {
+              const dx = bot.pos.x - hitX;
+              const dz = bot.pos.z - hitZ;
+              const dist = Math.hypot(dx, dz);
+              if (dist < p.radius + 0.5 && Math.abs(bot.pos.y - hitY) < 2.0) {
+                bot.hp = Math.max(0, (bot.hp === undefined ? 3 : bot.hp) - 1);
+                burst(bot.pos, p.color, 10, 1.5, 0.25, false, 0.2);
+                Audio2.sfxBreak();
+                
+                if (bot.hp <= 0) {
+                  let spawnPos = new THREE.Vector3(0, 0.1, 0);
+                  if (bot.teamId === "team1") spawnPos.set(-18, 0.1, -18);
+                  else if (bot.teamId === "team2") spawnPos.set(18, 0.1, 18);
+                  else if (bot.teamId === "team3") spawnPos.set(-18, 0.1, 18);
+                  else if (bot.teamId === "team4") spawnPos.set(18, 0.1, -18);
+                  
+                  bot.pos.copy(spawnPos);
+                  bot.fairy.group.position.copy(spawnPos);
+                  bot.vy = 0;
+                  bot.splatTimer = 10.0;
+                  bot.invincibleTimer = 10.0;
+                  bot.hp = 3;
+                  toast(`💀 봇_${bot.id.slice(4, 8)}이 아웃되어 출발지점으로 강제 이동되었습니다!`);
+                } else {
+                  bot.invincibleTimer = 1.5;
+                }
+              }
+            }
+          }
+        });
       }
       
       scene.remove(p.mesh);
@@ -7212,6 +7300,237 @@ function initWeaponBoxGame() {
   if (Net.mode === "online" && Net.db && Net.uid) {
     Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/players/${Net.uid}/inkWeapon`), "rifle").catch(()=>{});
   }
+}
+
+/* ================================================================
+   🎁 스플래툰 다채화 게임성 특수 아이템 스폰 및 효과 시스템
+   ================================================================ */
+let gameItems = [];
+let gameItemSpawnTimer = 0;
+
+function buildGameItemMesh(itemType) {
+  const group = new THREE.Group();
+  
+  if (itemType === "recovery") {
+    const mat = lambert({color: 0xff3b30});
+    const s1 = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 8), mat);
+    s1.position.set(-0.12, 0.12, 0);
+    const s2 = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 8), mat);
+    s2.position.set(0.12, 0.12, 0);
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.42, 8), mat);
+    cone.rotation.x = Math.PI;
+    cone.position.set(0, -0.15, 0);
+    group.add(s1, s2, cone);
+  } else if (itemType === "invincible") {
+    const mat = lambert({color: 0xffcc00});
+    const mesh = new THREE.Mesh(new THREE.IcosahedronGeometry(0.26, 0), mat);
+    group.add(mesh);
+  } else if (itemType === "speed") {
+    const mat = lambert({color: 0x007aff});
+    const cone1 = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.35, 8), mat);
+    cone1.position.y = 0.16;
+    const cone2 = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.35, 8), mat);
+    cone2.rotation.x = Math.PI;
+    cone2.position.y = -0.16;
+    group.add(cone1, cone2);
+  } else if (itemType === "flight") {
+    const mat = lambert({color: 0xe6e6ec});
+    const wing1 = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.08, 0.14), mat);
+    wing1.position.set(-0.2, 0, 0);
+    wing1.rotation.y = 0.2;
+    const wing2 = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.08, 0.14), mat);
+    wing2.position.set(0.2, 0, 0);
+    wing2.rotation.y = -0.2;
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.22, 8), mat);
+    group.add(wing1, wing2, body);
+  }
+  
+  const ringGeo = new THREE.RingGeometry(0.32, 0.38, 16);
+  const ringMat = new THREE.MeshBasicMaterial({
+    color: itemType === "recovery" ? 0xff3b30 : (itemType === "invincible" ? 0xffcc00 : (itemType === "speed" ? 0x007aff : 0xffffff)),
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.65
+  });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.rotation.x = Math.PI / 2;
+  ring.position.y = -0.45;
+  group.add(ring);
+
+  const light = new THREE.PointLight(ringMat.color, 0.6, 2.5);
+  light.position.set(0, 0, 0);
+  group.add(light);
+
+  return { group, ring };
+}
+
+function spawnGameItemOnFirebase() {
+  const rx = (Math.random() - 0.5) * 58;
+  const rz = (Math.random() - 0.5) * 42;
+  const ry = 0.5;
+  const id = "item_" + Math.floor(Math.random() * 10000000);
+  
+  const types = ["recovery", "invincible", "speed", "flight"];
+  const rType = types[Math.floor(Math.random() * types.length)];
+  
+  const itemData = { id, x: rx, y: ry, z: rz, itemType: rType };
+  Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/gameItems/${id}`), itemData).catch(()=>{});
+}
+
+function spawnGameItemLocally() {
+  const rx = (Math.random() - 0.5) * 58;
+  const rz = (Math.random() - 0.5) * 42;
+  const ry = 0.5;
+  const id = "local_item_" + Math.floor(Math.random() * 10000000);
+  
+  const types = ["recovery", "invincible", "speed", "flight"];
+  const rType = types[Math.floor(Math.random() * types.length)];
+  
+  const meshObj = buildGameItemMesh(rType);
+  meshObj.group.position.set(rx, ry, rz);
+  scene.add(meshObj.group);
+  
+  gameItems.push({
+    id,
+    x: rx,
+    y: ry,
+    z: rz,
+    itemType: rType,
+    group: meshObj.group,
+    ring: meshObj.ring,
+    baseY: ry,
+    floatOffset: Math.random() * Math.PI * 2
+  });
+}
+
+function applyItemEffect(itemType) {
+  Audio2.sfxRefill();
+  const colors = {
+    recovery: "#ff3b30",
+    invincible: "#ffcc00",
+    speed: "#007aff",
+    flight: "#ffffff"
+  };
+  burst(G.pos.clone().add(new THREE.Vector3(0, 0.5, 0)), colors[itemType] || "#ffffff", 14, 2.5, 0.4);
+
+  if (itemType === "recovery") {
+    G.hp = Math.min(3, (G.hp === undefined ? 3 : G.hp) + 1);
+    toast(`❤️ 체력 회복! 현재 생명력: ${"❤️".repeat(G.hp)}${"🖤".repeat(3 - G.hp)}`);
+  } else if (itemType === "invincible") {
+    G.invincibleTimer = 8.0;
+    toast("⭐ 무적 획득! 8초 동안 적 탄환에 피해를 입지 않습니다.");
+  } else if (itemType === "speed") {
+    G.speedBoostTimer = 8.0;
+    toast("⚡ 속도 향상! 8초 동안 이동 속도가 1.5배 빨라집니다.");
+  } else if (itemType === "flight") {
+    G.infiniteFlightTimer = 8.0;
+    toast("🪶 자유 비행! 8초 동안 게이지 소모 없이 날 수 있습니다.");
+  }
+}
+
+function applyBotItemEffect(bot, itemType) {
+  const colors = {
+    recovery: "#ff3b30",
+    invincible: "#ffcc00",
+    speed: "#007aff",
+    flight: "#ffffff"
+  };
+  burst(bot.pos.clone().add(new THREE.Vector3(0, 0.5, 0)), colors[itemType] || "#ffffff", 10, 2.0, 0.3);
+
+  if (itemType === "recovery") {
+    bot.hp = Math.min(3, (bot.hp === undefined ? 3 : bot.hp) + 1);
+    toast(`🤖 봇_${bot.id.slice(4, 8)}이 체력을 회복했습니다!`);
+  } else if (itemType === "invincible") {
+    bot.invincibleTimer = 8.0;
+    toast(`🤖 봇_${bot.id.slice(4, 8)}이 무적 상태가 되었습니다!`);
+  } else if (itemType === "speed") {
+    bot.speedBoostTimer = 8.0;
+    toast(`🤖 봇_${bot.id.slice(4, 8)}의 이동 속도가 빨라졌습니다!`);
+  } else if (itemType === "flight") {
+    bot.infiniteFlightTimer = 8.0;
+  }
+}
+
+function updateGameItems(dt) {
+  if (!isInkMode() || G.screen !== "GAME") {
+    gameItems.forEach(item => scene.remove(item.group));
+    gameItems = [];
+    gameItemSpawnTimer = 0;
+    return;
+  }
+
+  const now = performance.now() * 0.0035;
+  gameItems.forEach(item => {
+    item.group.rotation.y += dt * 1.5;
+    item.group.position.y = item.baseY + Math.sin(now + item.floatOffset) * 0.12;
+  });
+
+  const isSeeker = G.role === "seeker";
+  if (!isSeeker && !G.found && (!G.splatTimer || G.splatTimer <= 0)) {
+    for (let i = gameItems.length - 1; i >= 0; i--) {
+      const item = gameItems[i];
+      const dx = G.pos.x - item.x;
+      const dz = G.pos.z - item.z;
+      const dist = Math.hypot(dx, dz);
+      if (dist < 1.3 && Math.abs(G.pos.y - item.group.position.y) < 1.6) {
+        applyItemEffect(item.itemType);
+        
+        if (Net.mode === "online") {
+          Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/gameItems/${item.id}`), null).catch(()=>{});
+        }
+        scene.remove(item.group);
+        gameItems.splice(i, 1);
+        break;
+      }
+    }
+  }
+
+  if (Net.mode === "practice") {
+    practiceAIList.forEach(bot => {
+      if (bot.role === "hider" && (!bot.splatTimer || bot.splatTimer <= 0)) {
+        for (let i = gameItems.length - 1; i >= 0; i--) {
+          const item = gameItems[i];
+          const dx = bot.pos.x - item.x;
+          const dz = bot.pos.z - item.z;
+          const dist = Math.hypot(dx, dz);
+          if (dist < 1.3 && Math.abs(bot.pos.y - item.group.position.y) < 1.6) {
+            applyBotItemEffect(bot, item.itemType);
+            scene.remove(item.group);
+            gameItems.splice(i, 1);
+            break;
+          }
+        }
+      }
+    });
+  }
+
+  if (Net.mode === "practice") {
+    gameItemSpawnTimer += dt;
+    if (gameItemSpawnTimer >= 10.0) {
+      gameItemSpawnTimer = 0;
+      if (gameItems.length < 5) {
+        spawnGameItemLocally();
+      }
+    }
+  } else if (G.isHost) {
+    gameItemSpawnTimer += dt;
+    if (gameItemSpawnTimer >= 10.0) {
+      gameItemSpawnTimer = 0;
+      if (gameItems.length < 5) {
+        spawnGameItemOnFirebase();
+      }
+    }
+  }
+}
+
+function initGameItems() {
+  gameItems.forEach(item => { scene.remove(item.group); });
+  gameItems = [];
+  gameItemSpawnTimer = 0;
+  G.hp = 3;
+  G.speedBoostTimer = 0;
+  G.infiniteFlightTimer = 0;
+  G.invincibleTimer = 0;
 }
 
 /* ================================================================
@@ -7512,6 +7831,8 @@ function updateSplatAndInvincible(dt) {
   if (!isInkMode() || G.screen !== "GAME") {
     G.splatTimer = 0;
     G.invincibleTimer = 0;
+    G.speedBoostTimer = 0;
+    G.infiniteFlightTimer = 0;
     return;
   }
   
@@ -7535,6 +7856,28 @@ function updateSplatAndInvincible(dt) {
     
     if (Math.random() < 0.25) {
       burst(G.pos, "#ffffff", 2, 1.5, 0.4, true, 0.15); 
+    }
+  }
+
+  if (G.speedBoostTimer > 0) {
+    G.speedBoostTimer -= dt;
+    if (G.speedBoostTimer <= 0) {
+      G.speedBoostTimer = 0;
+      toast("⚡ 속도 향상 효과가 종료되었습니다.");
+    }
+    if (Math.random() < 0.15) {
+      burst(G.pos, "#007aff", 1, 1.0, 0.3, true, 0.08);
+    }
+  }
+
+  if (G.infiniteFlightTimer > 0) {
+    G.infiniteFlightTimer -= dt;
+    if (G.infiniteFlightTimer <= 0) {
+      G.infiniteFlightTimer = 0;
+      toast("🪶 무한 비행 효과가 종료되었습니다.");
+    }
+    if (Math.random() < 0.15) {
+      burst(G.pos, "#ffffff", 1, 1.2, 0.3, true, 0.08);
     }
   }
 }
@@ -7657,6 +8000,7 @@ function loop(){
   if (isInkMode()) {
     updateInkProjectiles(dt);
     updateWeaponBoxes(dt);
+    updateGameItems(dt);
     updateSplatAndInvincible(dt);
     
     const nowTime = performance.now();
@@ -7739,7 +8083,7 @@ function spawnPracticeAI(role, zombieState, teamId, inkWeapon) {
   const tColor = TEAM_COLORS[teamId]?.color || "#007AFF";
   const tName = TEAM_COLORS[teamId]?.name || "상대팀";
   
-  setFairyNameLabel(fairy.nameLabel, `봇_${botId.slice(4, 8)} (${tName})`, 100, false);
+  setFairyNameLabel(fairy.nameLabel, `봇_${botId.slice(4, 8)} (${tName})`, 100, false, 3);
   updateFairyWeaponVisual(fairy, role, inkWeapon);
   applyZombieSkinToFairy(fairy, zombieState);
   
@@ -7756,12 +8100,18 @@ function spawnPracticeAI(role, zombieState, teamId, inkWeapon) {
     vy: 0,
     changeDirTimer: 0,
     moveDir: new THREE.Vector2(0, 0),
-    shootTimer: Math.random() * 2.0
+    shootTimer: Math.random() * 2.0,
+    hp: 3,
+    invincibleTimer: 0,
+    splatTimer: 0,
+    speedBoostTimer: 0,
+    infiniteFlightTimer: 0
   });
 }
 
 function initOfflinePracticeObjects() {
   clearPracticeAI();
+  initGameItems();
   localCureTimer = 0;
   localWeaponBoxTimer = 0;
   
@@ -7814,6 +8164,39 @@ function updatePracticeAI(dt) {
   const nowTime = performance.now() / 1000;
   
   practiceAIList.forEach(bot => {
+    if (bot.invincibleTimer > 0) {
+      bot.invincibleTimer -= dt;
+      if (bot.invincibleTimer < 0) bot.invincibleTimer = 0;
+      const flash = Math.floor(performance.now() / 100) % 2 === 0;
+      bot.fairy.group.visible = flash;
+    } else {
+      bot.fairy.group.visible = true;
+    }
+    
+    if (bot.splatTimer > 0) {
+      bot.splatTimer -= dt;
+      if (bot.splatTimer <= 0) {
+        bot.splatTimer = 0;
+        bot.invincibleTimer = 2.5;
+      }
+      bot.fairy.group.position.copy(bot.pos);
+      animateFairyMovement(bot.fairy, dt, 0, "stand", true, false, bot.zombieState);
+      if (gm === "splatoon") {
+        const tName = TEAM_COLORS[bot.teamId]?.name || "상대팀";
+        setFairyNameLabel(bot.fairy.nameLabel, `봇_${bot.id.slice(4, 8)} (${tName})`, 100, false, bot.hp || 3);
+      }
+      return;
+    }
+    
+    if (bot.speedBoostTimer > 0) {
+      bot.speedBoostTimer -= dt;
+      if (bot.speedBoostTimer < 0) bot.speedBoostTimer = 0;
+    }
+    if (bot.infiniteFlightTimer > 0) {
+      bot.infiniteFlightTimer -= dt;
+      if (bot.infiniteFlightTimer < 0) bot.infiniteFlightTimer = 0;
+    }
+
     bot.changeDirTimer -= dt;
     if (bot.changeDirTimer <= 0) {
       bot.changeDirTimer = 1.5 + Math.random() * 2.0;
@@ -7846,7 +8229,10 @@ function updatePracticeAI(dt) {
       }
     }
     
-    const speed = bot.zombieState === 2 ? 6.8 : 5.0;
+    let speed = bot.zombieState === 2 ? 6.8 : 5.0;
+    if (gm === "splatoon" && bot.speedBoostTimer > 0) {
+      speed *= 1.5;
+    }
     const dx = bot.moveDir.x * speed * dt;
     const dz = bot.moveDir.y * speed * dt;
     
@@ -7922,6 +8308,11 @@ function updatePracticeAI(dt) {
           spawnInkProjectile(bot.pos.x, bot.pos.y + 0.6, bot.pos.z, vx, 1.5, vz, bot.teamId, bot.teamColor, bot.inkWeapon, 2.0);
         }
       }
+    }
+    
+    if (gm === "splatoon") {
+      const tName = TEAM_COLORS[bot.teamId]?.name || "상대팀";
+      setFairyNameLabel(bot.fairy.nameLabel, `봇_${bot.id.slice(4, 8)} (${tName})`, 100, false, bot.hp || 3);
     }
   });
   
