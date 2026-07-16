@@ -4140,7 +4140,14 @@ window.addEventListener("mousedown", e => {
   if (G.screen !== "GAME" || (G.tvMode && G.isHost)) return;
   if (e.button === 0 && !IS_TOUCH) {
     if (isInkMode() && G.role === "hider" && !G.found) {
-      const isInteractive = e.target.closest("button, input, select, textarea, a, .mbtn, #paintPanel, #lobbyPracticeBox, #statsModal");
+      let isInteractive = false;
+      try {
+        if (e.target && typeof e.target.closest === "function") {
+          isInteractive = !!e.target.closest("button, input, select, textarea, a, .mbtn, #paintPanel, #lobbyPracticeBox, #statsModal");
+        }
+      } catch (err) {
+        console.warn(err);
+      }
       if (!isInteractive) {
         fireInkWeapon();
       }
