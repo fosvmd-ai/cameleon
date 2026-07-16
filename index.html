@@ -4136,10 +4136,9 @@ renderer.domElement.addEventListener("mousedown",e=>{
     }
   }
 });
-window.addEventListener("mousedown", e => {
+window.addEventListener("pointerdown", e => {
   if (G.screen !== "GAME" || (G.tvMode && G.isHost)) return;
-  console.log("Mousedown window click received:", e.button);
-  if (e.button === 0 && !IS_TOUCH) {
+  if (e.button === 0 && e.pointerType !== "touch") {
     let isInteractive = false;
     try {
       if (e.target && typeof e.target.closest === "function") {
@@ -4148,10 +4147,8 @@ window.addEventListener("mousedown", e => {
     } catch (err) {
       console.warn(err);
     }
-    console.log("InkMode check:", isInkMode(), "Role:", G.role, "Found:", G.found, "Interactive:", isInteractive);
     if (isInkMode() && G.role === "hider" && !G.found) {
       if (!isInteractive) {
-        console.log("Calling fireInkWeapon...");
         fireInkWeapon();
       }
     }
