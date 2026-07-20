@@ -2786,30 +2786,56 @@ function buildFairy(canvas,isPencil=false){
   const group=new THREE.Group();
   const parts=[];
   let bodyM;
+  let armMat, legMat;
+  
   if(isPencil){
-    // 술래 = 진짜 육각 연필 몸통(각진 느낌은 flatShading으로 표현) + 은색 페룰 + 분홍 지우개 캡
-    const shaftMat=lambert({color:0xF5C518,flatShading:true});
-    const bodyGeo=new THREE.CylinderGeometry(0.26,0.26,0.72,6);
-    bodyM=new THREE.Mesh(bodyGeo,shaftMat);
-    bodyM.position.y=0.62; bodyM.rotation.y=Math.PI/6;
-    group.add(bodyM); parts.push(bodyM);
-    const ferrule=new THREE.Mesh(new THREE.CylinderGeometry(0.275,0.275,0.11,6),
-      lambert({color:0xe6e6ec,flatShading:true}));
-    ferrule.position.y=1.035; ferrule.rotation.y=Math.PI/6;
-    group.add(ferrule); parts.push(ferrule);
-    const eraserCap=new THREE.Mesh(new THREE.CylinderGeometry(0.23,0.27,0.24,6),
-      lambert({color:0xff9fc0,flatShading:true}));
-    eraserCap.position.y=1.21; eraserCap.rotation.y=Math.PI/6;
-    group.add(eraserCap); parts.push(eraserCap);
-    // 귀여운 눈
-    const eyeMat=new THREE.MeshBasicMaterial({color:0x2B2B2B});
-    const eyeGeo=new THREE.SphereGeometry(0.035,8,6);
-    const eyeL=new THREE.Mesh(eyeGeo,eyeMat); eyeL.position.set(-0.09,0.72,0.235);
-    const eyeR=new THREE.Mesh(eyeGeo,eyeMat); eyeR.position.set(0.09,0.72,0.235);
-    group.add(eyeL,eyeR); parts.push(eyeL,eyeR);
+    const isCop = typeof isCopsMode === "function" && isCopsMode();
+    if(isCop) {
+      const copMat = lambert({color: 0x1c3b5e, flatShading: true});
+      bodyM = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.8, 8), copMat);
+      bodyM.position.y = 0.65;
+      group.add(bodyM); parts.push(bodyM);
+      
+      const hatVisor = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.35, 0.05, 8), lambert({color: 0x111111}));
+      hatVisor.position.set(0, 1.05, 0.08);
+      const hatTop = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.28, 0.2, 8), copMat);
+      hatTop.position.set(0, 1.15, 0);
+      const badge = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.05), lambert({color: 0xf5c518}));
+      badge.position.set(0, 1.15, 0.27);
+      group.add(hatVisor, hatTop, badge); parts.push(hatVisor, hatTop, badge);
+      
+      const glassMat = lambert({color: 0x111111});
+      const glasses = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.12, 0.1), glassMat);
+      glasses.position.set(0, 0.85, 0.26);
+      group.add(glasses); parts.push(glasses);
+      
+      armMat = lambert({color: 0x4aa8ff, flatShading: true});
+      legMat = lambert({color: 0x111111, flatShading: true});
+    } else {
+      const shaftMat=lambert({color:0xF5C518,flatShading:true});
+      const bodyGeo=new THREE.CylinderGeometry(0.26,0.26,0.72,6);
+      bodyM=new THREE.Mesh(bodyGeo,shaftMat);
+      bodyM.position.y=0.62; bodyM.rotation.y=Math.PI/6;
+      group.add(bodyM); parts.push(bodyM);
+      const ferrule=new THREE.Mesh(new THREE.CylinderGeometry(0.275,0.275,0.11,6),
+        lambert({color:0xe6e6ec,flatShading:true}));
+      ferrule.position.y=1.035; ferrule.rotation.y=Math.PI/6;
+      group.add(ferrule); parts.push(ferrule);
+      const eraserCap=new THREE.Mesh(new THREE.CylinderGeometry(0.23,0.27,0.24,6),
+        lambert({color:0xff9fc0,flatShading:true}));
+      eraserCap.position.y=1.21; eraserCap.rotation.y=Math.PI/6;
+      group.add(eraserCap); parts.push(eraserCap);
+      const eyeMat=new THREE.MeshBasicMaterial({color:0x2B2B2B});
+      const eyeGeo=new THREE.SphereGeometry(0.035,8,6);
+      const eyeL=new THREE.Mesh(eyeGeo,eyeMat); eyeL.position.set(-0.09,0.72,0.235);
+      const eyeR=new THREE.Mesh(eyeGeo,eyeMat); eyeR.position.set(0.09,0.72,0.235);
+      group.add(eyeL,eyeR); parts.push(eyeL,eyeR);
+      
+      armMat = lambert({color:0xF5C518,flatShading:true});
+      legMat = lambert({color:0xe8b90f,flatShading:true});
+    }
   }else{
     const body=new THREE.BoxGeometry(0.6,1.0,0.35);
-    // BoxGeometry uv: px(0-3) nx(4-7) py(8-11) ny(12-15) pz(16-19) nz(20-23)
     remapUVRange(body,0,4,RECT.px); remapUVRange(body,4,4,RECT.nx);
     remapUVRange(body,8,4,RECT.py); remapUVRange(body,12,4,RECT.ny);
     remapUVRange(body,16,4,RECT.front); remapUVRange(body,20,4,RECT.back);
@@ -2820,11 +2846,7 @@ function buildFairy(canvas,isPencil=false){
   const armRG=new THREE.CylinderGeometry(0.085,0.085,0.5,8);
   const legLG=new THREE.CylinderGeometry(0.1,0.1,0.42,8);
   const legRG=new THREE.CylinderGeometry(0.1,0.1,0.42,8);
-  let armMat,legMat;
-  if(isPencil){
-    armMat=lambert({color:0xF5C518,flatShading:true});
-    legMat=lambert({color:0xe8b90f,flatShading:true});
-  }else{
+  if(!isPencil){
     remapUVRange(armLG,0,armLG.attributes.uv.count,RECT.armL);
     remapUVRange(armRG,0,armRG.attributes.uv.count,RECT.armR);
     remapUVRange(legLG,0,legLG.attributes.uv.count,RECT.legL);
@@ -2833,7 +2855,7 @@ function buildFairy(canvas,isPencil=false){
   }
   const aL=new THREE.Mesh(armLG,armMat),aR=new THREE.Mesh(armRG,armMat);
   aL.position.set(-0.39,1.05,0); aR.position.set(0.39,1.05,0);
-  aL.rotation.z=0.08; aR.rotation.z=-0.08; // 가만히 있을 때 = 차렷 자세 (팔을 몸에 붙여 내림)
+  aL.rotation.z=0.08; aR.rotation.z=-0.08;
   aL.userData.baseRz=0.08; aR.userData.baseRz=-0.08;
   const lL=new THREE.Mesh(legLG,legMat),lR=new THREE.Mesh(legRG,legMat);
   lL.position.set(-0.17,0.21,0); lR.position.set(0.17,0.21,0);
@@ -2843,7 +2865,6 @@ function buildFairy(canvas,isPencil=false){
   }
   group.add(aL,aR,lL,lR); parts.push(aL,aR,lL,lR);
 
-  // 좀비용 빨간 눈 (zomEyes)
   const zomEyesGroup = new THREE.Group();
   if(!isPencil){
     const zomEyeMat=new THREE.MeshBasicMaterial({color:0xff0000});
@@ -2855,8 +2876,6 @@ function buildFairy(canvas,isPencil=false){
     group.add(zomEyesGroup);
   }
 
-  // 술래 판정 전용 히트박스: 실제 몸보다 약간 넓게 잡아 태블릿에서도 판정이 안정적입니다.
-  // opacity 0이지만 visible은 true로 유지해야 Raycaster가 감지합니다.
   const hitbox=new THREE.Mesh(
     new THREE.BoxGeometry(0.95,1.55,0.85),
     new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false,colorWrite:false})
@@ -2866,17 +2885,13 @@ function buildFairy(canvas,isPencil=false){
   hitbox.userData.isFairyHitbox=true;
   group.add(hitbox);
 
-  // 자유 구경 모드에서만 보이는 닉네임 이름표
   const nameLabel=makeFairyNameLabel();
   group.add(nameLabel);
 
-  // 날개 3D 날개깃 생성
   const wingGroup = new THREE.Group();
   let wingL = null, wingR = null;
   if(!isPencil){
     const wingMat = lambert({color: 0xffffff, transparent: true, opacity: 0.85, side: THREE.DoubleSide});
-    
-    // 왼쪽 날개
     wingL = new THREE.Group();
     const featherL1 = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.12, 0.03), wingMat);
     featherL1.position.set(-0.25, 0, 0); featherL1.rotation.z = -0.2;
@@ -2887,7 +2902,6 @@ function buildFairy(canvas,isPencil=false){
     wingL.position.set(-0.2, 1.0, -0.22);
     wingGroup.add(wingL);
     
-    // 오른쪽 날개
     wingR = new THREE.Group();
     const featherR1 = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.12, 0.03), wingMat);
     featherR1.position.set(0.25, 0, 0); featherR1.rotation.z = 0.2;
@@ -2898,18 +2912,17 @@ function buildFairy(canvas,isPencil=false){
     wingR.position.set(0.2, 1.0, -0.22);
     wingGroup.add(wingR);
     
-    wingGroup.visible = false; // 기본적으론 가려둠
+    wingGroup.visible = false; 
     group.add(wingGroup);
   }
 
-  // 발밑 그림자
   const shTex=canvasTex(64,64,(g)=>{const gr=g.createRadialGradient(32,32,4,32,32,30);
     gr.addColorStop(0,"rgba(0,0,0,.35)");gr.addColorStop(1,"rgba(0,0,0,0)");
     g.fillStyle=gr;g.fillRect(0,0,64,64);});
   const sh=new THREE.Mesh(new THREE.PlaneGeometry(1.3,1.3),
     new THREE.MeshBasicMaterial({map:shTex,transparent:true,depthWrite:false}));
   sh.rotation.x=-Math.PI/2; sh.position.y=0.02; sh.visible=false;
-  // 위장 플레이에서 위치가 드러나지 않도록 캐릭터 그림자는 씬에 추가하지 않습니다.
+  
   const weaponHolder = new THREE.Group();
   weaponHolder.position.set(0, -0.25, -0.1);
   aR.add(weaponHolder);
@@ -7731,8 +7744,8 @@ let currentPrisonMesh = null;
 let copsCampTimer = 0;
 
 function getPrisonZone(mapId) {
-  const mId = mapId || practiceMapId || activeMapId || "classroom";
-  if (mId === "sciencelab") {
+  const mId = mapId || (typeof practiceMapId !== "undefined" ? practiceMapId : null) || (typeof currentMapId !== "undefined" ? currentMapId : "classroom");
+  if (mId === "science") {
     return {
       center: new THREE.Vector3(-18, 0.1, 14),
       radius: 4.5,
@@ -8081,7 +8094,7 @@ function updateCopsGame(dt) {
   const sBoard = $("copsScoreBoard");
   if (sBoard) sBoard.classList.remove("hidden");
 
-  const mapId = practiceMapId || activeMapId || "classroom";
+  const mapId = typeof currentMapId !== "undefined" ? currentMapId : "classroom";
   const pZone = getPrisonZone(mapId);
   if (!currentPrisonMesh) {
     buildPrisonMesh(pZone);
@@ -8138,6 +8151,70 @@ function updateCopsGame(dt) {
         }
       } else {
         copsCampTimer = 0;
+      }
+    }
+  } else {
+    // 🌐 온라인 멀티플레이 연행 및 수감 로직
+    if (G.role === "hider" && G.escortedBy && !G.imprisoned) {
+      const cop = remotes.get(G.escortedBy);
+      if (cop && cop.cur) {
+        const copDir = new THREE.Vector3(Math.sin(cop.cur.ry), 0, Math.cos(cop.cur.ry)).normalize();
+        const targetPos = new THREE.Vector3(cop.cur.x, G.pos.y, cop.cur.z).addScaledVector(copDir, -1.2);
+        G.pos.lerp(targetPos, dt * 6.0);
+      }
+    }
+
+    if (G.role === "hider" && G.imprisoned) {
+      const dist = G.pos.distanceTo(pZone.center);
+      if (dist > pZone.radius - 0.5) {
+        const dir = G.pos.clone().sub(pZone.center).setY(0).normalize();
+        G.pos.x = pZone.center.x + dir.x * (pZone.radius - 0.5);
+        G.pos.z = pZone.center.z + dir.z * (pZone.radius - 0.5);
+      }
+    }
+
+    if (G.role === "seeker") {
+      if (pZone.box.containsPoint(G.pos) || G.pos.distanceTo(pZone.center) < pZone.radius) {
+        let imprisonedCount = 0;
+        Object.keys(remotes).forEach(uid => {
+          const r = remotes[uid];
+          if (r && r.info && r.info.escortedBy === Net.uid && !r.info.imprisoned) {
+            Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/players/${uid}/escortedBy`), null).catch(()=>{});
+            Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/players/${uid}/imprisoned`), true).catch(()=>{});
+            
+            const rx = pZone.center.x + (Math.random() - 0.5) * (pZone.radius * 1.2);
+            const rz = pZone.center.z + (Math.random() - 0.5) * (pZone.radius * 1.2);
+            Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/pos/${uid}`), `${rx},0.1,${rz},0,0,0,0,3,,1`).catch(()=>{});
+            
+            imprisonedCount++;
+          }
+        });
+        if (imprisonedCount > 0) {
+          Audio2.sfxFound();
+          toast(`🔒 감옥 수감 완료! 도둑 ${imprisonedCount}명이 감옥에 수감되었습니다!`);
+        }
+      }
+
+      const settings = Net.meta?.settings || {};
+      const noCamp = (settings.copsNoCamp !== false);
+      if (noCamp) {
+        let escortedCount = 0;
+        Object.keys(remotes).forEach(uid => {
+          const r = remotes[uid];
+          if (r && r.info && r.info.escortedBy === Net.uid) escortedCount++;
+        });
+        
+        if (escortedCount === 0 && (pZone.box.containsPoint(G.pos) || G.pos.distanceTo(pZone.center) < pZone.radius + 1.0)) {
+          copsCampTimer += dt;
+          if (copsCampTimer >= 3.5) {
+            toast("⚠️ 감옥 캠핑 금지! 수감자 없는 경찰은 감옥 근처에 머무를 수 없습니다!");
+            const pushDir = G.pos.clone().sub(pZone.center).setY(0).normalize();
+            if (pushDir.lengthSq() < 0.01) pushDir.set(1, 0, 0);
+            G.pos.addScaledVector(pushDir, dt * 8.0);
+          }
+        } else {
+          copsCampTimer = 0;
+        }
       }
     }
   }
