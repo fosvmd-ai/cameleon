@@ -1006,6 +1006,7 @@ function clearMap(){
   hiderSpawns=[]; seekerSpawns.length=0;
   clearAllSplatDecals();
   if (typeof clearPracticeAI === "function") clearPracticeAI();
+  if (typeof cleanPrisonMesh === "function") cleanPrisonMesh();
 }
 
 function lambert(opt){ return new THREE.MeshLambertMaterial(opt); }
@@ -7774,7 +7775,7 @@ function getPrisonZone(mapId) {
 
 function buildPrisonMesh(prisonZone) {
   if (currentPrisonMesh) {
-    scene.remove(currentPrisonMesh);
+    if (currentPrisonMesh.parent) currentPrisonMesh.parent.remove(currentPrisonMesh);
     currentPrisonMesh = null;
   }
   if (!isCopsMode()) return;
@@ -7800,7 +7801,7 @@ function buildPrisonMesh(prisonZone) {
     color: 0xff3b30,
     side: THREE.DoubleSide,
     transparent: true,
-    opacity: 0.25
+    opacity: 0.35
   });
   const fenceNorth = new THREE.Mesh(new THREE.PlaneGeometry(r * 2 - 1, 3.0), fenceMat);
   fenceNorth.position.set(c.x, c.y + 1.5, c.z - r + 0.5);
@@ -7827,17 +7828,17 @@ function buildPrisonMesh(prisonZone) {
   ring.position.set(c.x, c.y + 0.05, c.z);
   group.add(ring);
 
-  const light = new THREE.PointLight(0xff3b30, 0.8, 8);
+  const light = new THREE.PointLight(0xff3b30, 1.2, 12);
   light.position.set(c.x, c.y + 2.5, c.z);
   group.add(light);
 
-  scene.add(group);
+  mapRoot.add(group);
   currentPrisonMesh = group;
 }
 
 function cleanPrisonMesh() {
   if (currentPrisonMesh) {
-    scene.remove(currentPrisonMesh);
+    if (currentPrisonMesh.parent) currentPrisonMesh.parent.remove(currentPrisonMesh);
     currentPrisonMesh = null;
   }
 }
@@ -7862,9 +7863,10 @@ function doArrestAction() {
     });
   } else {
     Object.keys(remotes).forEach(uid => {
-      const r = remotes[uid];
+      const r = remotes.get(uid);
       if (r && r.info && r.info.role === "hider" && !r.info.imprisoned && !r.info.escortedBy) {
-        const d = copPos.distanceTo(r.info.pos);
+        const rPos = new THREE.Vector3(r.cur.x, r.cur.y, r.cur.z);
+        const d = copPos.distanceTo(rPos);
         if (d < targetDist) {
           targetDist = d;
           target = { isBot: false, uid, nick: r.info.nick };
@@ -8096,126 +8098,170 @@ function updateCopsGame(dt) {
 
   const mapId = typeof currentMapId !== "undefined" ? currentMapId : "classroom";
   const pZone = getPrisonZone(mapId);
-  if (!currentPrisonMesh) {
+  if (!currentPrisonMesh || currentPrisonMesh.userData.mapId !== mapId) {
     buildPrisonMesh(pZone);
+    if (currentPrisonMesh) currentPrisonMesh.userData.mapId = mapId;
   }
 
+  // ── 1. 연행 추종 (Escort Train Lerp) ──
+  // (A) 내(G)가 연행 중일 때
+  if (G.role === "hider" && G.escortedBy && !G.imprisoned) {
+    let cPos = null;
+    let cYaw = 0;
+    if (Net.mode === "practice") {
+      const copBot = practiceAIList.find(b => b.id === G.escortedBy);
+      if (copBot) { cPos = copBot.pos; cYaw = copBot.yaw; }
+    } else {
+      const cop = remotes.get(G.escortedBy);
+      if (cop && cop.cur) { cPos = new THREE.Vector3(cop.cur.x, G.pos.y, cop.cur.z); cYaw = cop.cur.ry || 0; }
+    }
+    if (cPos) {
+      const backVec = new THREE.Vector3(Math.sin(cYaw), 0, Math.cos(cYaw));
+      const targetPos = cPos.clone().addScaledVector(backVec, 1.2);
+      G.pos.lerp(targetPos, dt * 8.0);
+      if (myFairy && myFairy.group) myFairy.group.position.copy(G.pos);
+    }
+  }
+
+  // (B) 연습모드 AI 봇 연행 추종
   if (Net.mode === "practice") {
-    const copMap = {};
-    if (G.role === "seeker") copMap[Net.uid || "local_host"] = G.pos;
     practiceAIList.forEach(bot => {
-      if (bot.role === "seeker") copMap[bot.id] = bot.pos;
+      if (bot.role === "hider" && bot.escortedBy && !bot.imprisoned) {
+        let cPos = null;
+        let cYaw = 0;
+        if (bot.escortedBy === Net.uid || bot.escortedBy === "local_host") {
+          cPos = G.pos;
+          cYaw = G.fairyYaw || G.yaw || 0;
+        } else {
+          const copBot = practiceAIList.find(b => b.id === bot.escortedBy);
+          if (copBot) { cPos = copBot.pos; cYaw = copBot.yaw; }
+        }
+        if (cPos) {
+          const backVec = new THREE.Vector3(Math.sin(cYaw), 0, Math.cos(cYaw));
+          const targetPos = cPos.clone().addScaledVector(backVec, 1.2);
+          bot.pos.lerp(targetPos, dt * 8.0);
+          if (bot.fairy && bot.fairy.group) bot.fairy.group.position.copy(bot.pos);
+        }
+      }
     });
+  }
 
-    Object.keys(copMap).forEach(copId => {
-      const cPos = copMap[copId];
-      const escortedBots = practiceAIList.filter(b => b.escortedBy === copId);
-      escortedBots.forEach((b, idx) => {
-        const offsetDist = (idx + 1) * 1.1;
-        const targetPos = cPos.clone().add(new THREE.Vector3(0, 0, offsetDist));
-        b.pos.lerp(targetPos, dt * 6.0);
-        b.fairy.group.position.copy(b.pos);
-      });
+  // (C) 온라인 원격 플레이어 연행 추종
+  if (Net.mode === "online") {
+    remotes.forEach((r, uid) => {
+      if (r.info && r.info.role === "hider" && r.info.escortedBy && !r.info.imprisoned) {
+        let cPos = null;
+        let cYaw = 0;
+        if (r.info.escortedBy === Net.uid) {
+          cPos = G.pos;
+          cYaw = G.fairyYaw || G.yaw || 0;
+        } else {
+          const cop = remotes.get(r.info.escortedBy);
+          if (cop && cop.cur) { cPos = new THREE.Vector3(cop.cur.x, r.cur.y, cop.cur.z); cYaw = cop.cur.ry || 0; }
+        }
+        if (cPos) {
+          const backVec = new THREE.Vector3(Math.sin(cYaw), 0, Math.cos(cYaw));
+          const targetPos = cPos.clone().addScaledVector(backVec, 1.2);
+          r.cur.x = lerp(r.cur.x, targetPos.x, dt * 8.0);
+          r.cur.z = lerp(r.cur.z, targetPos.z, dt * 8.0);
+          if (r.fairy && r.fairy.group) r.fairy.group.position.set(r.cur.x, r.cur.y, r.cur.z);
+        }
+      }
     });
+  }
 
-    Object.keys(copMap).forEach(copId => {
-      const cPos = copMap[copId];
-      if (pZone.box.containsPoint(cPos) || cPos.distanceTo(pZone.center) < pZone.radius) {
-        const escortedBots = practiceAIList.filter(b => b.escortedBy === copId);
-        if (escortedBots.length > 0) {
+  // ── 2. 감옥 자동 수감 (Automatic Imprisonment) ──
+  const checkCopPrisonEntry = (copId, copPos) => {
+    if (pZone.box.containsPoint(copPos) || copPos.distanceTo(pZone.center) < pZone.radius) {
+      if (Net.mode === "practice") {
+        if (G.role === "hider" && G.escortedBy === copId && !G.imprisoned) {
+          G.escortedBy = null;
+          G.imprisoned = true;
+          const rx = pZone.center.x + (Math.random() - 0.5) * (pZone.radius * 0.8);
+          const rz = pZone.center.z + (Math.random() - 0.5) * (pZone.radius * 0.8);
+          G.pos.set(rx, 0.1, rz);
           Audio2.sfxFound();
-          escortedBots.forEach(b => {
+          toast("🔒 감옥 수감! 경찰에게 잡혀 감옥에 갇혔습니다!");
+        }
+        let imprisonedBotsCount = 0;
+        practiceAIList.forEach(b => {
+          if (b.role === "hider" && b.escortedBy === copId && !b.imprisoned) {
             b.escortedBy = null;
             b.imprisoned = true;
-            const rx = pZone.center.x + (Math.random() - 0.5) * (pZone.radius * 1.2);
-            const rz = pZone.center.z + (Math.random() - 0.5) * (pZone.radius * 1.2);
+            const rx = pZone.center.x + (Math.random() - 0.5) * (pZone.radius * 0.8);
+            const rz = pZone.center.z + (Math.random() - 0.5) * (pZone.radius * 0.8);
             b.pos.set(rx, 0.1, rz);
-            b.fairy.group.position.copy(b.pos);
-          });
-          toast(`🔒 감옥 수감 완료! 도둑 ${escortedBots.length}명이 감옥에 수감되었습니다!`);
-        }
-      }
-    });
-
-    const settings = Net.meta?.settings || {};
-    const noCamp = (settings.copsNoCamp !== false);
-    if (noCamp && G.role === "seeker") {
-      const escortedCount = practiceAIList.filter(b => b.escortedBy === (Net.uid || "local_host")).length;
-      if (escortedCount === 0 && (pZone.box.containsPoint(G.pos) || G.pos.distanceTo(pZone.center) < pZone.radius + 1.0)) {
-        copsCampTimer += dt;
-        if (copsCampTimer >= 3.5) {
-          toast("⚠️ 감옥 캠핑 금지! 수감자 없는 경찰은 감옥 근처에 머무를 수 없습니다!");
-          const pushDir = G.pos.clone().sub(pZone.center).setY(0).normalize();
-          if (pushDir.lengthSq() < 0.01) pushDir.set(1, 0, 0);
-          G.pos.addScaledVector(pushDir, dt * 8.0);
+            if (b.fairy && b.fairy.group) b.fairy.group.position.copy(b.pos);
+            imprisonedBotsCount++;
+          }
+        });
+        if (imprisonedBotsCount > 0) {
+          Audio2.sfxFound();
+          toast(`🔒 감옥 수감 완료! 도둑 ${imprisonedBotsCount}명이 감옥에 수감되었습니다!`);
         }
       } else {
-        copsCampTimer = 0;
-      }
-    }
-  } else {
-    // 🌐 온라인 멀티플레이 연행 및 수감 로직
-    if (G.role === "hider" && G.escortedBy && !G.imprisoned) {
-      const cop = remotes.get(G.escortedBy);
-      if (cop && cop.cur) {
-        const copDir = new THREE.Vector3(Math.sin(cop.cur.ry), 0, Math.cos(cop.cur.ry)).normalize();
-        const targetPos = new THREE.Vector3(cop.cur.x, G.pos.y, cop.cur.z).addScaledVector(copDir, -1.2);
-        G.pos.lerp(targetPos, dt * 6.0);
-      }
-    }
-
-    if (G.role === "hider" && G.imprisoned) {
-      const dist = G.pos.distanceTo(pZone.center);
-      if (dist > pZone.radius - 0.5) {
-        const dir = G.pos.clone().sub(pZone.center).setY(0).normalize();
-        G.pos.x = pZone.center.x + dir.x * (pZone.radius - 0.5);
-        G.pos.z = pZone.center.z + dir.z * (pZone.radius - 0.5);
-      }
-    }
-
-    if (G.role === "seeker") {
-      if (pZone.box.containsPoint(G.pos) || G.pos.distanceTo(pZone.center) < pZone.radius) {
-        let imprisonedCount = 0;
-        Object.keys(remotes).forEach(uid => {
-          const r = remotes[uid];
-          if (r && r.info && r.info.escortedBy === Net.uid && !r.info.imprisoned) {
-            Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/players/${uid}/escortedBy`), null).catch(()=>{});
-            Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/players/${uid}/imprisoned`), true).catch(()=>{});
-            
-            const rx = pZone.center.x + (Math.random() - 0.5) * (pZone.radius * 1.2);
-            const rz = pZone.center.z + (Math.random() - 0.5) * (pZone.radius * 1.2);
-            Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/pos/${uid}`), `${rx},0.1,${rz},0,0,0,0,3,,1`).catch(()=>{});
-            
-            imprisonedCount++;
+        if (copId === Net.uid) {
+          let count = 0;
+          remotes.forEach((r, uid) => {
+            if (r.info && r.info.escortedBy === Net.uid && !r.info.imprisoned) {
+              Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/players/${uid}/escortedBy`), null).catch(()=>{});
+              Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/players/${uid}/imprisoned`), true).catch(()=>{});
+              const rx = pZone.center.x + (Math.random() - 0.5) * (pZone.radius * 0.8);
+              const rz = pZone.center.z + (Math.random() - 0.5) * (pZone.radius * 0.8);
+              Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/pos/${uid}`), `${rx},0.1,${rz},0,0,0,0,3,,1`).catch(()=>{});
+              count++;
+            }
+          });
+          if (count > 0) {
+            Audio2.sfxFound();
+            toast(`🔒 감옥 수감 완료! 도둑 ${count}명이 감옥에 수감되었습니다!`);
           }
-        });
-        if (imprisonedCount > 0) {
-          Audio2.sfxFound();
-          toast(`🔒 감옥 수감 완료! 도둑 ${imprisonedCount}명이 감옥에 수감되었습니다!`);
         }
       }
+    }
+  };
 
-      const settings = Net.meta?.settings || {};
-      const noCamp = (settings.copsNoCamp !== false);
-      if (noCamp) {
-        let escortedCount = 0;
-        Object.keys(remotes).forEach(uid => {
-          const r = remotes[uid];
-          if (r && r.info && r.info.escortedBy === Net.uid) escortedCount++;
-        });
-        
-        if (escortedCount === 0 && (pZone.box.containsPoint(G.pos) || G.pos.distanceTo(pZone.center) < pZone.radius + 1.0)) {
-          copsCampTimer += dt;
-          if (copsCampTimer >= 3.5) {
-            toast("⚠️ 감옥 캠핑 금지! 수감자 없는 경찰은 감옥 근처에 머무를 수 없습니다!");
-            const pushDir = G.pos.clone().sub(pZone.center).setY(0).normalize();
-            if (pushDir.lengthSq() < 0.01) pushDir.set(1, 0, 0);
-            G.pos.addScaledVector(pushDir, dt * 8.0);
-          }
-        } else {
-          copsCampTimer = 0;
-        }
+  if (G.role === "seeker") {
+    checkCopPrisonEntry(Net.uid || "local_host", G.pos);
+  }
+  if (Net.mode === "practice") {
+    practiceAIList.forEach(bot => {
+      if (bot.role === "seeker") {
+        checkCopPrisonEntry(bot.id, bot.pos);
       }
+    });
+  }
+
+  // ── 3. 수감자 구역 이탈 방지 (Prison Boundaries) ──
+  if (G.role === "hider" && G.imprisoned) {
+    const dist = G.pos.distanceTo(pZone.center);
+    if (dist > pZone.radius - 0.5) {
+      const dir = G.pos.clone().sub(pZone.center).setY(0).normalize();
+      G.pos.x = pZone.center.x + dir.x * (pZone.radius - 0.5);
+      G.pos.z = pZone.center.z + dir.z * (pZone.radius - 0.5);
+    }
+  }
+
+  // ── 4. 감옥 캠핑 방지 (copsNoCamp) ──
+  const settings = Net.meta?.settings || {};
+  const noCamp = (settings.copsNoCamp !== false);
+  if (noCamp && G.role === "seeker") {
+    let escortedCount = 0;
+    if (Net.mode === "practice") {
+      escortedCount = practiceAIList.filter(b => b.escortedBy === (Net.uid || "local_host")).length;
+    } else {
+      remotes.forEach(r => { if (r.info && r.info.escortedBy === Net.uid) escortedCount++; });
+    }
+    if (escortedCount === 0 && (pZone.box.containsPoint(G.pos) || G.pos.distanceTo(pZone.center) < pZone.radius + 1.0)) {
+      copsCampTimer += dt;
+      if (copsCampTimer >= 3.5) {
+        toast("⚠️ 감옥 캠핑 금지! 수감자 없는 경찰은 감옥 근처에 머무를 수 없습니다!");
+        const pushDir = G.pos.clone().sub(pZone.center).setY(0).normalize();
+        if (pushDir.lengthSq() < 0.01) pushDir.set(1, 0, 0);
+        G.pos.addScaledVector(pushDir, dt * 8.0);
+      }
+    } else {
+      copsCampTimer = 0;
     }
   }
 
