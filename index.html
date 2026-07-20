@@ -2567,6 +2567,8 @@ function updateMapGimmicks(dt){
   if(currentMapId==="cafeteria"){ updateSlipZones(dt); updateConveyor(dt); updateSteam(dt); } else steamCleanup();
   if(currentMapId!=="library") cartCleanup(); else updateBookCarts(dt);
   if(currentMapId==="playground") updatePlaygroundGimmick(dt); else playgroundCleanup();
+
+  if(typeof updateIceGame === "function") updateIceGame(dt);
 }
 
 /* ================= v2: 멀티 맵 레지스트리 ================= */
@@ -3000,6 +3002,21 @@ function applyPoseToFairy(f,pose){
 }
 function applyZombieSkinToFairy(f, state){
   if(!f || !f.parts) return;
+  
+  if (typeof isIceMode === "function" && isIceMode()) {
+    if (state > 0) { // 얼음 상태
+      f.parts.forEach(part => {
+        if(part.material) part.material.color.setHex(0xa9d9ee);
+      });
+    } else { // 자유 상태
+      f.parts.forEach(part => {
+        if(part.material) part.material.color.setHex(0xffffff);
+      });
+    }
+    if(f.zomEyes) f.zomEyes.visible = false;
+    return;
+  }
+
   const isZombie = state === 2;
   const isInfected = state === 1;
   
@@ -3669,7 +3686,6 @@ function updateFrozenBanner(){
 }
 function updateMovement(dt){
   const ghost=G.role==="ghost";
-  // v2: 얼음 모드 — 지우개는 제자리에 얼어붙습니다 (중력만 적용해 공중에 뜨지 않게).
   if(isFrozenNow()){
     G.moveIn.x=0; G.moveIn.z=0; G.jumpReq=false; G.flyUp=false; G.flyDown=false;
     if(!G.flying){
@@ -3689,10 +3705,10 @@ function updateMovement(dt){
     return;
   }
   let baseSpeed=G.role==="seeker"?7.2:(G.pose==="lie"?2.8:5.6);
-  if(G.pose==="roll"||G.pose==="roll_lie") baseSpeed=0; // 말기 및 말기눕기 자세는 이동 불가!
+  if(G.pose==="roll"||G.pose==="roll_lie") baseSpeed=0;
   if(G.onSprinkler) baseSpeed *= 0.5;
   if(isZombieMode() && G.zombieState === 2) {
-    baseSpeed = isNight ? 7.8 : 4.2; // 밤에는 7.8로 빨라지고 낮에는 4.2로 느려짐
+    baseSpeed = isNight ? 7.8 : 4.2;
   }
   if(isInkMode() && G.speedBoostTimer > 0) {
     baseSpeed *= 1.5;
@@ -3707,6 +3723,14 @@ function updateMovement(dt){
       if(G.speedBoostTimer > 0) baseSpeed *= 2.0;
     }
   }
+
+  // 🧊 얼음땡 모드 제약
+  if(typeof isIceMode === "function" && isIceMode() && G.role === "hider" && G.zombieState > 0) {
+      baseSpeed = 0;
+      G.jumpReq = false;
+      G.flyUp = false;
+  }
+
   const speed=ghost?13.5:baseSpeed;
   const f=new THREE.Vector3(-Math.sin(G.yaw),0,-Math.cos(G.yaw));
   const rgt=new THREE.Vector3(-f.z,0,f.x);
@@ -4308,7 +4332,10 @@ function updateMobileButtons(){
   if(!IS_TOUCH)return;
   const seek=G.role==="seeker"&&G.phase==="SEEK";
   const hidePaint=G.role==="hider"&&(G.lobbyPractice||G.phase==="PAINT"||G.phase==="SEEK")&&!G.found;
-  $("btnJudge").classList.toggle("hidden",!seek);
+  
+  const isIce = typeof isIceMode === "function" && isIceMode();
+
+  $("btnJudge").classList.toggle("hidden",!seek || isIce);
   $("mobileUI").classList.toggle("seekerControls",seek);
   $("mobileUI").classList.toggle("flyingControls",G.flying||G.spectating||G.role==="ghost");
   $("btnJump").classList.toggle("hidden",G.mirror);
@@ -4321,19 +4348,25 @@ function updateMobileButtons(){
   $("btnSpoit").classList.toggle("hidden",!(hidePaint));
   $("btnMirror").classList.toggle("hidden",!hidePaint||G.mirror);
   
-  const showInkFire = isInkMode() && G.role === "hider" && !G.found && (!G.splatTimer || G.splatTimer <= 0);
-  $("btnInkFire").classList.toggle("hidden", !showInkFire);
+  const showInkFire = typeof isInkMode==="function" && isInkMode() && G.role === "hider" && !G.found && (!G.splatTimer || G.splatTimer <= 0);
+  if($("btnInkFire")) $("btnInkFire").classList.toggle("hidden", !showInkFire);
 
-  const isCops = isCopsMode();
-  const showArrest = isCops && G.role === "seeker" && G.phase === "SEEK";
-  const showRescue = isCops && G.role === "hider" && !G.imprisoned && (!G.escortedBy);
-  const showCopsStatus = isCops;
-  const showItem = isCops && G.role === "hider" && !G.imprisoned && (!G.escortedBy);
+  const isCops = typeof isCopsMode==="function" && isCopsMode();
+  if($("btnArrest")) $("btnArrest").classList.toggle("hidden", !(isCops && G.role === "seeker" && G.phase === "SEEK"));
+  if($("btnRescue")) $("btnRescue").classList.toggle("hidden", !(isCops && G.role === "hider" && !G.imprisoned && (!G.escortedBy)));
+  if($("btnCopsStatus")) $("btnCopsStatus").classList.toggle("hidden", !isCops);
+  if($("btnItem")) $("btnItem").classList.toggle("hidden", !(isCops && G.role === "hider" && !G.imprisoned && (!G.escortedBy)));
 
-  $("btnArrest").classList.toggle("hidden", !showArrest);
-  $("btnRescue").classList.toggle("hidden", !showRescue);
-  $("btnCopsStatus").classList.toggle("hidden", !showCopsStatus);
-  $("btnItem").classList.toggle("hidden", !showItem);
+  // 얼음땡 버튼
+  if (typeof injectIceButtons === "function") injectIceButtons();
+  if ($("btnIceSelf")) {
+      const showIceSelf = isIce && G.role === "hider" && G.phase === "SEEK" && G.zombieState === 0;
+      $("btnIceSelf").classList.toggle("hidden", !showIceSelf);
+  }
+  if ($("btnIceTag")) {
+      const showIceTag = isIce && G.phase === "SEEK" && (G.role === "seeker" || (G.role === "hider" && G.zombieState === 0));
+      $("btnIceTag").classList.toggle("hidden", !showIceTag);
+  }
 
   document.querySelectorAll(".poseCol .mbtn").forEach(b=>b.classList.toggle("hidden",G.role==="seeker"||G.role==="ghost"||G.mirror||G.spectating));
   updateSpectatorButton();
@@ -5405,16 +5438,16 @@ function enterPaint(){
   Audio2.resume();
   showScreen("GAME");
   foundLog=[]; G.tvMode=false; $("tvHud").classList.add("hidden"); $("tvFollowBar").classList.add("hidden");
-  if(G.isHost && Net.meta && Net.meta.frozen) Net.setFrozen(false); // 숨는 시간엔 얼음 자동 해제
+  if(G.isHost && Net.meta && Net.meta.frozen) Net.setFrozen(false);
   resetFrozenBanner();
   G.texUploaded=false; G.found=false; G.paint=1000; G.pose="stand"; G.lastPosSent="";
   G.flying=false; G.flyUp=false; G.flyDown=false; G.lastJumpTap=0;G.lastFlyDownTap=0;
   G.vy=0; G.spectating=false;G.lobbyPractice=false; G.mirror&&setMirror(false);
-  // 내 캔버스 초기화
+  
   const g=myFairy.canvas.getContext("2d");
-  const bgColor = isInkMode() ? G.teamColor : "#FFFFFF";
+  const bgColor = (typeof isInkMode === "function" && isInkMode()) ? G.teamColor : "#FFFFFF";
   g.drawImage(makeEraserCanvas(bgColor),0,0); myFairy.tex.needsUpdate=true;
-  [...remotes.keys()].forEach(removeRemote); // 라운드 리셋
+  [...remotes.keys()].forEach(removeRemote);
   const me=Net.mode==="online"?Net.players[Net.uid]:{role:G.role};
   G.role=me.role||"hider";
 
@@ -5429,6 +5462,8 @@ function enterPaint(){
       showRoleCard("🎨 팀 배정 완료!","곧 색칠 배틀이 시작됩니다!");
     } else if (gm === "cops") {
       showRoleCard("🏃 도둑 준비 시간!","경찰이 오기 전에 도망쳐 숨을 자리를 찾으세요! (구출: [F]키)");
+    } else if (gm === "ice") {
+      showRoleCard("🏃 도망갈 준비!","술래를 피해 도망가고, 위험하면 [Q]얼음을 하세요!");
     } else {
       showRoleCard("🧼 당신은 지우개!","몸에 물감을 칠하고 교실에 숨자!");
     }
@@ -5436,13 +5471,13 @@ function enterPaint(){
     $("blockOverlay").classList.add("hidden");
     stopCaseGame();
   }else if(G.role==="seeker"){
-    if (gm === "hide" || gm === "cops") {
-      showRoleCard(gm === "cops" ? "👮 경찰 대기 중!" : "✏️ 당신은 술래 연필!","도둑들이 숨는 동안 출동 대기!");
+    if (gm === "hide" || gm === "cops" || gm === "ice") {
+      showRoleCard(gm === "cops" ? "👮 경찰 대기 중!" : "✏️ 당신은 술래!","도망가는 동안 출동 대기!");
     }
-    $("blockOverlay").classList.toggle("hidden", gm !== "hide" && gm !== "cops");
-    $("paintPanel").classList.toggle("hidden", gm === "hide" || gm === "cops");
-    if (gm === "hide" || gm === "cops") startCaseGame(); else stopCaseGame();
-  }else{ // ghost
+    $("blockOverlay").classList.toggle("hidden", gm !== "hide" && gm !== "cops" && gm !== "ice");
+    $("paintPanel").classList.toggle("hidden", gm === "hide" || gm === "cops" || gm === "ice");
+    if (gm === "hide" || gm === "cops" || gm === "ice") startCaseGame(); else stopCaseGame();
+  }else{
     G.pos.set(0,20,20);
     $("blockOverlay").classList.add("hidden");
     $("paintPanel").classList.add("hidden");
@@ -5456,17 +5491,19 @@ function enterPaint(){
     $("phaseLabel").textContent = "🎨 팀 배정 중...";
   } else if (gm === "cops") {
     $("phaseLabel").textContent = "👮 경찰 출동 대기 중...";
+  } else if (gm === "ice") {
+    $("phaseLabel").textContent = "🏃 도망 준비 중...";
   } else {
     $("phaseLabel").textContent=G.role==="seeker"?"숨는 중...":"🎨 칠하고 숨기!";
   }
 
   Music.start("PAINT");
-  G.joinedMidgame=false;  // 숨는 시간엔 항상 정상 스폰되므로 도중합류 표시 해제
+  G.joinedMidgame=false;
   syncLocalFairy();
   updateMobileButtons();
 }
 function enterSeek(){
-  Net.uploadTex(); // 안전망: 아직 안 올렸으면 즉시
+  Net.uploadTex();
   setMirror(false);
   stopCaseGame();
   $("blockOverlay").classList.add("hidden");
@@ -5476,20 +5513,20 @@ function enterSeek(){
   const gm = Net.meta?.settings?.gameMode || "hide";
 
   if(G.role==="seeker"){
-    // v2: 다중 술래 — seekerOrder 내 내 순서에 맞는 스폰 지점에 겹치지 않게 배치
     const order=(Net.mode==="online"&&Net.meta.seekerOrder)||[];
     let idx=order.indexOf(Net.uid);
     if(idx<0)idx=Math.abs(hashUid(Net.uid||"s"))%Math.max(1,seekerSpawns.length);
     const sp=seekerSpawns[idx%Math.max(1,seekerSpawns.length)]||seekerSpawns[0]||new THREE.Vector3(50,0,0);
     G.pos.copy(sp); G.vy=0; G.yaw=Math.PI;
     if (gm === "hide") {
-      showRoleCard("🔍 찾아라!",IS_TOUCH?"연필로 콕 찍어 지우개를 찾자! (다른 술래와 힘을 합치자)":"마우스 커서 = 조준점! 누른 채 드래그하면 회전, 그대로 떼면 콕! 다른 술래와 협동하자!");
+      showRoleCard("🔍 찾아라!",IS_TOUCH?"연필로 콕 찍어 지우개를 찾자!":"마우스 커서 = 조준점! 누른 채 드래그하면 회전, 떼면 콕!");
     } else if (gm === "cops") {
       showRoleCard("👮 경찰 출동!","도둑들을 추격하여 [F]키로 체포하고 감옥으로 연행하세요!");
+    } else if (gm === "ice") {
+      showRoleCard("✏️ 술래 출발!","도망자들을 쫓아가 [F]키로 터치하여 얼리세요!");
     }
   }
   else if(G.role==="hider"){
-    // 도중 합류한 지우개(재입장 등)는 아직 교실에 자리가 없으므로 숨는 스폰 지점에 새로 배치합니다.
     if(G.joinedMidgame){
       const idx=Math.abs(hashUid(Net.uid||"p"))%hiderSpawns.length;
       G.pos.copy(hiderSpawns[idx]); G.vy=0; G.pose="stand";
@@ -5501,6 +5538,8 @@ function enterSeek(){
       showRoleCard("🎨 색칠 시작!","팀 색으로 맵을 최대한 많이 칠하세요!");
     } else if (gm === "cops") {
       showRoleCard("🏃 경찰 출동!","경찰을 피해 도망치고 갇힌 동료를 [F]키로 구출하세요!");
+    } else if (gm === "ice") {
+      showRoleCard("🧊 얼음땡!","술래를 피해 도망치고, [F]를 눌러 얼어붙은 친구를 구해주세요!");
     } else {
       showRoleCard("🤫 들키지 마!","게임 도중 합류! 얼른 숨을 곳을 찾자!");
     }
@@ -5512,6 +5551,8 @@ function enterSeek(){
     $("phaseLabel").textContent = "🎨 색칠 배틀 진행 중!";
   } else if (gm === "cops") {
     $("phaseLabel").textContent = "👮 경찰과 도둑 — 추격전 진행 중!";
+  } else if (gm === "ice") {
+    $("phaseLabel").textContent = "🧊 얼음땡 추격전 진행 중!";
   } else {
     $("phaseLabel").textContent="🔍 술래가 찾는 중!";
   }
@@ -5846,16 +5887,23 @@ function refreshLobbySettingsUI(){
   if(document.activeElement!==$("seekSecSlider")){ $("seekSecSlider").value=settings.seekSec; }
   $("paintSecSlider").disabled=!G.isHost;
   $("seekSecSlider").disabled=!G.isHost;
+
+  const selMode = $("selGameMode");
+  if (!selMode.querySelector('option[value="ice"]')) {
+      const opt = document.createElement('option');
+      opt.value = "ice";
+      opt.textContent = "🧊 얼음땡 모드";
+      selMode.appendChild(opt);
+  }
   
   const gameMode=settings.gameMode||"hide";
-  $("selGameMode").value=gameMode;
-  $("selGameMode").disabled=!G.isHost;
+  selMode.value=gameMode;
+  selMode.disabled=!G.isHost;
   $("selInkTeams").value=settings.teamCount||2;
   $("selInkTeams").disabled=!G.isHost;
   $("inkTeamRow").classList.toggle("hidden",gameMode!=="splatoon");
   $("copsSettingsRow").classList.toggle("hidden",gameMode!=="cops");
 
-  // ── 게임모드별 슬라이더 레이블 및 표시/숨김 분기 ──
   if (gameMode === "hide") {
     $("paintSecRow").classList.remove("hidden");
     $("seekSecRow").classList.remove("hidden");
@@ -5880,40 +5928,31 @@ function refreshLobbySettingsUI(){
     $("chkCopsRescueEscort").disabled = !G.isHost;
     $("chkCopsNoCamp").checked = settings.copsNoCamp !== false;
     $("chkCopsNoCamp").disabled = !G.isHost;
+  } else if (gameMode === "ice") {
+    $("paintSecRow").classList.remove("hidden");
+    $("seekSecRow").classList.remove("hidden");
+    $("paintSecLabel").textContent = "🏃 도망 시간";
+    $("seekSecLabel").textContent = "🧊 얼음땡 시간";
   }
 
   $("paintSecVal").textContent=fmtMinSec(+$("paintSecSlider").value);
   $("seekSecVal").textContent=fmtMinSec(+$("seekSecSlider").value);
 
-  // ── 게임모드별 방장 역할 선택 버튼 동적 교체 ──
   $("hostRoleBox").classList.toggle("hidden", !G.isHost);
   const hostRole=Net.meta.hostRole||"spectator";
   const btnRow=$("hostRoleBtnRow");
   if (btnRow && G.isHost) {
     let buttons = [];
     if (gameMode === "zombie") {
-      buttons = [
-        {role:"seeker", label:"🧟 좀비"},
-        {role:"fairy",  label:"🏃 사람"},
-        {role:"spectator", label:"👀 관전"}
-      ];
+      buttons = [{role:"seeker", label:"🧟 좀비"}, {role:"fairy", label:"🏃 사람"}, {role:"spectator", label:"👀 관전"}];
     } else if (gameMode === "splatoon") {
-      buttons = [
-        {role:"fairy",  label:"🎨 참여자"},
-        {role:"spectator", label:"👀 관전"}
-      ];
+      buttons = [{role:"fairy", label:"🎨 참여자"}, {role:"spectator", label:"👀 관전"}];
     } else if (gameMode === "cops") {
-      buttons = [
-        {role:"seeker", label:"👮 경찰"},
-        {role:"fairy",  label:"🏃 도둑"},
-        {role:"spectator", label:"👀 관전"}
-      ];
+      buttons = [{role:"seeker", label:"👮 경찰"}, {role:"fairy", label:"🏃 도둑"}, {role:"spectator", label:"👀 관전"}];
+    } else if (gameMode === "ice") {
+      buttons = [{role:"seeker", label:"✏️ 술래"}, {role:"fairy", label:"🏃 도망자"}, {role:"spectator", label:"👀 관전"}];
     } else {
-      buttons = [
-        {role:"seeker", label:"✏️ 술래"},
-        {role:"fairy",  label:"🧼 지우개 요정"},
-        {role:"spectator", label:"👀 관전"}
-      ];
+      buttons = [{role:"seeker", label:"✏️ 술래"}, {role:"fairy", label:"🧼 지우개 요정"}, {role:"spectator", label:"👀 관전"}];
     }
     btnRow.innerHTML = "";
     buttons.forEach(b => {
@@ -5921,12 +5960,7 @@ function refreshLobbySettingsUI(){
       el.className = "secondary hostRoleBtn" + (b.role === hostRole ? " on" : "");
       el.dataset.role = b.role;
       el.textContent = b.label;
-      el.onclick = () => {
-        Audio2.resume();
-        btnRow.querySelectorAll(".hostRoleBtn").forEach(x => x.classList.remove("on"));
-        el.classList.add("on");
-        Net.setHostRole(b.role);
-      };
+      el.onclick = () => { Audio2.resume(); btnRow.querySelectorAll(".hostRoleBtn").forEach(x => x.classList.remove("on")); el.classList.add("on"); Net.setHostRole(b.role); };
       btnRow.appendChild(el);
     });
   }
@@ -9179,6 +9213,120 @@ function updatePracticeAI(dt) {
       if (weaponBoxSpawns.length < 4) spawnWeaponBoxLocally();
     }
   }
+}
+
+// ================= 얼음땡 모드 시스템 =================
+function isIceMode() {
+  if (Net.mode === "practice" || G.lobbyPractice) return G.practiceGameMode === "ice";
+  if (Net.mode !== "online" || !Net.meta || !Net.meta.settings) return false;
+  return Net.meta.settings.gameMode === "ice";
+}
+
+function injectIceButtons() {
+    if(!$("btnIceSelf")) {
+        const btnIce = document.createElement("div");
+        btnIce.id = "btnIceSelf";
+        btnIce.className = "mbtn hidden";
+        btnIce.style.cssText = "background:#a9d9ee; color:#000; width:70px; height:70px; right:22px; bottom:184px; z-index:45;";
+        btnIce.innerHTML = "🧊<br>얼음[Q]";
+        btnIce.onpointerdown = (e) => { e.preventDefault(); e.stopPropagation(); Audio2.resume(); doIceSelfAction(); };
+        $("mobileUI").appendChild(btnIce);
+        
+        const btnIceTag = document.createElement("div");
+        btnIceTag.id = "btnIceTag";
+        btnIceTag.className = "mbtn hidden";
+        btnIceTag.style.cssText = "background:#ffcc00; color:#000; width:100px; height:100px; right:18px; bottom:20px; z-index:45;";
+        btnIceTag.innerHTML = "🔔<br>땡/터치[F]";
+        btnIceTag.onpointerdown = (e) => { e.preventDefault(); e.stopPropagation(); Audio2.resume(); doIceTagAction(); };
+        $("mobileUI").appendChild(btnIceTag);
+    }
+}
+
+window.addEventListener("keydown", e => {
+  if (isIceMode() && G.screen === "GAME") {
+     if (e.code === "KeyQ" && !e.repeat) doIceSelfAction();
+     if (e.code === "KeyF" && !e.repeat) doIceTagAction();
+  }
+});
+
+function doIceSelfAction() {
+    if (!isIceMode() || G.screen !== "GAME" || G.role !== "hider" || G.phase !== "SEEK") return;
+    if (G.zombieState > 0) {
+        toast("🧊 이미 얼음 상태입니다!");
+        return;
+    }
+    G.zombieState = 1;
+    Audio2.sfxRefill();
+    toast("🧊 얼음! 술래가 잡을 수 없습니다. 구출을 기다리세요.");
+    if(Net.mode==="online" && Net.uid) {
+        Net.fb.update(Net.fb.ref(Net.db, `rooms/${Net.code}/players/${Net.uid}`), {zombieState: 1}).catch(()=>{});
+    }
+}
+
+function doIceTagAction() {
+    if (!isIceMode() || G.screen !== "GAME" || G.phase !== "SEEK") return;
+    const myPos = G.pos;
+    let target = null;
+    let minDist = 3.0;
+
+    if (G.role === "seeker") {
+        Object.keys(remotes).forEach(uid => {
+            const r = remotes.get(uid);
+            if (r && r.info && r.info.role === "hider" && (r.target?.zombieState || 0) === 0) {
+                const d = myPos.distanceTo(r.cur);
+                if (d < minDist) { minDist = d; target = { uid, nick: r.info.nick }; }
+            }
+        });
+        if (target) {
+            Audio2.sfxFound();
+            burst(myPos.clone().add(new THREE.Vector3(0,1,0)), "#4aa8ff", 15, 2.5, 0.4);
+            toast(`🥶 ${target.nick}님을 터치했습니다 (아웃)!`);
+            if(Net.mode==="online") {
+                Net.fb.update(Net.fb.ref(Net.db, `rooms/${Net.code}/players/${target.uid}`), {zombieState: 2}).catch(()=>{});
+            }
+        } else {
+            toast("🔍 근처에 잡을 수 있는 도망자가 없습니다. (얼음 상태는 터치 불가)");
+        }
+    } else if (G.role === "hider" && G.zombieState === 0) {
+        Object.keys(remotes).forEach(uid => {
+            const r = remotes.get(uid);
+            if (r && r.info && r.info.role === "hider" && (r.target?.zombieState || 0) > 0) {
+                const d = myPos.distanceTo(r.cur);
+                if (d < minDist) { minDist = d; target = { uid, nick: r.info.nick }; }
+            }
+        });
+        if (target) {
+            Audio2.sfxRefill();
+            burst(myPos.clone().add(new THREE.Vector3(0,1,0)), "#ffd700", 15, 2.5, 0.4);
+            toast(`🔔 땡! ${target.nick}님을 구했습니다!`);
+            if(Net.mode==="online") {
+                Net.fb.update(Net.fb.ref(Net.db, `rooms/${Net.code}/players/${target.uid}`), {zombieState: 0}).catch(()=>{});
+            }
+        } else {
+            toast("💡 구해줄 수 있는 동료가 근처에 없습니다.");
+        }
+    }
+}
+
+function checkIceWinConditions() {
+    if (!isIceMode() || G.screen !== "GAME" || G.phase !== "SEEK") return;
+    let freeCount = 0;
+    const players = Net.players || {};
+    Object.keys(players).forEach(uid => {
+        const p = players[uid];
+        if ((p.role || "hider") === "hider" && (p.zombieState || 0) === 0) {
+            freeCount++;
+        }
+    });
+    if (freeCount === 0 && G.isHost && Net.mode==="online") {
+        Audio2.sfxFound();
+        Net.setPhase("RESULT", 0, { winner: "seeker" });
+    }
+}
+
+function updateIceGame(dt) {
+    if (!isIceMode() || G.screen !== "GAME") return;
+    checkIceWinConditions();
 }
 
 window.G = G;
