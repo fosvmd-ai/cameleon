@@ -434,6 +434,7 @@ if (typeof window.TEACHER_CODE === "undefined" || !window.TEACHER_CODE) window.T
           <option value="hide">🙈 숨바꼭질 모드</option>
           <option value="zombie">🧟 좀비 추격 모드</option>
           <option value="splatoon">🎨 스플래툰 색칠 모드</option>
+          <option value="cops">👮 경찰과 도둑 모드</option>
         </select>
       </div>
       <div class="note" style="margin-bottom:2px;">연습할 맵을 골라주세요</div>
@@ -480,6 +481,7 @@ if (typeof window.TEACHER_CODE === "undefined" || !window.TEACHER_CODE) window.T
           <option value="hide">🙈 숨바꼭질 모드</option>
           <option value="zombie">🧟 좀비 추격 모드</option>
           <option value="splatoon">🎨 스플래툰 색칠 모드</option>
+          <option value="cops">👮 경찰과 도둑 모드</option>
         </select>
         
         <div id="inkTeamRow" class="hidden" style="display:flex; align-items:center; gap:8px; font-size:13px; margin-top:6px; color:var(--ink); font-weight:bold;">
@@ -489,6 +491,27 @@ if (typeof window.TEACHER_CODE === "undefined" || !window.TEACHER_CODE) window.T
             <option value="3">3팀 (레드 vs 블루 vs 옐로)</option>
             <option value="4">4팀 (레드 vs 블루 vs 옐로 vs 그린)</option>
           </select>
+        </div>
+
+        <div id="copsSettingsRow" class="hidden" style="display:flex; flex-direction:column; gap:6px; font-size:13px; margin-top:6px; color:var(--ink); font-weight:bold; background:rgba(0,0,0,0.04); padding:8px; border-radius:8px;">
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <span>⏱️ 총 제한 시간:</span>
+            <select id="selCopsLimitSec" style="padding:2px 6px; border:2px solid var(--ink); border-radius:6px; font-family:inherit; font-weight:bold;">
+              <option value="60">1분</option>
+              <option value="120">2분</option>
+              <option value="180" selected>3분</option>
+              <option value="240">4분</option>
+              <option value="300">5분</option>
+            </select>
+          </div>
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <span>⛓️ 연행 중 구출 허용:</span>
+            <label style="cursor:pointer;"><input type="checkbox" id="chkCopsRescueEscort" checked> ON</label>
+          </div>
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <span>🚫 감옥 캠핑 방지:</span>
+            <label style="cursor:pointer;"><input type="checkbox" id="chkCopsNoCamp" checked> ON</label>
+          </div>
         </div>
       </div>
     </div>
@@ -600,6 +623,13 @@ if (typeof window.TEACHER_CODE === "undefined" || !window.TEACHER_CODE) window.T
         </div>
       </div>
     </div>
+    <div id="copsScoreBoard" class="hidden" style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 5px; padding: 4px 10px; background: rgba(0,0,0,0.6); border-radius: 12px; pointer-events: none;">
+      <div style="display: flex; gap: 8px; align-items: center; font-size: 11px; font-weight: bold; color: #fff;">
+        <span style="color:#34C759;">🏃 자유: <b id="copsFreeCount">0</b>명</span>
+        <span style="color:#FF9500;">⛓️ 연행: <b id="copsEscortCount">0</b>명</span>
+        <span style="color:#FF3B30;">🔒 수감: <b id="copsImprisonedCount">0</b>명</span>
+      </div>
+    </div>
   </div>
   <div id="gaugeBox">
     <div class="pal"></div>
@@ -707,6 +737,10 @@ if (typeof window.TEACHER_CODE === "undefined" || !window.TEACHER_CODE) window.T
   <div class="mbtn" id="btnMirror">🎨<br>색칠 모드</div>
   <div class="mbtn hidden" id="btnJudge">콕<br>찍기!</div>
   <div class="mbtn hidden" id="btnInkFire">🎨<br>발사!</div>
+  <div class="mbtn hidden" id="btnArrest" style="background:#FF3B30; color:#fff;">👮<br>체포[F]</div>
+  <div class="mbtn hidden" id="btnRescue" style="background:#34C759; color:#fff;">🔓<br>구출[F]</div>
+  <div class="mbtn hidden" id="btnCopsStatus" style="background:#007AFF; color:#fff;">🗺️<br>현황[Tab]</div>
+  <div class="mbtn hidden" id="btnItem" style="background:#FFCC00; color:#000;">⚡<br>버프[Shift]</div>
   <div class="mbtn hidden" id="btnFlyDown" aria-label="하강" title="하강">↓</div>
   <div class="poseCol">
     <div class="mbtn" data-pose="stand">서기</div>
@@ -716,6 +750,41 @@ if (typeof window.TEACHER_CODE === "undefined" || !window.TEACHER_CODE) window.T
     <div class="mbtn" data-pose="fold">접기</div>
   </div>
   <button id="btnMirrorDone" class="hidden">✅ 색칠 완료</button>
+</div>
+
+<!-- 👮 경찰과 도둑 현황 & 미니맵 모달 [Tab] -->
+<div id="copsStatusModal" class="hidden" style="position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); width:90%; max-width:480px; max-height:85vh; background:rgba(20,25,35,0.95); border:3px solid var(--ink); border-radius:16px; box-shadow:0 12px 36px rgba(0,0,0,0.6); z-index:999; padding:16px; color:#fff; font-family:inherit; overflow-y:auto;">
+  <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid rgba(255,255,255,0.15); padding-bottom:8px; margin-bottom:12px;">
+    <h3 style="margin:0; font-size:18px;">👮 경찰과 도둑 현황판 [Tab]</h3>
+    <button id="btnCloseCopsStatus" class="secondary" style="padding:2px 8px; font-size:12px;">✕ 닫기</button>
+  </div>
+  
+  <div style="display:flex; justify-content:space-around; background:rgba(255,255,255,0.08); padding:8px; border-radius:10px; margin-bottom:12px; text-align:center;">
+    <div>
+      <div style="font-size:11px; opacity:0.8;">⏱️ 남은 시간</div>
+      <div id="copsTabTimer" style="font-size:16px; font-weight:bold; color:#FFCC00;">--:--</div>
+    </div>
+    <div>
+      <div style="font-size:11px; opacity:0.8;">🏃 자유 도둑</div>
+      <div id="copsTabFree" style="font-size:16px; font-weight:bold; color:#34C759;">0명</div>
+    </div>
+    <div>
+      <div style="font-size:11px; opacity:0.8;">⛓️ 연행 중</div>
+      <div id="copsTabEscort" style="font-size:16px; font-weight:bold; color:#FF9500;">0명</div>
+    </div>
+    <div>
+      <div style="font-size:11px; opacity:0.8;">🔒 감옥 수감</div>
+      <div id="copsTabImprisoned" style="font-size:16px; font-weight:bold; color:#FF3B30;">0명</div>
+    </div>
+  </div>
+
+  <div style="font-size:13px; font-weight:bold; margin-bottom:6px;">👥 참가자 상태 목록</div>
+  <div id="copsPlayerTable" style="display:flex; flex-direction:column; gap:4px; max-height:220px; overflow-y:auto; background:rgba(0,0,0,0.3); padding:8px; border-radius:8px;"></div>
+  
+  <div style="font-size:11px; color:#aaa; margin-top:10px; text-align:center; line-height:1.4;">
+    💡 도둑 조작: <b>[F]</b> 구출 | <b>[Shift]</b> 도주 2배 버프 | <b>[Space]</b> 점프<br>
+    💡 경찰 조작: <b>[F]</b> 도둑 체포 (거리 2.2m 이내) -> 감옥 이동 시 자동 수감
+  </div>
 </div>
 
 <div id="rotateOverlay" class="screen hidden">📱 화면을 <b>가로</b>로 돌려주세요!</div>
@@ -2653,7 +2722,8 @@ function makeFairyNameLabel(){
 function setFairyNameLabel(sprite,name,fuelVal=100,showFuel=false, hp=3){
   if(!sprite)return;
   const safe=String(name||"지우개").slice(0,10);
-  const cacheKey = safe + "_" + Math.floor(fuelVal) + "_" + showFuel + "_" + hp;
+  const copsState = sprite.userData.copsState || "";
+  const cacheKey = safe + "_" + Math.floor(fuelVal) + "_" + showFuel + "_" + hp + "_" + copsState;
   if(sprite.userData.labelText===cacheKey)return;
   sprite.userData.labelText=cacheKey;
   
@@ -2661,6 +2731,8 @@ function setFairyNameLabel(sprite,name,fuelVal=100,showFuel=false, hp=3){
   if (isInkMode()) {
     const hearts = "❤️".repeat(Math.max(0, hp)) + "🖤".repeat(Math.max(0, 3 - hp));
     displayName = safe + " " + hearts;
+  } else if (isCopsMode()) {
+    displayName = (copsState ? copsState + " " : "") + safe;
   }
   
   const c=sprite.userData.canvas,g=c.getContext("2d");
@@ -3153,7 +3225,14 @@ function ensureRemote(uid,info){
   if(info.role==="ghost"){ r.fairy.group.visible=false; return r; }
   
   const isSeek = info.role === "seeker";
-  if (isInkMode() && !isSeek) {
+  if (isCopsMode()) {
+    let cState = "🏃";
+    if (info.role === "seeker") cState = "👮";
+    else if (info.imprisoned) cState = "🔒";
+    else if (info.escortedBy) cState = "⛓️";
+    r.fairy.nameLabel.userData.copsState = cState;
+    setFairyNameLabel(r.fairy.nameLabel, info.nick || "지우개", 100, false, 3);
+  } else if (isInkMode() && !isSeek) {
     const tName = TEAM_COLORS[info.teamId || "team1"]?.name || "레드팀";
     setFairyNameLabel(r.fairy.nameLabel, `${info.nick || "지우개"} (${tName})`, 100, false, r.target.hp !== undefined ? r.target.hp : 3);
   } else {
@@ -3491,6 +3570,12 @@ function moveVertical(delta,ignoreAssets=false){
 }
 function toggleFlight(force){
   if(G.role==="ghost")return;
+  if(isCopsMode() && (!G.infiniteFlightTimer || G.infiniteFlightTimer <= 0)) {
+    if (force !== false) {
+      toast("🚫 경찰과 도둑 모드에서는 깃털/비행 아이템을 획득해야 날 수 있습니다!");
+      return;
+    }
+  }
   const isSeeker = G.role === "seeker";
   let targetVal = typeof force==="boolean"?force:!G.flying;
   if(targetVal && !isSeeker && flyEnergy <= 0){
@@ -3597,6 +3682,16 @@ function updateMovement(dt){
   }
   if(isInkMode() && G.speedBoostTimer > 0) {
     baseSpeed *= 1.5;
+  }
+  if(isCopsMode()) {
+    if(G.imprisoned || G.escortedBy) {
+      baseSpeed = 0;
+    } else if(G.role === "seeker") {
+      baseSpeed = 6.8;
+    } else {
+      baseSpeed = 5.6;
+      if(G.speedBoostTimer > 0) baseSpeed *= 2.0;
+    }
   }
   const speed=ghost?13.5:baseSpeed;
   const f=new THREE.Vector3(-Math.sin(G.yaw),0,-Math.cos(G.yaw));
@@ -4022,13 +4117,30 @@ let mouseX=innerWidth/2, mouseY=innerHeight/2;
 addEventListener("keydown",e=>{
   const key=String(e.key||"").toLowerCase();
   keys[e.code]=true;keys[key]=true;
-  if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].includes(e.code))e.preventDefault();
+  if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space","Tab"].includes(e.code))e.preventDefault();
   if(G.screen!=="GAME")return;
   if(e.code==="KeyE")setMirror(!G.mirror);
   if(e.code==="Space"&&!e.repeat){
     if(G.spectating)G.flyUp=true;
     else handleJumpPress();
     e.preventDefault();
+  }
+  if(e.code==="KeyF" && !e.repeat) {
+    if(isCopsMode()) {
+      if(G.role === "seeker") doArrestAction();
+      else if(G.role === "hider") doRescueAction();
+    }
+  }
+  if(e.code==="Tab" && !e.repeat) {
+    if(isCopsMode()) {
+      e.preventDefault();
+      toggleCopsStatusModal();
+    }
+  }
+  if((e.code==="ShiftLeft" || e.code==="ShiftRight") && !e.repeat) {
+    if(isCopsMode() && G.role === "hider") {
+      doItemBuffAction();
+    }
   }
   if(e.code==="ShiftLeft"||e.code==="ShiftRight")G.flyDown=true;
   if(e.code==="Digit1")setPose("stand");
@@ -4198,6 +4310,17 @@ function updateMobileButtons(){
   const showInkFire = isInkMode() && G.role === "hider" && !G.found && (!G.splatTimer || G.splatTimer <= 0);
   $("btnInkFire").classList.toggle("hidden", !showInkFire);
 
+  const isCops = isCopsMode();
+  const showArrest = isCops && G.role === "seeker" && G.phase === "SEEK";
+  const showRescue = isCops && G.role === "hider" && !G.imprisoned && (!G.escortedBy);
+  const showCopsStatus = isCops;
+  const showItem = isCops && G.role === "hider" && !G.imprisoned && (!G.escortedBy);
+
+  $("btnArrest").classList.toggle("hidden", !showArrest);
+  $("btnRescue").classList.toggle("hidden", !showRescue);
+  $("btnCopsStatus").classList.toggle("hidden", !showCopsStatus);
+  $("btnItem").classList.toggle("hidden", !showItem);
+
   document.querySelectorAll(".poseCol .mbtn").forEach(b=>b.classList.toggle("hidden",G.role==="seeker"||G.role==="ghost"||G.mirror||G.spectating));
   updateSpectatorButton();
 }
@@ -4292,6 +4415,11 @@ $("btnInkFire").onpointerdown=e=>{
   e.preventDefault(); e.stopPropagation(); Audio2.resume();
   fireInkWeapon();
 };
+$("btnArrest").onpointerdown=e=>{ e.preventDefault(); e.stopPropagation(); Audio2.resume(); doArrestAction(); };
+$("btnRescue").onpointerdown=e=>{ e.preventDefault(); e.stopPropagation(); Audio2.resume(); doRescueAction(); };
+$("btnCopsStatus").onpointerdown=e=>{ e.preventDefault(); e.stopPropagation(); Audio2.resume(); toggleCopsStatusModal(); };
+$("btnCloseCopsStatus").onclick=()=>toggleCopsStatusModal(false);
+$("btnItem").onpointerdown=e=>{ e.preventDefault(); e.stopPropagation(); Audio2.resume(); doItemBuffAction(); };
 $("btnJudge").onpointerdown=()=>{tryJudge();Audio2.resume();};
 $("btnMirror").onpointerdown=()=>{setMirror(true);Audio2.resume();};
 $("btnMirrorDone").onpointerdown=()=>setMirror(false);
@@ -4708,6 +4836,9 @@ const Net={
     r.target.flying=a[5]==="1";
     r.target.zombieState=+a[6]||0;
     r.target.hp=a[7] !== undefined ? +a[7] : 3;
+    r.target.escortedBy=a[8]||null;
+    r.target.imprisoned=a[9]==="1";
+    if(info){ info.escortedBy=r.target.escortedBy; info.imprisoned=r.target.imprisoned; }
     if(r.cur.x===0&&r.cur.y===0&&r.cur.z===0){Object.assign(r.cur,{x:r.target.x,y:r.target.y,z:r.target.z,ry:r.target.ry});}
   },
   sendPos(){
@@ -4715,7 +4846,7 @@ const Net={
     if(G.lobbyPractice||G.role==="ghost"||G.spectating)return;
     if(G.role==="seeker"&&G.phase==="PAINT")return; // 술래는 숨는 시간에 스폰 전
     const pi=["stand","lie","lean","roll","fold","roll_lie"].indexOf(G.pose);
-    const str=[G.pos.x.toFixed(2),G.pos.y.toFixed(2),G.pos.z.toFixed(2),(G.fairyYaw%(Math.PI*2)).toFixed(2),pi,G.flying?1:0,G.zombieState||0,G.hp !== undefined ? G.hp : 3].join(",");
+    const str=[G.pos.x.toFixed(2),G.pos.y.toFixed(2),G.pos.z.toFixed(2),(G.fairyYaw%(Math.PI*2)).toFixed(2),pi,G.flying?1:0,G.zombieState||0,G.hp !== undefined ? G.hp : 3,G.escortedBy||"",G.imprisoned?1:0].join(",");
     if(str===G.lastPosSent)return;
     G.lastPosSent=str;
     this.positions[this.uid]=str;
@@ -5205,6 +5336,7 @@ async function onPhaseChange(phase,prev){
     initFeatherGame(); 
     initWeaponBoxGame();
     initGameItems();
+    initCopsGame();
     if (isInkMode()) {
       initSharedFloorCanvas();
       if (G.role === "hider") {
@@ -5223,7 +5355,7 @@ async function onPhaseChange(phase,prev){
   }
   else if(phase==="SEEK")enterSeek();
   else if(phase==="RESULT")enterResult();
-  else if(phase==="LOBBY"){ initZombieGame(); initFeatherGame(); initWeaponBoxGame(); initGameItems(); if(G.isHost)resetLobbyForNewRound(); showScreen("LOBBY"); }
+  else if(phase==="LOBBY"){ initZombieGame(); initFeatherGame(); initWeaponBoxGame(); initGameItems(); initCopsGame(); if(G.isHost)resetLobbyForNewRound(); showScreen("LOBBY"); }
   syncLocalFairy();
   updateMobileButtons();
 }
@@ -5281,6 +5413,8 @@ function enterPaint(){
       showRoleCard("🏃 준비 시간","잠시 후 좀비가 선정됩니다! 도망갈 준비를 하세요!");
     } else if (gm === "splatoon") {
       showRoleCard("🎨 팀 배정 완료!","곧 색칠 배틀이 시작됩니다!");
+    } else if (gm === "cops") {
+      showRoleCard("🏃 도둑 준비 시간!","경찰이 오기 전에 도망쳐 숨을 자리를 찾으세요! (구출: [F]키)");
     } else {
       showRoleCard("🧼 당신은 지우개!","몸에 물감을 칠하고 교실에 숨자!");
     }
@@ -5288,12 +5422,12 @@ function enterPaint(){
     $("blockOverlay").classList.add("hidden");
     stopCaseGame();
   }else if(G.role==="seeker"){
-    if (gm === "hide") {
-      showRoleCard("✏️ 당신은 술래 연필!","지우개들이 숨는 동안 필통에서 대기!");
+    if (gm === "hide" || gm === "cops") {
+      showRoleCard(gm === "cops" ? "👮 경찰 대기 중!" : "✏️ 당신은 술래 연필!","도둑들이 숨는 동안 출동 대기!");
     }
-    $("blockOverlay").classList.toggle("hidden", gm !== "hide");
-    $("paintPanel").classList.toggle("hidden", gm === "hide");
-    if (gm === "hide") startCaseGame(); else stopCaseGame();
+    $("blockOverlay").classList.toggle("hidden", gm !== "hide" && gm !== "cops");
+    $("paintPanel").classList.toggle("hidden", gm === "hide" || gm === "cops");
+    if (gm === "hide" || gm === "cops") startCaseGame(); else stopCaseGame();
   }else{ // ghost
     G.pos.set(0,20,20);
     $("blockOverlay").classList.add("hidden");
@@ -5306,6 +5440,8 @@ function enterPaint(){
     $("phaseLabel").textContent = "🏃 준비 시간 — 좀비 선정 대기 중...";
   } else if (gm === "splatoon") {
     $("phaseLabel").textContent = "🎨 팀 배정 중...";
+  } else if (gm === "cops") {
+    $("phaseLabel").textContent = "👮 경찰 출동 대기 중...";
   } else {
     $("phaseLabel").textContent=G.role==="seeker"?"숨는 중...":"🎨 칠하고 숨기!";
   }
@@ -5334,6 +5470,8 @@ function enterSeek(){
     G.pos.copy(sp); G.vy=0; G.yaw=Math.PI;
     if (gm === "hide") {
       showRoleCard("🔍 찾아라!",IS_TOUCH?"연필로 콕 찍어 지우개를 찾자! (다른 술래와 힘을 합치자)":"마우스 커서 = 조준점! 누른 채 드래그하면 회전, 그대로 떼면 콕! 다른 술래와 협동하자!");
+    } else if (gm === "cops") {
+      showRoleCard("👮 경찰 출동!","도둑들을 추격하여 [F]키로 체포하고 감옥으로 연행하세요!");
     }
   }
   else if(G.role==="hider"){
@@ -5347,6 +5485,8 @@ function enterSeek(){
       showRoleCard("🧟 좀비 출현!","좀비에게 잡히지 않게 도망치세요!");
     } else if (gm === "splatoon") {
       showRoleCard("🎨 색칠 시작!","팀 색으로 맵을 최대한 많이 칠하세요!");
+    } else if (gm === "cops") {
+      showRoleCard("🏃 경찰 출동!","경찰을 피해 도망치고 갇힌 동료를 [F]키로 구출하세요!");
     } else {
       showRoleCard("🤫 들키지 마!","게임 도중 합류! 얼른 숨을 곳을 찾자!");
     }
@@ -5356,6 +5496,8 @@ function enterSeek(){
     $("phaseLabel").textContent = "🧟 좀비 생존 시간!";
   } else if (gm === "splatoon") {
     $("phaseLabel").textContent = "🎨 색칠 배틀 진행 중!";
+  } else if (gm === "cops") {
+    $("phaseLabel").textContent = "👮 경찰과 도둑 — 추격전 진행 중!";
   } else {
     $("phaseLabel").textContent="🔍 술래가 찾는 중!";
   }
@@ -5697,6 +5839,7 @@ function refreshLobbySettingsUI(){
   $("selInkTeams").value=settings.teamCount||2;
   $("selInkTeams").disabled=!G.isHost;
   $("inkTeamRow").classList.toggle("hidden",gameMode!=="splatoon");
+  $("copsSettingsRow").classList.toggle("hidden",gameMode!=="cops");
 
   // ── 게임모드별 슬라이더 레이블 및 표시/숨김 분기 ──
   if (gameMode === "hide") {
@@ -5713,6 +5856,16 @@ function refreshLobbySettingsUI(){
     $("paintSecRow").classList.add("hidden");
     $("seekSecRow").classList.remove("hidden");
     $("seekSecLabel").textContent = "🎨 색칠 시간";
+  } else if (gameMode === "cops") {
+    $("paintSecRow").classList.remove("hidden");
+    $("seekSecRow").classList.add("hidden");
+    $("paintSecLabel").textContent = "🙈 도둑 숨는 시간";
+    if (document.activeElement !== $("selCopsLimitSec")) $("selCopsLimitSec").value = settings.copsSec || 180;
+    $("selCopsLimitSec").disabled = !G.isHost;
+    $("chkCopsRescueEscort").checked = settings.copsRescueEscort !== false;
+    $("chkCopsRescueEscort").disabled = !G.isHost;
+    $("chkCopsNoCamp").checked = settings.copsNoCamp !== false;
+    $("chkCopsNoCamp").disabled = !G.isHost;
   }
 
   $("paintSecVal").textContent=fmtMinSec(+$("paintSecSlider").value);
@@ -5733,6 +5886,12 @@ function refreshLobbySettingsUI(){
     } else if (gameMode === "splatoon") {
       buttons = [
         {role:"fairy",  label:"🎨 참여자"},
+        {role:"spectator", label:"👀 관전"}
+      ];
+    } else if (gameMode === "cops") {
+      buttons = [
+        {role:"seeker", label:"👮 경찰"},
+        {role:"fairy",  label:"🏃 도둑"},
         {role:"spectator", label:"👀 관전"}
       ];
     } else {
@@ -5778,6 +5937,15 @@ $("selGameMode").addEventListener("change",e=>{
 });
 $("selInkTeams").addEventListener("change",e=>{
   if(G.isHost) Net.updateSettings({teamCount:+e.target.value});
+});
+$("selCopsLimitSec").addEventListener("change",e=>{
+  if(G.isHost) Net.updateSettings({copsSec:+e.target.value, seekSec:+e.target.value});
+});
+$("chkCopsRescueEscort").addEventListener("change",e=>{
+  if(G.isHost) Net.updateSettings({copsRescueEscort:e.target.checked});
+});
+$("chkCopsNoCamp").addEventListener("change",e=>{
+  if(G.isHost) Net.updateSettings({copsNoCamp:e.target.checked});
 });
 document.querySelectorAll(".hostRoleBtn").forEach(b=>b.onclick=()=>{
   Audio2.resume();
@@ -7549,6 +7717,446 @@ function initGameItems() {
 }
 
 /* ================================================================
+   👮 경찰과 도둑 (Cops & Robbers) 게임 모드 전용 시스템
+   ================================================================ */
+function isCopsMode() {
+  if (Net.mode === "practice" || G.lobbyPractice) {
+    return G.practiceGameMode === "cops";
+  }
+  if (Net.mode !== "online" || !Net.meta || !Net.meta.settings) return false;
+  return Net.meta.settings.gameMode === "cops";
+}
+
+let currentPrisonMesh = null;
+let copsCampTimer = 0;
+
+function getPrisonZone(mapId) {
+  const mId = mapId || practiceMapId || activeMapId || "classroom";
+  if (mId === "sciencelab") {
+    return {
+      center: new THREE.Vector3(-18, 0.1, 14),
+      radius: 4.5,
+      box: new THREE.Box3(new THREE.Vector3(-22.5, -0.5, 9.5), new THREE.Vector3(-13.5, 5, 18.5))
+    };
+  } else if (mId === "cafeteria") {
+    return {
+      center: new THREE.Vector3(18, 0.1, -14),
+      radius: 4.5,
+      box: new THREE.Box3(new THREE.Vector3(13.5, -0.5, -18.5), new THREE.Vector3(22.5, 5, -9.5))
+    };
+  } else if (mId === "library") {
+    return {
+      center: new THREE.Vector3(-18, 0.1, -14),
+      radius: 4.5,
+      box: new THREE.Box3(new THREE.Vector3(-22.5, -0.5, -18.5), new THREE.Vector3(-13.5, 5, -9.5))
+    };
+  } else {
+    return {
+      center: new THREE.Vector3(0, 0.1, 16),
+      radius: 4.5,
+      box: new THREE.Box3(new THREE.Vector3(-4.5, -0.5, 11.5), new THREE.Vector3(4.5, 5, 20.5))
+    };
+  }
+}
+
+function buildPrisonMesh(prisonZone) {
+  if (currentPrisonMesh) {
+    scene.remove(currentPrisonMesh);
+    currentPrisonMesh = null;
+  }
+  if (!isCopsMode()) return;
+
+  const group = new THREE.Group();
+  const c = prisonZone.center;
+  const r = prisonZone.radius;
+
+  const postMat = lambert({color: 0x4a4a52});
+  const offsets = [
+    [-r + 0.5, -r + 0.5],
+    [r - 0.5, -r + 0.5],
+    [-r + 0.5, r - 0.5],
+    [r - 0.5, r - 0.5]
+  ];
+  offsets.forEach(off => {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 3.5, 8), postMat);
+    post.position.set(c.x + off[0], c.y + 1.75, c.z + off[1]);
+    group.add(post);
+  });
+
+  const fenceMat = new THREE.MeshBasicMaterial({
+    color: 0xff3b30,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.25
+  });
+  const fenceNorth = new THREE.Mesh(new THREE.PlaneGeometry(r * 2 - 1, 3.0), fenceMat);
+  fenceNorth.position.set(c.x, c.y + 1.5, c.z - r + 0.5);
+  const fenceSouth = new THREE.Mesh(new THREE.PlaneGeometry(r * 2 - 1, 3.0), fenceMat);
+  fenceSouth.position.set(c.x, c.y + 1.5, c.z + r - 0.5);
+  const fenceWest = new THREE.Mesh(new THREE.PlaneGeometry(r * 2 - 1, 3.0), fenceMat);
+  fenceWest.rotation.y = Math.PI / 2;
+  fenceWest.position.set(c.x - r + 0.5, c.y + 1.5, c.z);
+  const fenceEast = new THREE.Mesh(new THREE.PlaneGeometry(r * 2 - 1, 3.0), fenceMat);
+  fenceEast.rotation.y = Math.PI / 2;
+  fenceEast.position.set(c.x + r - 0.5, c.y + 1.5, c.z);
+
+  group.add(fenceNorth, fenceSouth, fenceWest, fenceEast);
+
+  const ringGeo = new THREE.RingGeometry(r - 0.4, r, 24);
+  const ringMat = new THREE.MeshBasicMaterial({
+    color: 0xff9500,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.75
+  });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.rotation.x = Math.PI / 2;
+  ring.position.set(c.x, c.y + 0.05, c.z);
+  group.add(ring);
+
+  const light = new THREE.PointLight(0xff3b30, 0.8, 8);
+  light.position.set(c.x, c.y + 2.5, c.z);
+  group.add(light);
+
+  scene.add(group);
+  currentPrisonMesh = group;
+}
+
+function cleanPrisonMesh() {
+  if (currentPrisonMesh) {
+    scene.remove(currentPrisonMesh);
+    currentPrisonMesh = null;
+  }
+}
+
+function doArrestAction() {
+  if (!isCopsMode() || G.screen !== "GAME") return;
+  if (G.role !== "seeker" && G.zombieState !== 2) return;
+
+  const copPos = G.pos;
+  let target = null;
+  let targetDist = 2.4;
+
+  if (Net.mode === "practice") {
+    practiceAIList.forEach(bot => {
+      if (bot.role === "hider" && !bot.imprisoned && !bot.escortedBy) {
+        const d = copPos.distanceTo(bot.pos);
+        if (d < targetDist) {
+          targetDist = d;
+          target = { isBot: true, data: bot };
+        }
+      }
+    });
+  } else {
+    Object.keys(remotes).forEach(uid => {
+      const r = remotes[uid];
+      if (r && r.info && r.info.role === "hider" && !r.info.imprisoned && !r.info.escortedBy) {
+        const d = copPos.distanceTo(r.info.pos);
+        if (d < targetDist) {
+          targetDist = d;
+          target = { isBot: false, uid, nick: r.info.nick };
+        }
+      }
+    });
+  }
+
+  if (target) {
+    Audio2.sfxFound();
+    burst(copPos.clone().add(new THREE.Vector3(0, 0.5, 0)), "#ff3b30", 14, 2.5, 0.4);
+    if (target.isBot) {
+      target.data.escortedBy = Net.uid || "local_host";
+      toast(`👮 봇_${target.data.id.slice(4, 8)}을 체포하여 연행합니다!`);
+    } else {
+      Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/players/${target.uid}/escortedBy`), Net.uid).catch(()=>{});
+      toast(`👮 ${target.nick}님을 체포하여 연행합니다!`);
+    }
+  } else {
+    toast("🔍 근처 2.2m 이내에 체포할 수 있는 자유 도둑이 없습니다.");
+  }
+}
+
+function doRescueAction() {
+  if (!isCopsMode() || G.screen !== "GAME") return;
+  if (G.role !== "hider" || G.imprisoned || G.escortedBy) return;
+
+  const mapId = practiceMapId || activeMapId || "classroom";
+  const pZone = getPrisonZone(mapId);
+  const distToPrison = G.pos.distanceTo(pZone.center);
+
+  if (distToPrison < pZone.radius + 1.0) {
+    let rescuedCount = 0;
+    if (Net.mode === "practice") {
+      practiceAIList.forEach(bot => {
+        if (bot.imprisoned) {
+          bot.imprisoned = false;
+          bot.invincibleTimer = 2.5;
+          rescuedCount++;
+        }
+      });
+    } else {
+      Object.keys(remotes).forEach(uid => {
+        const r = remotes[uid];
+        if (r && r.info && r.info.imprisoned) {
+          Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/players/${uid}/imprisoned`), false).catch(()=>{});
+          Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/players/${uid}/invincibleTimer`), 2.5).catch(()=>{});
+          rescuedCount++;
+        }
+      });
+    }
+    if (rescuedCount > 0) {
+      Audio2.sfxRefill();
+      burst(G.pos.clone().add(new THREE.Vector3(0, 0.5, 0)), "#34c759", 16, 3.0, 0.5);
+      toast(`🔓 감옥 구출 성공! ${rescuedCount}명의 도둑을 풀어주었습니다!`);
+      return;
+    }
+  }
+
+  const settings = Net.meta?.settings || {};
+  const allowRescueEscort = (settings.copsRescueEscort !== false);
+  if (allowRescueEscort) {
+    let target = null;
+    let minD = 2.5;
+    if (Net.mode === "practice") {
+      practiceAIList.forEach(bot => {
+        if (bot.escortedBy) {
+          const d = G.pos.distanceTo(bot.pos);
+          if (d < minD) { minD = d; target = { isBot: true, data: bot }; }
+        }
+      });
+    } else {
+      Object.keys(remotes).forEach(uid => {
+        const r = remotes[uid];
+        if (r && r.info && r.info.escortedBy) {
+          const d = G.pos.distanceTo(r.info.pos);
+          if (d < minD) { minD = d; target = { isBot: false, uid, nick: r.info.nick }; }
+        }
+      });
+    }
+    if (target) {
+      Audio2.sfxRefill();
+      burst(G.pos.clone().add(new THREE.Vector3(0, 0.5, 0)), "#34c759", 14, 2.5, 0.4);
+      if (target.isBot) {
+        target.data.escortedBy = null;
+        target.data.invincibleTimer = 2.5;
+        toast(`🔓 봇_${target.data.id.slice(4, 8)}을 연행 상태에서 구출했습니다!`);
+      } else {
+        Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/players/${target.uid}/escortedBy`), null).catch(()=>{});
+        Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/players/${target.uid}/invincibleTimer`), 2.5).catch(()=>{});
+        toast(`🔓 ${target.nick}님을 연행 상태에서 구출했습니다!`);
+      }
+      return;
+    }
+  }
+
+  toast("💡 구출하려면 감옥 구역 근처나 연행 중인 도둑에게 다가가 [F]를 누르세요!");
+}
+
+function doItemBuffAction() {
+  if (!isCopsMode() || G.screen !== "GAME") return;
+  if (G.speedBoostTimer > 0) {
+    toast("⚡ 이미 도주 폭스피드 버프가 발동 중입니다!");
+    return;
+  }
+  G.speedBoostTimer = 5.0;
+  Audio2.sfxRefill();
+  burst(G.pos.clone().add(new THREE.Vector3(0, 0.5, 0)), "#ffcc00", 14, 2.5, 0.4);
+  toast("⚡ 도주 버프 발동! 5초간 이동속도가 2배로 증가합니다!");
+}
+
+function toggleCopsStatusModal(force) {
+  const modal = $("copsStatusModal");
+  if (!modal) return;
+  const show = typeof force === "boolean" ? force : modal.classList.contains("hidden");
+  modal.classList.toggle("hidden", !show);
+  if (show) updateCopsStatusModalUI();
+}
+
+function updateCopsStatusModalUI() {
+  const modal = $("copsStatusModal");
+  if (!modal || modal.classList.contains("hidden")) return;
+
+  const timerEl = $("copsTabTimer");
+  const freeEl = $("copsTabFree");
+  const escortEl = $("copsTabEscort");
+  const imprisonedEl = $("copsTabImprisoned");
+  const tableEl = $("copsPlayerTable");
+
+  let freeCount = 0, escortCount = 0, imprisonedCount = 0;
+  const rows = [];
+
+  const addRow = (nick, role, stateText, stateColor) => {
+    rows.push(`
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:4px 8px; border-bottom:1px solid rgba(255,255,255,0.08); font-size:12px;">
+        <div><b>${escapeHtml(nick)}</b> <span style="font-size:10px; opacity:0.7;">(${role === "seeker" ? "👮경찰" : "🏃도둑"})</span></div>
+        <div style="font-weight:bold; color:${stateColor};">${stateText}</div>
+      </div>
+    `);
+  };
+
+  if (Net.mode === "practice") {
+    const myRole = G.role;
+    let myState = "🏃 자유";
+    let myColor = "#34c759";
+    if (myRole === "seeker") { myState = "👮 경찰"; myColor = "#007aff"; }
+    else if (G.imprisoned) { myState = "🔒 수감"; myColor = "#ff3b30"; imprisonedCount++; }
+    else if (G.escortedBy) { myState = "⛓️ 연행 중"; myColor = "#ff9500"; escortCount++; }
+    else { freeCount++; }
+    addRow(G.nick || "나", myRole, myState, myColor);
+
+    practiceAIList.forEach(bot => {
+      let bState = "🏃 자유";
+      let bColor = "#34c759";
+      if (bot.role === "seeker") { bState = "👮 경찰"; bColor = "#007aff"; }
+      else if (bot.imprisoned) { bState = "🔒 수감"; bColor = "#ff3b30"; imprisonedCount++; }
+      else if (bot.escortedBy) { bState = "⛓️ 연행 중"; bColor = "#ff9500"; escortCount++; }
+      else { freeCount++; }
+      addRow(`봇_${bot.id.slice(4, 8)}`, bot.role, bState, bColor);
+    });
+  } else {
+    const players = Net.players || {};
+    Object.keys(players).forEach(uid => {
+      const p = players[uid];
+      const role = p.role || "hider";
+      let pState = "🏃 자유";
+      let pColor = "#34c759";
+      if (role === "seeker") { pState = "👮 경찰"; pColor = "#007aff"; }
+      else if (p.imprisoned) { pState = "🔒 수감"; pColor = "#ff3b30"; imprisonedCount++; }
+      else if (p.escortedBy) { pState = "⛓️ 연행 중"; pColor = "#ff9500"; escortCount++; }
+      else if (role === "hider") { freeCount++; }
+      addRow(p.nick || uid.slice(0, 4), role, pState, pColor);
+    });
+  }
+
+  if (timerEl) timerEl.textContent = $("timer")?.textContent || "--:--";
+  if (freeEl) freeEl.textContent = freeCount + "명";
+  if (escortEl) escortEl.textContent = escortCount + "명";
+  if (imprisonedEl) imprisonedEl.textContent = imprisonedCount + "명";
+  if (tableEl) tableEl.innerHTML = rows.join("");
+
+  const fCnt = $("copsFreeCount");
+  const eCnt = $("copsEscortCount");
+  const iCnt = $("copsImprisonedCount");
+  if (fCnt) fCnt.textContent = freeCount;
+  if (eCnt) eCnt.textContent = escortCount;
+  if (iCnt) iCnt.textContent = imprisonedCount;
+}
+
+function checkCopsWinConditions() {
+  if (!isCopsMode() || G.screen !== "GAME") return;
+  if (G.phase !== "SEEK") return;
+
+  let freeCount = 0;
+  if (Net.mode === "practice") {
+    if (G.role === "hider" && !G.imprisoned && !G.escortedBy) freeCount++;
+    practiceAIList.forEach(bot => {
+      if (bot.role === "hider" && !bot.imprisoned && !bot.escortedBy) freeCount++;
+    });
+  } else {
+    const players = Net.players || {};
+    Object.keys(players).forEach(uid => {
+      const p = players[uid];
+      if ((p.role || "hider") === "hider" && !p.imprisoned && !p.escortedBy) {
+        freeCount++;
+      }
+    });
+  }
+
+  if (freeCount === 0) {
+    if (Net.mode === "practice" || G.isHost) {
+      showRoleCard("👮 경찰 팀 승리!", "모든 도둑을 체포하여 감옥에 수감시켰습니다!");
+      Audio2.sfxFound();
+    }
+  }
+}
+
+function updateCopsGame(dt) {
+  if (!isCopsMode() || G.screen !== "GAME") {
+    cleanPrisonMesh();
+    copsCampTimer = 0;
+    const sBoard = $("copsScoreBoard");
+    if (sBoard) sBoard.classList.add("hidden");
+    return;
+  }
+
+  const sBoard = $("copsScoreBoard");
+  if (sBoard) sBoard.classList.remove("hidden");
+
+  const mapId = practiceMapId || activeMapId || "classroom";
+  const pZone = getPrisonZone(mapId);
+  if (!currentPrisonMesh) {
+    buildPrisonMesh(pZone);
+  }
+
+  if (Net.mode === "practice") {
+    const copMap = {};
+    if (G.role === "seeker") copMap[Net.uid || "local_host"] = G.pos;
+    practiceAIList.forEach(bot => {
+      if (bot.role === "seeker") copMap[bot.id] = bot.pos;
+    });
+
+    Object.keys(copMap).forEach(copId => {
+      const cPos = copMap[copId];
+      const escortedBots = practiceAIList.filter(b => b.escortedBy === copId);
+      escortedBots.forEach((b, idx) => {
+        const offsetDist = (idx + 1) * 1.1;
+        const targetPos = cPos.clone().add(new THREE.Vector3(0, 0, offsetDist));
+        b.pos.lerp(targetPos, dt * 6.0);
+        b.fairy.group.position.copy(b.pos);
+      });
+    });
+
+    Object.keys(copMap).forEach(copId => {
+      const cPos = copMap[copId];
+      if (pZone.box.containsPoint(cPos) || cPos.distanceTo(pZone.center) < pZone.radius) {
+        const escortedBots = practiceAIList.filter(b => b.escortedBy === copId);
+        if (escortedBots.length > 0) {
+          Audio2.sfxFound();
+          escortedBots.forEach(b => {
+            b.escortedBy = null;
+            b.imprisoned = true;
+            const rx = pZone.center.x + (Math.random() - 0.5) * (pZone.radius * 1.2);
+            const rz = pZone.center.z + (Math.random() - 0.5) * (pZone.radius * 1.2);
+            b.pos.set(rx, 0.1, rz);
+            b.fairy.group.position.copy(b.pos);
+          });
+          toast(`🔒 감옥 수감 완료! 도둑 ${escortedBots.length}명이 감옥에 수감되었습니다!`);
+        }
+      }
+    });
+
+    const settings = Net.meta?.settings || {};
+    const noCamp = (settings.copsNoCamp !== false);
+    if (noCamp && G.role === "seeker") {
+      const escortedCount = practiceAIList.filter(b => b.escortedBy === (Net.uid || "local_host")).length;
+      if (escortedCount === 0 && (pZone.box.containsPoint(G.pos) || G.pos.distanceTo(pZone.center) < pZone.radius + 1.0)) {
+        copsCampTimer += dt;
+        if (copsCampTimer >= 3.5) {
+          toast("⚠️ 감옥 캠핑 금지! 수감자 없는 경찰은 감옥 근처에 머무를 수 없습니다!");
+          const pushDir = G.pos.clone().sub(pZone.center).setY(0).normalize();
+          if (pushDir.lengthSq() < 0.01) pushDir.set(1, 0, 0);
+          G.pos.addScaledVector(pushDir, dt * 8.0);
+        }
+      } else {
+        copsCampTimer = 0;
+      }
+    }
+  }
+
+  checkCopsWinConditions();
+  updateCopsStatusModalUI();
+}
+
+function initCopsGame() {
+  cleanPrisonMesh();
+  copsCampTimer = 0;
+  G.escortedBy = null;
+  G.imprisoned = false;
+  toggleCopsStatusModal(false);
+  const sBoard = $("copsScoreBoard");
+  if (sBoard) sBoard.classList.add("hidden");
+}
+
+/* ================================================================
    🔫 3인칭 3D 무기 메쉬 빌더 및 갱신 시스템
    ================================================================ */
 function buildThirdPersonWeaponMesh(weaponType) {
@@ -8144,6 +8752,13 @@ function initOfflinePracticeObjects() {
     spawnPracticeAI("hider", 0, "team1", "shooter");
     spawnWeaponBoxLocally();
     spawnWeaponBoxLocally();
+  } else if (gm === "cops") {
+    initCopsGame();
+    // 경찰 봇 1마리, 도둑 봇 3마리 스폰
+    spawnPracticeAI("seeker", 0, "team2", "none");
+    spawnPracticeAI("hider", 0, "team1", "none");
+    spawnPracticeAI("hider", 0, "team1", "none");
+    spawnPracticeAI("hider", 0, "team1", "none");
   }
 }
 
@@ -8212,6 +8827,10 @@ function updatePracticeAI(dt) {
       if (bot.infiniteFlightTimer < 0) bot.infiniteFlightTimer = 0;
     }
 
+    if (gm === "cops" && (bot.imprisoned || bot.escortedBy)) {
+      return;
+    }
+
     bot.changeDirTimer -= dt;
     if (bot.changeDirTimer <= 0) {
       bot.changeDirTimer = 1.5 + Math.random() * 2.0;
@@ -8239,13 +8858,64 @@ function updatePracticeAI(dt) {
             bot.moveDir.set((Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2).normalize();
           }
         }
+      } else if (gm === "cops") {
+        const pZone = getPrisonZone(practiceMapId || activeMapId || "classroom");
+        if (bot.role === "seeker") {
+          const holdingBots = practiceAIList.filter(b => b.escortedBy === bot.id);
+          if (holdingBots.length > 0) {
+            const dir = new THREE.Vector2(pZone.center.x - bot.pos.x, pZone.center.z - bot.pos.z).normalize();
+            bot.moveDir.copy(dir);
+          } else {
+            let closestHider = null;
+            let minDist = 999;
+            practiceAIList.forEach(b => {
+              if (b.role === "hider" && !b.imprisoned && !b.escortedBy) {
+                const d = bot.pos.distanceTo(b.pos);
+                if (d < minDist) { minDist = d; closestHider = b; }
+              }
+            });
+            if (G.role === "hider" && !G.imprisoned && !G.escortedBy) {
+              const d = bot.pos.distanceTo(G.pos);
+              if (d < minDist) { minDist = d; closestHider = { pos: G.pos, isLocal: true }; }
+            }
+
+            if (closestHider) {
+              const dir = new THREE.Vector2(closestHider.pos.x - bot.pos.x, closestHider.pos.z - bot.pos.z).normalize();
+              bot.moveDir.copy(dir);
+            } else {
+              bot.moveDir.set((Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2).normalize();
+            }
+          }
+        } else {
+          const imprisonedBots = practiceAIList.filter(b => b.imprisoned);
+          if (imprisonedBots.length > 0) {
+            const dir = new THREE.Vector2(pZone.center.x - bot.pos.x, pZone.center.z - bot.pos.z).normalize();
+            bot.moveDir.copy(dir);
+          } else {
+            let dangerPos = null;
+            if (G.role === "seeker") dangerPos = G.pos;
+            const copBot = practiceAIList.find(b => b.role === "seeker");
+            if (copBot && (!dangerPos || bot.pos.distanceTo(copBot.pos) < bot.pos.distanceTo(dangerPos))) {
+              dangerPos = copBot.pos;
+            }
+            if (dangerPos) {
+              const dir = new THREE.Vector2(bot.pos.x - dangerPos.x, bot.pos.z - dangerPos.z).normalize();
+              bot.moveDir.copy(dir);
+            } else {
+              bot.moveDir.set((Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2).normalize();
+            }
+          }
+        }
       } else {
         bot.moveDir.set((Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2).normalize();
       }
     }
     
     let speed = bot.zombieState === 2 ? 6.8 : 5.0;
-    if (gm === "splatoon" && bot.speedBoostTimer > 0) {
+    if (gm === "cops") {
+      speed = bot.role === "seeker" ? 6.8 : 5.6;
+      if (bot.speedBoostTimer > 0) speed *= 2.0;
+    } else if (gm === "splatoon" && bot.speedBoostTimer > 0) {
       speed *= 1.5;
     }
     const dx = bot.moveDir.x * speed * dt;
@@ -8283,6 +8953,48 @@ function updatePracticeAI(dt) {
     
     const speedVal = collided ? 0 : speed;
     animateFairyMovement(bot.fairy, dt, speedVal, "stand", true, false, bot.zombieState);
+    
+    if (gm === "cops") {
+      const pZone = getPrisonZone(practiceMapId || activeMapId || "classroom");
+      if (bot.role === "seeker") {
+        practiceAIList.forEach(b => {
+          if (b.role === "hider" && !b.imprisoned && !b.escortedBy && b.invincibleTimer <= 0) {
+            if (bot.pos.distanceTo(b.pos) < 1.8) {
+              b.escortedBy = bot.id;
+              Audio2.sfxFound();
+              toast(`👮 봇_${bot.id.slice(4, 8)}이 봇_${b.id.slice(4, 8)}을 체포했습니다!`);
+            }
+          }
+        });
+        if (G.role === "hider" && !G.imprisoned && !G.escortedBy && G.invincibleTimer <= 0) {
+          if (bot.pos.distanceTo(G.pos) < 1.8) {
+            G.escortedBy = bot.id;
+            Audio2.sfxFound();
+            toast(`👮 봇_${bot.id.slice(4, 8)}에게 체포되어 연행되고 있습니다!`);
+          }
+        }
+      } else if (bot.role === "hider" && !bot.imprisoned && !bot.escortedBy) {
+        if (bot.pos.distanceTo(pZone.center) < pZone.radius + 0.8) {
+          let rescued = 0;
+          practiceAIList.forEach(b => {
+            if (b.imprisoned) {
+              b.imprisoned = false;
+              b.invincibleTimer = 2.5;
+              rescued++;
+            }
+          });
+          if (G.imprisoned) {
+            G.imprisoned = false;
+            G.invincibleTimer = 2.5;
+            rescued++;
+          }
+          if (rescued > 0) {
+            Audio2.sfxRefill();
+            toast(`🔓 봇_${bot.id.slice(4, 8)}이 감옥의 도둑들을 구출했습니다!`);
+          }
+        }
+      }
+    }
     
     if (gm === "zombie") {
       if (bot.zombieState === 2 && G.zombieState === 0 && !G.found) {
