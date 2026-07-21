@@ -2706,6 +2706,42 @@ function makePencilCanvas(){ // 술래(연필) 고정 텍스처
   g.beginPath();g.arc(82,34,6,0,7);g.fill();
   return c;
 }
+function makeRobberCanvas(){ // 도둑(죄수복) 줄무늬 텍스처
+  const c=document.createElement("canvas");c.width=256;c.height=256;
+  const g=c.getContext("2d");
+  // 1. 흰색 바탕
+  g.fillStyle="#ffffff";
+  g.fillRect(0,0,256,256);
+  // 2. 검은색 가로 줄무늬 (Stripes)
+  g.fillStyle="#1e1e24";
+  const stripeH=14;
+  for(let y=0;y<256;y+=stripeH*2){
+    g.fillRect(0,y,256,stripeH);
+  }
+  // 3. 앞면 안대 (Burglar Mask)
+  g.fillStyle="#111111";
+  if(g.roundRect) g.roundRect(24,22,80,26,8); else g.fillRect(24,22,80,26);
+  g.fill();
+  // 4. 안대 속 흰색 눈동자
+  g.fillStyle="#ffffff";
+  g.beginPath();g.arc(46,35,5,0,Math.PI*2);g.fill();
+  g.beginPath();g.arc(82,35,5,0,Math.PI*2);g.fill();
+  g.fillStyle="#111111";
+  g.beginPath();g.arc(47,35,2.5,0,Math.PI*2);g.fill();
+  g.beginPath();g.arc(83,35,2.5,0,Math.PI*2);g.fill();
+  // 5. 가슴 죄수번호 명찰 (Prisoner ID Badge)
+  g.fillStyle="#ffffff";
+  g.strokeStyle="#111111";
+  g.lineWidth=2;
+  g.fillRect(36,72,56,22);
+  g.strokeRect(36,72,56,22);
+  g.fillStyle="#111111";
+  g.font="bold 12px monospace";
+  g.textAlign="center";
+  g.textBaseline="middle";
+  g.fillText("№ 777",64,83);
+  return c;
+}
 /* group 원점 = 발바닥 중앙 */
 
 function makeFairyNameLabel(){
@@ -3279,11 +3315,15 @@ function ensureRemote(uid,info){
   let r=remotes.get(uid);
   if(!r){
     const isPencil=info.role==="seeker";
+    const isRobber = typeof isCopsMode === "function" && isCopsMode() && (info.role === "hider" || info.role === "fairy");
     let bgColor = "#FFFFFF";
     if (isInkMode()) {
       bgColor = TEAM_COLORS[info.teamId || "team1"]?.color || "#FF3B30";
     }
-    const canvas=isPencil?makePencilCanvas():makeEraserCanvas(bgColor);
+    let canvas;
+    if (isPencil) canvas = makePencilCanvas();
+    else if (isRobber) canvas = makeRobberCanvas();
+    else canvas = makeEraserCanvas(bgColor);
     const fairy=buildFairy(canvas,isPencil);
     fairy.group.userData.baseY=0;
     // 선생님(참관/ghost)은 그냥 관찰자일 뿐 교실에 몸을 갖지 않습니다.
@@ -5521,9 +5561,10 @@ function enterPaint(){
     if (typeof clearAllSplatDecals === "function") clearAllSplatDecals();
   }
 
+  const isRobber = typeof isCopsMode === "function" && isCopsMode() && (G.role === "hider" || G.role === "fairy");
   const g=myFairy.canvas.getContext("2d");
-  const bgColor = (typeof isInkMode === "function" && isInkMode()) ? G.teamColor : "#FFFFFF";
-  g.drawImage(makeEraserCanvas(bgColor),0,0); myFairy.tex.needsUpdate=true;
+  const canvas = isRobber ? makeRobberCanvas() : makeEraserCanvas((typeof isInkMode === "function" && isInkMode()) ? G.teamColor : "#FFFFFF");
+  g.drawImage(canvas,0,0); myFairy.tex.needsUpdate=true;
 
   const gm = Net.meta?.settings?.gameMode || "hide";
 
@@ -6747,9 +6788,10 @@ async function startOfflinePractice(){
     const sp=(hiderSpawns&&hiderSpawns.length)?hiderSpawns[0]:null;
     if(sp) G.pos.set(sp.x,0,sp.z); else G.pos.set(0,0,10);
     G.paint=1000; G.flying=false; G.flyUp=false; G.flyDown=false;
+    const isRobber = typeof isCopsMode === "function" && isCopsMode() && (G.role === "hider" || G.role === "fairy");
     const g=myFairy.canvas.getContext("2d");
-    const bgColor = isInkMode() ? G.teamColor : "#FFFFFF";
-    g.drawImage(makeEraserCanvas(bgColor),0,0); myFairy.tex.needsUpdate=true;
+    const canvas = isRobber ? makeRobberCanvas() : makeEraserCanvas(isInkMode() ? G.teamColor : "#FFFFFF");
+    g.drawImage(canvas,0,0); myFairy.tex.needsUpdate=true;
     showScreen("GAME");
     $("paintPanel").classList.remove("hidden");
     const mapName=(MAPS[practiceMapId]&&MAPS[practiceMapId].name)||"교실";
@@ -8924,11 +8966,15 @@ function spawnPracticeAI(role, zombieState, teamId, inkWeapon) {
   const ry = 0.5;
   
   const isPencil = (role === "seeker" || zombieState === 2);
+  const isRobber = typeof isCopsMode === "function" && isCopsMode() && (role === "hider" || role === "fairy");
   let bgColor = "#FFFFFF";
   if (isInkMode()) {
     bgColor = TEAM_COLORS[teamId || "team1"]?.color || "#FF3B30";
   }
-  const canvas = isPencil ? makePencilCanvas() : makeEraserCanvas(bgColor);
+  let canvas;
+  if (isPencil) canvas = makePencilCanvas();
+  else if (isRobber) canvas = makeRobberCanvas();
+  else canvas = makeEraserCanvas(bgColor);
   const fairy = buildFairy(canvas, isPencil);
   fairy.group.position.set(rx, ry, rz);
   fairy.group.visible = true;
