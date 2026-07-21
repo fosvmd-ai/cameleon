@@ -2899,6 +2899,46 @@ function buildFairy(canvas,isPencil=false){
       // 4. 소매 / 바지 재질
       armMat = lambert({color: 0xffffff, flatShading: true});
       legMat = lambert({color: 0x222222, flatShading: true});
+    } else if (typeof isIceMode === "function" && isIceMode()) {
+      // 👹 얼음땡 모드 전용 붉은 불꽃 얼음 술래 3D 스킨
+      const shaftMat = lambert({color: 0xff3b30, flatShading: true});
+      const bodyGeo = new THREE.CylinderGeometry(0.28, 0.28, 0.76, 6);
+      bodyM = new THREE.Mesh(bodyGeo, shaftMat);
+      bodyM.position.y = 0.62; bodyM.rotation.y = Math.PI / 6;
+      group.add(bodyM); parts.push(bodyM);
+
+      // 금색 띠 (Gold Trim)
+      const ferrule = new THREE.Mesh(new THREE.CylinderGeometry(0.29, 0.29, 0.12, 6), lambert({color: 0xf5c518, flatShading: true}));
+      ferrule.position.y = 1.04; ferrule.rotation.y = Math.PI / 6;
+      group.add(ferrule); parts.push(ferrule);
+
+      // 술래 불꽃 왕관 (Flame Seeker Crown)
+      const crownBase = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.28, 0.24, 6), lambert({color: 0xd90429, flatShading: true}));
+      crownBase.position.y = 1.22; crownBase.rotation.y = Math.PI / 6;
+      
+      const peakMat = lambert({color: 0xffd000});
+      for(let i = 0; i < 3; i++) {
+        const angle = (i * Math.PI * 2) / 3;
+        const peak = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.16, 4), peakMat);
+        peak.position.set(Math.sin(angle) * 0.16, 1.40, Math.cos(angle) * 0.16);
+        group.add(peak); parts.push(peak);
+      }
+      group.add(crownBase); parts.push(crownBase);
+
+      // 붉은 눈 (Glowing Red Eyes)
+      const eyeMat = new THREE.MeshBasicMaterial({color: 0xff0000});
+      const eyeGeo = new THREE.SphereGeometry(0.04, 8, 6);
+      const eyeL = new THREE.Mesh(eyeGeo, eyeMat); eyeL.position.set(-0.09, 0.72, 0.24);
+      const eyeR = new THREE.Mesh(eyeGeo, eyeMat); eyeR.position.set(0.09, 0.72, 0.24);
+      group.add(eyeL, eyeR); parts.push(eyeL, eyeR);
+
+      // 가슴 술래 배지 (Gold Seeker Chest Badge)
+      const seekerBadge = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 0.04), lambert({color: 0xffd000}));
+      seekerBadge.position.set(0, 0.65, 0.27);
+      group.add(seekerBadge); parts.push(seekerBadge);
+
+      armMat = lambert({color: 0xff3b30, flatShading: true});
+      legMat = lambert({color: 0x800f2f, flatShading: true});
     } else {
       const shaftMat=lambert({color:0xF5C518,flatShading:true});
       const bodyGeo=new THREE.CylinderGeometry(0.26,0.26,0.72,6);
@@ -3802,14 +3842,26 @@ function updateMovement(dt){
     }
     return;
   }
-  let baseSpeed=G.role==="seeker"?7.2:(G.pose==="lie"?2.8:5.6);
+  let normalSpeed = G.pose === "lie" ? 2.8 : 5.6;
+  let baseSpeed = normalSpeed;
+
+  if (G.role === "seeker") {
+    if (typeof isIceMode === "function" && isIceMode()) {
+      baseSpeed = 5.6 * 1.2; // 6.72 (일반 도망자 5.6 대비 정확히 1.2배)
+    } else if (isCopsMode()) {
+      baseSpeed = 6.8;
+    } else {
+      baseSpeed = 7.2;
+    }
+  } else {
+    baseSpeed = normalSpeed;
+    if (G.speedBoostTimer > 0) baseSpeed *= 1.5;
+  }
+
   if(G.pose==="roll"||G.pose==="roll_lie") baseSpeed=0;
   if(G.onSprinkler) baseSpeed *= 0.5;
   if(isZombieMode() && G.zombieState === 2) {
     baseSpeed = isNight ? 7.8 : 4.2;
-  }
-  if(isInkMode() && G.speedBoostTimer > 0) {
-    baseSpeed *= 1.5;
   }
   if(isCopsMode()) {
     if(G.imprisoned || G.escortedBy) {
@@ -9189,10 +9241,14 @@ function updatePracticeAI(dt) {
       }
     }
     
-    let speed = bot.zombieState === 2 ? 6.8 : 5.0;
-    if (gm === "cops") {
+    let speed = 5.6;
+    if (gm === "ice") {
+      speed = bot.role === "seeker" ? (5.6 * 1.2) : 5.6;
+    } else if (gm === "cops") {
       speed = bot.role === "seeker" ? 6.8 : 5.6;
       if (bot.speedBoostTimer > 0) speed *= 2.0;
+    } else if (gm === "zombie") {
+      speed = bot.zombieState === 2 ? 6.8 : 5.0;
     } else if (gm === "splatoon" && bot.speedBoostTimer > 0) {
       speed *= 1.5;
     }
