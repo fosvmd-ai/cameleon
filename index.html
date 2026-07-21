@@ -2797,26 +2797,72 @@ function buildFairy(canvas,isPencil=false){
   if(isPencil){
     const isCop = typeof isCopsMode === "function" && isCopsMode();
     if(isCop) {
-      const copMat = lambert({color: 0x1c3b5e, flatShading: true});
-      bodyM = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.8, 8), copMat);
-      bodyM.position.y = 0.65;
+      // 1. 머리 (Skin Tone Head)
+      const headMat = lambert({color: 0xffdfd0, flatShading: true});
+      const headMesh = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.45, 0.42), headMat);
+      headMesh.position.set(0, 0.95, 0);
+      
+      const eyeMat = new THREE.MeshBasicMaterial({color: 0x2b2b2b});
+      const eyeGeo = new THREE.SphereGeometry(0.035, 8, 6);
+      const eyeL = new THREE.Mesh(eyeGeo, eyeMat); eyeL.position.set(-0.09, 0.96, 0.22);
+      const eyeR = new THREE.Mesh(eyeGeo, eyeMat); eyeR.position.set(0.09, 0.96, 0.22);
+      group.add(headMesh, eyeL, eyeR); parts.push(headMesh, eyeL, eyeR);
+
+      // 2. 경찰모 (Cop Hat - 이미지 참조)
+      // (A) 챙 (Visor - 검은색)
+      const hatVisor = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.04, 0.22), lambert({color: 0x1f1f1f}));
+      hatVisor.position.set(0, 1.16, 0.12);
+      // (B) 띠 (Gold Band - 노란색 띠)
+      const hatBand = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.08, 0.46), lambert({color: 0xf5c518}));
+      hatBand.position.set(0, 1.21, 0);
+      // (C) 배지 (Red/Blue Police Insignia)
+      const hatBadgeR = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.05, 0.04), lambert({color: 0xff3b30}));
+      hatBadgeR.position.set(-0.035, 1.23, 0.24);
+      const hatBadgeB = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.05, 0.04), lambert({color: 0x007aff}));
+      hatBadgeB.position.set(0.035, 1.23, 0.24);
+      // (D) 모자 윗부분 (White Cap Top)
+      const hatTop = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.18, 0.48), lambert({color: 0xffffff}));
+      hatTop.position.set(0, 1.32, 0);
+      group.add(hatVisor, hatBand, hatBadgeR, hatBadgeB, hatTop);
+      parts.push(hatVisor, hatBand, hatBadgeR, hatBadgeB, hatTop);
+
+      // 3. 경찰복 상의 (White Shirt Body)
+      const shirtMat = lambert({color: 0xffffff, flatShading: true});
+      bodyM = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.55, 0.32), shirtMat);
+      bodyM.position.y = 0.55;
       group.add(bodyM); parts.push(bodyM);
-      
-      const hatVisor = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.35, 0.05, 8), lambert({color: 0x111111}));
-      hatVisor.position.set(0, 1.05, 0.08);
-      const hatTop = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.28, 0.2, 8), copMat);
-      hatTop.position.set(0, 1.15, 0);
-      const badge = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.05), lambert({color: 0xf5c518}));
-      badge.position.set(0, 1.15, 0.27);
-      group.add(hatVisor, hatTop, badge); parts.push(hatVisor, hatTop, badge);
-      
-      const glassMat = lambert({color: 0x111111});
-      const glasses = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.12, 0.1), glassMat);
-      glasses.position.set(0, 0.85, 0.26);
-      group.add(glasses); parts.push(glasses);
-      
-      armMat = lambert({color: 0x4aa8ff, flatShading: true});
-      legMat = lambert({color: 0x111111, flatShading: true});
+
+      // (A) 넥타이 (Black Necktie)
+      const tieMesh = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.40, 0.04), lambert({color: 0x151515}));
+      tieMesh.position.set(0, 0.54, 0.17);
+      // (B) 가슴 명찰/뱃지 (Gold Chest Badge)
+      const chestBadge = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.05, 0.04), lambert({color: 0xf5c518}));
+      chestBadge.position.set(0.15, 0.65, 0.17);
+      // (C) 벨트 버클 (Gold Belt Buckle)
+      const beltBuckle = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, 0.04), lambert({color: 0xf5c518}));
+      beltBuckle.position.set(0, 0.27, 0.17);
+      group.add(tieMesh, chestBadge, beltBuckle);
+      parts.push(tieMesh, chestBadge, beltBuckle);
+
+      // (D) 어깨 네이비 패치/견장 (Navy Blue Shoulder Patches)
+      const patchMat = lambert({color: 0x1c3b5e});
+      const patchL = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.14, 0.16), patchMat);
+      patchL.position.set(-0.41, 1.05, 0);
+      const patchR = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.14, 0.16), patchMat);
+      patchR.position.set(0.41, 1.05, 0);
+      group.add(patchL, patchR); parts.push(patchL, patchR);
+
+      // (E) 흰색 신발 (White Shoes)
+      const shoeMat = lambert({color: 0xeeeeee});
+      const shoeL = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.08, 0.22), shoeMat);
+      shoeL.position.set(-0.17, 0.04, 0.02);
+      const shoeR = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.08, 0.22), shoeMat);
+      shoeR.position.set(0.17, 0.04, 0.02);
+      group.add(shoeL, shoeR); parts.push(shoeL, shoeR);
+
+      // 4. 소매 / 바지 재질
+      armMat = lambert({color: 0xffffff, flatShading: true});
+      legMat = lambert({color: 0x222222, flatShading: true});
     } else {
       const shaftMat=lambert({color:0xF5C518,flatShading:true});
       const bodyGeo=new THREE.CylinderGeometry(0.26,0.26,0.72,6);
