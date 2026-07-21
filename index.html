@@ -5120,8 +5120,10 @@ const Net={
     const now=this.now();
     const settings=m.settings||{paintSec:60,seekSec:180};
     const gameMode = settings.gameMode || "hide";
-    const zombieMode = (gameMode === "zombie");
-    const inkMode = (gameMode === "splatoon");
+    const zombieMode = (gameMode === "zombie") || !!settings.zombieMode;
+    const inkMode = (gameMode === "splatoon") || !!settings.inkMode;
+    const copsMode = (gameMode === "cops");
+    const iceMode = (gameMode === "ice");
 
     if(m.phase==="ROULETTE"&&m.roulette){
       const total=(m.roulette.startAt||now)+(m.roulette.perMs||1400)*((m.roulette.final||[]).length)+900;
@@ -5132,13 +5134,15 @@ const Net={
     }else if(m.phase==="PAINT"&&now>=m.phaseEndsAt){
       this.phaseAdvanceLock=true;
       if (inkMode) {
-        // 스플래툰 색칠 모드: 대기/색칠 시간이 끝나면 곧바로 결과(RESULT) 페이즈로 전환
+        // 스플래툰 색칠 모드: 색칠 시간이 끝나면 곧바로 결과(RESULT) 페이즈로 전환
         this.setPhase("RESULT",0,{winner:"hider"}).finally(()=>{this.phaseAdvanceLock=false;});
       } else if (zombieMode) {
         // 좀비 모드: 대기 시간이 끝나면 5초 좀비 선정 단계(ZOMBIE_CHOOSE)로 전환
         this.setPhase("ZOMBIE_CHOOSE",5000).finally(()=>{this.phaseAdvanceLock=false;});
+      } else if (copsMode) {
+        this.setPhase("SEEK",(settings.copsSec||180)*1000).finally(()=>{this.phaseAdvanceLock=false;});
       } else {
-        // 숨바꼭질 모드: 대기(숨기) 시간이 끝나면 찾는 단계(SEEK)로 전환
+        // 숨바꼭질 / 얼음땡 모드: 대기(숨기) 시간이 끝나면 찾는 단계(SEEK)로 전환
         this.setPhase("SEEK",(settings.seekSec||180)*1000).finally(()=>{this.phaseAdvanceLock=false;});
       }
     }else if(m.phase==="ZOMBIE_CHOOSE"&&now>=m.phaseEndsAt){
@@ -5224,14 +5228,16 @@ const Net={
       }
 
       // v2: 술래 지정 3가지 경로 — ①직접 지정 있으면 그것만 ②없으면 랜덤(5명당 1명, 공평성) ③교사 역할 반영
-      const settings=this.meta.settings||{paintSec:60,seekSec:180,zombieMode:false};
-      const zombieMode=!!settings.zombieMode;
+      const settings=this.meta.settings||{paintSec:60,seekSec:180};
+      const gameMode = settings.gameMode || "hide";
+      const zombieMode = (gameMode === "zombie") || !!settings.zombieMode;
+      const inkMode = (gameMode === "splatoon") || !!settings.inkMode;
 
       const seekers=new Set();
       let usedRandom=false;
       let seekerOrder=[];
 
-      if (!zombieMode) {
+      if (!zombieMode && !inkMode) {
         const manualList=Object.keys(this.meta.manualSeekers||{}).filter(u=>ids.includes(u)&&u!==this.uid);
         if(manualList.length>0){
           manualList.forEach(u=>seekers.add(u));
@@ -5268,7 +5274,6 @@ const Net={
       roleUpd[`rooms/${this.code}/weaponBoxes`]=null; // 이전 무기상자 삭제
       roleUpd[`rooms/${this.code}/gameItems`]=null; // 이전 게임아이템 삭제
 
-      const inkMode = !!settings.inkMode;
       const teamCount = settings.teamCount || 2;
       const teamList = ["team1", "team2", "team3", "team4"].slice(0, teamCount);
       const hiderIds = ids.filter(u => u !== this.uid && !seekers.has(u));
@@ -5315,8 +5320,8 @@ const Net={
       await new Promise(resolve=>setTimeout(resolve,80));
       const metaPatch={
         round:(this.meta.round||0)+1,
-        seekerIds:zombieMode ? {} : Object.fromEntries(seekerOrder.map(u=>[u,true])),
-        seekerOrder:zombieMode ? [] : seekerOrder,
+        seekerIds:(zombieMode || inkMode) ? {} : Object.fromEntries(seekerOrder.map(u=>[u,true])),
+        seekerOrder:(zombieMode || inkMode) ? [] : seekerOrder,
         winner:null,
         frozen:false   
       };
@@ -5324,7 +5329,8 @@ const Net={
       const skipRoulette = zombieMode || inkMode;
       if (skipRoulette) {
         metaPatch.phase="PAINT";
-        metaPatch.phaseEndsAt=this.now()+(settings.paintSec||60)*1000;
+        const durationSec = inkMode ? (settings.seekSec || 180) : (settings.paintSec || 60);
+        metaPatch.phaseEndsAt=this.now()+durationSec*1000;
         metaPatch.roulette=null;
       } else {
         if(usedRandom){
