@@ -3466,7 +3466,33 @@ function ensureRemote(uid,info){
 }
 function removeRemote(uid){
   const r=remotes.get(uid); if(!r)return;
-  scene.remove(r.fairy.group); remotes.delete(uid);
+  if (r.fairy) {
+    if (r.fairy.group) {
+      scene.remove(r.fairy.group);
+      if (r.fairy.group.parent) r.fairy.group.parent.remove(r.fairy.group);
+    }
+    if (r.fairy.shadow) {
+      scene.remove(r.fairy.shadow);
+      if (r.fairy.shadow.parent) r.fairy.shadow.parent.remove(r.fairy.shadow);
+      if (r.fairy.shadow.geometry) r.fairy.shadow.geometry.dispose();
+      if (r.fairy.shadow.material) r.fairy.shadow.material.dispose();
+    }
+    if (r.fairy.nameLabel) {
+      scene.remove(r.fairy.nameLabel);
+      if (r.fairy.nameLabel.parent) r.fairy.nameLabel.parent.remove(r.fairy.nameLabel);
+    }
+    if (r.fairy.parts) {
+      r.fairy.parts.forEach(p => {
+        if (p.geometry) p.geometry.dispose();
+        if (p.material) {
+          if (Array.isArray(p.material)) p.material.forEach(m => m.dispose());
+          else p.material.dispose();
+        }
+      });
+    }
+    if (r.fairy.tex) r.fairy.tex.dispose();
+  }
+  remotes.delete(uid);
 }
 function updateRemotes(dt){
   const k=1-Math.pow(1-0.15,dt*60);
@@ -5568,9 +5594,55 @@ const Net={
   },
 };
 
-/* ================= 페이즈 처리 ================= */
+/* ================= 페이즈 처리 및 전판 흔적 초기화 ================= */
+function clearAllRoundGimmicks() {
+  if (typeof clearAllSplatDecals === "function") clearAllSplatDecals();
+  if (typeof initSharedFloorCanvas === "function") initSharedFloorCanvas();
+  if (typeof cleanPrisonMesh === "function") cleanPrisonMesh();
+  if (typeof clearPracticeAI === "function") clearPracticeAI();
+
+  if (typeof remotes !== "undefined" && remotes) {
+    [...remotes.keys()].forEach(uid => {
+      if (typeof removeRemote === "function") removeRemote(uid);
+    });
+    remotes.clear();
+  }
+
+  if (typeof cures !== "undefined" && Array.isArray(cures)) {
+    cures.forEach(c => { if (c.mesh) { scene.remove(c.mesh); if (c.mesh.parent) c.mesh.parent.remove(c.mesh); } });
+    cures.length = 0;
+  }
+  if (typeof cureSpawns !== "undefined" && Array.isArray(cureSpawns)) {
+    cureSpawns.forEach(c => { if (c.mesh) { scene.remove(c.mesh); if (c.mesh.parent) c.mesh.parent.remove(c.mesh); } });
+    cureSpawns.length = 0;
+  }
+  if (typeof feathers !== "undefined" && Array.isArray(feathers)) {
+    feathers.forEach(f => { if (f.mesh) { scene.remove(f.mesh); if (f.mesh.parent) f.mesh.parent.remove(f.mesh); } });
+    feathers.length = 0;
+  }
+  if (typeof weaponBoxSpawns !== "undefined" && Array.isArray(weaponBoxSpawns)) {
+    weaponBoxSpawns.forEach(w => { if (w.group) { scene.remove(w.group); if (w.group.parent) w.group.parent.remove(w.group); } });
+    weaponBoxSpawns.length = 0;
+  }
+  if (typeof gameItems !== "undefined" && Array.isArray(gameItems)) {
+    gameItems.forEach(i => { if (i.mesh) { scene.remove(i.mesh); if (i.mesh.parent) i.mesh.parent.remove(i.mesh); } });
+    gameItems.length = 0;
+  }
+
+  G.imprisoned = false;
+  G.escortedBy = null;
+  G.invincibleTimer = 0;
+  G.zombieState = 0;
+  G.found = false;
+  G.speedBoostTimer = 0;
+  G.infiniteFlightTimer = 0;
+}
+
 async function onPhaseChange(phase,prev){
   resetMovementInputs();
+  if (phase === "PAINT" || phase === "ROULETTE" || phase === "LOBBY") {
+    clearAllRoundGimmicks();
+  }
   if(G.lobbyPractice){
     G.lobbyPractice=false;
     $("btnPracticeReturn").classList.add("hidden");
@@ -6887,6 +6959,7 @@ $("btnPractice").onclick=()=>{
 };
 async function startOfflinePractice(){
   Audio2.resume();
+  if (typeof clearAllRoundGimmicks === "function") clearAllRoundGimmicks();
   const btn=$("btnPracticeStart"); btn.disabled=true;
   const prev=btn.textContent; btn.textContent="맵 준비 중...";
   try{
@@ -9072,8 +9145,27 @@ let localWeaponBoxTimer = 0;
 
 function clearPracticeAI() {
   practiceAIList.forEach(bot => {
-    if (bot.fairy && bot.fairy.group) {
-      scene.remove(bot.fairy.group);
+    if (bot.fairy) {
+      if (bot.fairy.group) {
+        scene.remove(bot.fairy.group);
+        if (bot.fairy.group.parent) bot.fairy.group.parent.remove(bot.fairy.group);
+      }
+      if (bot.fairy.shadow) {
+        scene.remove(bot.fairy.shadow);
+        if (bot.fairy.shadow.parent) bot.fairy.shadow.parent.remove(bot.fairy.shadow);
+        if (bot.fairy.shadow.geometry) bot.fairy.shadow.geometry.dispose();
+        if (bot.fairy.shadow.material) bot.fairy.shadow.material.dispose();
+      }
+      if (bot.fairy.parts) {
+        bot.fairy.parts.forEach(p => {
+          if (p.geometry) p.geometry.dispose();
+          if (p.material) {
+            if (Array.isArray(p.material)) p.material.forEach(m => m.dispose());
+            else p.material.dispose();
+          }
+        });
+      }
+      if (bot.fairy.tex) bot.fairy.tex.dispose();
     }
   });
   practiceAIList = [];
