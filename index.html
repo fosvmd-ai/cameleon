@@ -9467,20 +9467,19 @@ function doIceTagAction() {
     const isHider = (G.role === "hider" || G.role === "fairy");
 
     if (isSeeker) {
+        // 술래 → 얼음이 아닌(zombieState===0) 도망자를 터치(아웃)
         if (Net.mode === "practice") {
-            if (typeof PracticeAI !== "undefined" && PracticeAI.bots) {
-                PracticeAI.bots.forEach(bot => {
-                    if ((bot.zombieState || 0) === 0) {
-                        const d = myPos.distanceTo(bot.pos);
-                        if (d < minDist) { minDist = d; target = bot; }
-                    }
-                });
-            }
+            practiceAIList.forEach(bot => {
+                if ((bot.role === "hider" || bot.role === "fairy") && (bot.zombieState || 0) === 0) {
+                    const d = myPos.distanceTo(bot.pos);
+                    if (d < minDist) { minDist = d; target = bot; }
+                }
+            });
         } else {
-            Object.keys(remotes).forEach(uid => {
-                const r = remotes.get(uid);
-                if (r && r.info && (r.info.role === "hider" || r.info.role === "fairy") && (r.target?.zombieState || 0) === 0) {
-                    const d = myPos.distanceTo(r.cur);
+            remotes.forEach((r, uid) => {
+                if (r && r.info && (r.info.role === "hider" || r.info.role === "fairy") && (r.info.zombieState || 0) === 0) {
+                    const rPos = new THREE.Vector3(r.cur.x, r.cur.y || 0, r.cur.z);
+                    const d = myPos.distanceTo(rPos);
                     if (d < minDist) { minDist = d; target = { uid, nick: r.info.nick }; }
                 }
             });
@@ -9500,20 +9499,19 @@ function doIceTagAction() {
             toast("🔍 근처에 잡을 수 있는 도망자가 없습니다. (얼음 상태는 터치 불가)");
         }
     } else if (isHider && G.zombieState === 0) {
+        // 도망자 → 얼음 상태(zombieState > 0)인 동료를 구출
         if (Net.mode === "practice") {
-            if (typeof PracticeAI !== "undefined" && PracticeAI.bots) {
-                PracticeAI.bots.forEach(bot => {
-                    if ((bot.zombieState || 0) > 0) {
-                        const d = myPos.distanceTo(bot.pos);
-                        if (d < minDist) { minDist = d; target = bot; }
-                    }
-                });
-            }
+            practiceAIList.forEach(bot => {
+                if ((bot.role === "hider" || bot.role === "fairy") && (bot.zombieState || 0) > 0) {
+                    const d = myPos.distanceTo(bot.pos);
+                    if (d < minDist) { minDist = d; target = bot; }
+                }
+            });
         } else {
-            Object.keys(remotes).forEach(uid => {
-                const r = remotes.get(uid);
-                if (r && r.info && (r.info.role === "hider" || r.info.role === "fairy") && (r.target?.zombieState || 0) > 0) {
-                    const d = myPos.distanceTo(r.cur);
+            remotes.forEach((r, uid) => {
+                if (r && r.info && (r.info.role === "hider" || r.info.role === "fairy") && (r.info.zombieState || 0) > 0) {
+                    const rPos = new THREE.Vector3(r.cur.x, r.cur.y || 0, r.cur.z);
+                    const d = myPos.distanceTo(rPos);
                     if (d < minDist) { minDist = d; target = { uid, nick: r.info.nick }; }
                 }
             });
