@@ -5453,12 +5453,20 @@ function enterPaint(){
   G.flying=false; G.flyUp=false; G.flyDown=false; G.lastJumpTap=0;G.lastFlyDownTap=0;
   G.vy=0; G.spectating=false;G.lobbyPractice=false; G.mirror&&setMirror(false);
   
+  [...remotes.keys()].forEach(removeRemote);
+  const me=Net.mode==="online"?Net.players[Net.uid]:{role:G.role, teamId:G.teamId};
+  G.role=me.role||"hider";
+
+  if (typeof isInkMode === "function" && isInkMode()) {
+    G.teamId = me.teamId || "team1";
+    G.teamColor = TEAM_COLORS[G.teamId]?.color || "#FF3B30";
+    if (typeof initSharedFloorCanvas === "function") initSharedFloorCanvas();
+    if (typeof clearAllSplatDecals === "function") clearAllSplatDecals();
+  }
+
   const g=myFairy.canvas.getContext("2d");
   const bgColor = (typeof isInkMode === "function" && isInkMode()) ? G.teamColor : "#FFFFFF";
   g.drawImage(makeEraserCanvas(bgColor),0,0); myFairy.tex.needsUpdate=true;
-  [...remotes.keys()].forEach(removeRemote);
-  const me=Net.mode==="online"?Net.players[Net.uid]:{role:G.role};
-  G.role=me.role||"hider";
 
   const gm = Net.meta?.settings?.gameMode || "hide";
 
@@ -7119,17 +7127,14 @@ let sharedFloorCtx = null;
 let sharedFloorTexture = null;
 
 function initSharedFloorCanvas() {
-  if (sharedFloorCanvas) {
-    if (sharedFloorTexture) sharedFloorTexture.dispose();
-    sharedFloorCanvas = null;
-    sharedFloorCtx = null;
-    sharedFloorTexture = null;
+  if (!sharedFloorCanvas) {
+    sharedFloorCanvas = document.createElement("canvas");
+    sharedFloorCanvas.width = 1024;
+    sharedFloorCanvas.height = 1024;
+    sharedFloorCtx = sharedFloorCanvas.getContext("2d");
+    sharedFloorTexture = new THREE.CanvasTexture(sharedFloorCanvas);
+    sharedFloorTexture.colorSpace = THREE.SRGBColorSpace;
   }
-  
-  sharedFloorCanvas = document.createElement("canvas");
-  sharedFloorCanvas.width = 1024;
-  sharedFloorCanvas.height = 1024;
-  sharedFloorCtx = sharedFloorCanvas.getContext("2d");
   
   if (isInkMode()) {
     sharedFloorCtx.fillStyle = "#ffffff";
@@ -7149,9 +7154,7 @@ function initSharedFloorCanvas() {
       sharedFloorCtx.stroke();
     }
   }
-  
-  sharedFloorTexture = new THREE.CanvasTexture(sharedFloorCanvas);
-  sharedFloorTexture.colorSpace = THREE.SRGBColorSpace;
+  sharedFloorTexture.needsUpdate = true;
 }
 
 function paintInkOnFloor(worldX, worldZ, radius, color) {
