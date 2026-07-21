@@ -7167,8 +7167,8 @@ function paintInkOnFloor(worldX, worldZ, radius, color) {
   g.arc(px, py, pr, 0, Math.PI * 2);
   g.fill();
   
-  // 테두리 스플래시 효과 3~5개 추가해서 자연스러운 물감 번짐 연출
-  const splats = 3 + Math.floor(Math.random() * 3);
+  // 테두리 스플래시 효과 1~2개만 추가하여 캔버스 성능 최적화
+  const splats = 1 + Math.floor(Math.random() * 2);
   for (let i = 0; i < splats; i++) {
     const angle = Math.random() * Math.PI * 2;
     const dist = pr * (0.8 + Math.random() * 0.4);
@@ -8446,13 +8446,19 @@ function spawnSplatDecal(worldX, worldY, worldZ, color, radius) {
   }
   scene.add(mesh);
   splatDecals.push(mesh);
-  if (splatDecals.length > 3000) {
+  if (splatDecals.length > 40) {
     const old = splatDecals.shift();
     scene.remove(old);
+    if (old.geometry) old.geometry.dispose();
+    if (old.material) old.material.dispose();
   }
 }
 function clearAllSplatDecals() {
-  splatDecals.forEach(m => scene.remove(m));
+  splatDecals.forEach(m => {
+    scene.remove(m);
+    if (m.geometry) m.geometry.dispose();
+    if (m.material) m.material.dispose();
+  });
   splatDecals = [];
 }
 
@@ -8462,7 +8468,7 @@ function updateInkScoreBoard() {
   
   const canvasWidth = 1024;
   const canvasHeight = 1024;
-  const step = 16;
+  const step = 64;
   
   let imgData;
   try {
