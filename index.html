@@ -2570,6 +2570,7 @@ function updateMapGimmicks(dt){
   if(currentMapId!=="library") cartCleanup(); else updateBookCarts(dt);
   if(currentMapId==="playground") updatePlaygroundGimmick(dt); else playgroundCleanup();
 
+  if(typeof updateCopsGame === "function") updateCopsGame(dt);
   if(typeof updateIceGame === "function") updateIceGame(dt);
 }
 
@@ -8141,7 +8142,7 @@ function updateCopsGame(dt) {
 
   // ── 1. 연행 추종 (Escort Train Lerp) ──
   // (A) 내(G)가 연행 중일 때
-  if (G.role === "hider" && G.escortedBy && !G.imprisoned) {
+  if ((G.role === "hider" || G.role === "fairy") && G.escortedBy && !G.imprisoned) {
     let cPos = null;
     let cYaw = 0;
     if (Net.mode === "practice") {
@@ -8162,7 +8163,7 @@ function updateCopsGame(dt) {
   // (B) 연습모드 AI 봇 연행 추종
   if (Net.mode === "practice") {
     practiceAIList.forEach(bot => {
-      if (bot.role === "hider" && bot.escortedBy && !bot.imprisoned) {
+      if ((bot.role === "hider" || bot.role === "fairy") && bot.escortedBy && !bot.imprisoned) {
         let cPos = null;
         let cYaw = 0;
         if (bot.escortedBy === Net.uid || bot.escortedBy === "local_host") {
@@ -8185,7 +8186,7 @@ function updateCopsGame(dt) {
   // (C) 온라인 원격 플레이어 연행 추종
   if (Net.mode === "online") {
     remotes.forEach((r, uid) => {
-      if (r.info && r.info.role === "hider" && r.info.escortedBy && !r.info.imprisoned) {
+      if (r.info && (r.info.role === "hider" || r.info.role === "fairy") && r.info.escortedBy && !r.info.imprisoned) {
         let cPos = null;
         let cYaw = 0;
         if (r.info.escortedBy === Net.uid) {
@@ -8210,7 +8211,7 @@ function updateCopsGame(dt) {
   const checkCopPrisonEntry = (copId, copPos) => {
     if (pZone.box.containsPoint(copPos) || copPos.distanceTo(pZone.center) < pZone.radius) {
       if (Net.mode === "practice") {
-        if (G.role === "hider" && G.escortedBy === copId && !G.imprisoned) {
+        if ((G.role === "hider" || G.role === "fairy") && G.escortedBy === copId && !G.imprisoned) {
           G.escortedBy = null;
           G.imprisoned = true;
           const rx = pZone.center.x + (Math.random() - 0.5) * (pZone.radius * 0.8);
@@ -8221,7 +8222,7 @@ function updateCopsGame(dt) {
         }
         let imprisonedBotsCount = 0;
         practiceAIList.forEach(b => {
-          if (b.role === "hider" && b.escortedBy === copId && !b.imprisoned) {
+          if ((b.role === "hider" || b.role === "fairy") && b.escortedBy === copId && !b.imprisoned) {
             b.escortedBy = null;
             b.imprisoned = true;
             const rx = pZone.center.x + (Math.random() - 0.5) * (pZone.radius * 0.8);
@@ -8269,7 +8270,7 @@ function updateCopsGame(dt) {
   }
 
   // ── 3. 수감자 구역 이탈 방지 (Prison Boundaries) ──
-  if (G.role === "hider" && G.imprisoned) {
+  if ((G.role === "hider" || G.role === "fairy") && G.imprisoned) {
     const dist = G.pos.distanceTo(pZone.center);
     if (dist > pZone.radius - 0.5) {
       const dir = G.pos.clone().sub(pZone.center).setY(0).normalize();
