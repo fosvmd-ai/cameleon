@@ -3727,7 +3727,7 @@ function updateMovement(dt){
   }
 
   // 🧊 얼음땡 모드 제약
-  if(typeof isIceMode === "function" && isIceMode() && G.role === "hider" && G.zombieState > 0) {
+  if(typeof isIceMode === "function" && isIceMode() && (G.role === "hider" || G.role === "fairy") && G.zombieState > 0) {
       baseSpeed = 0;
       G.jumpReq = false;
       G.flyUp = false;
@@ -9220,8 +9220,8 @@ function updatePracticeAI(dt) {
 // ================= 얼음땡 모드 시스템 =================
 function isIceMode() {
   if (Net.mode === "practice" || G.lobbyPractice) return G.practiceGameMode === "ice";
-  if (Net.mode !== "online" || !Net.meta || !Net.meta.settings) return false;
-  return Net.meta.settings.gameMode === "ice";
+  if (Net.mode === "online" && Net.meta && Net.meta.settings) return Net.meta.settings.gameMode === "ice";
+  return G.practiceGameMode === "ice";
 }
 
 function injectIceButtons() {
@@ -9246,18 +9246,32 @@ function injectIceButtons() {
 
 window.addEventListener("keydown", e => {
   if (isIceMode() && G.screen === "GAME") {
-     if (e.code === "KeyQ" && !e.repeat) doIceSelfAction();
-     if (e.code === "KeyF" && !e.repeat) doIceTagAction();
+     const code = e.code;
+     const key = e.key ? e.key.toLowerCase() : "";
+     if ((code === "KeyQ" || key === "q" || key === "ㅂ") && !e.repeat) {
+         e.preventDefault();
+         doIceSelfAction();
+     }
+     if ((code === "KeyF" || key === "f" || key === "ㄹ") && !e.repeat) {
+         e.preventDefault();
+         doIceTagAction();
+     }
   }
 });
 
 function doIceSelfAction() {
-    if (!isIceMode() || G.screen !== "GAME" || G.role !== "hider" || G.phase !== "SEEK") return;
+    if (!isIceMode() || G.screen !== "GAME") return;
+    const isHider = (G.role === "hider" || G.role === "fairy");
+    if (!isHider) {
+        toast("⚠️ 도망자만 얼음을 사용할 수 있습니다.");
+        return;
+    }
     if (G.zombieState > 0) {
         toast("🧊 이미 얼음 상태입니다!");
         return;
     }
     G.zombieState = 1;
+    applyZombieSkinToFairy(myFairy, 1);
     Audio2.sfxRefill();
     toast("🧊 얼음! 술래가 잡을 수 없습니다. 구출을 기다리세요.");
     if(Net.mode==="online" && Net.uid) {
@@ -9266,43 +9280,76 @@ function doIceSelfAction() {
 }
 
 function doIceTagAction() {
-    if (!isIceMode() || G.screen !== "GAME" || G.phase !== "SEEK") return;
+    if (!isIceMode() || G.screen !== "GAME") return;
     const myPos = G.pos;
     let target = null;
-    let minDist = 3.0;
+    let minDist = 3.5;
 
-    if (G.role === "seeker") {
-        Object.keys(remotes).forEach(uid => {
-            const r = remotes.get(uid);
-            if (r && r.info && r.info.role === "hider" && (r.target?.zombieState || 0) === 0) {
-                const d = myPos.distanceTo(r.cur);
-                if (d < minDist) { minDist = d; target = { uid, nick: r.info.nick }; }
+    const isSeeker = (G.role === "seeker");
+    const isHider = (G.role === "hider" || G.role === "fairy");
+
+    if (isSeeker) {
+        if (Net.mode === "practice") {
+            if (typeof PracticeAI !== "undefined" && PracticeAI.bots) {
+                PracticeAI.bots.forEach(bot => {
+                    if ((bot.zombieState || 0) === 0) {
+                        const d = myPos.distanceTo(bot.pos);
+                        if (d < minDist) { minDist = d; target = bot; }
+                    }
+                });
             }
-        });
+        } else {
+            Object.keys(remotes).forEach(uid => {
+                const r = remotes.get(uid);
+                if (r && r.info && (r.info.role === "hider" || r.info.role === "fairy") && (r.target?.zombieState || 0) === 0) {
+                    const d = myPos.distanceTo(r.cur);
+                    if (d < minDist) { minDist = d; target = { uid, nick: r.info.nick }; }
+                }
+            });
+        }
+
         if (target) {
             Audio2.sfxFound();
             burst(myPos.clone().add(new THREE.Vector3(0,1,0)), "#4aa8ff", 15, 2.5, 0.4);
-            toast(`🥶 ${target.nick}님을 터치했습니다 (아웃)!`);
-            if(Net.mode==="online") {
+            toast(`🥶 ${target.nick || "상대"}님을 터치했습니다 (아웃)!`);
+            if (target.uid && Net.mode === "online") {
                 Net.fb.update(Net.fb.ref(Net.db, `rooms/${Net.code}/players/${target.uid}`), {zombieState: 2}).catch(()=>{});
+            } else if (target.zombieState !== undefined) {
+                target.zombieState = 2;
+                if (target.fairy) applyZombieSkinToFairy(target.fairy, 2);
             }
         } else {
             toast("🔍 근처에 잡을 수 있는 도망자가 없습니다. (얼음 상태는 터치 불가)");
         }
-    } else if (G.role === "hider" && G.zombieState === 0) {
-        Object.keys(remotes).forEach(uid => {
-            const r = remotes.get(uid);
-            if (r && r.info && r.info.role === "hider" && (r.target?.zombieState || 0) > 0) {
-                const d = myPos.distanceTo(r.cur);
-                if (d < minDist) { minDist = d; target = { uid, nick: r.info.nick }; }
+    } else if (isHider && G.zombieState === 0) {
+        if (Net.mode === "practice") {
+            if (typeof PracticeAI !== "undefined" && PracticeAI.bots) {
+                PracticeAI.bots.forEach(bot => {
+                    if ((bot.zombieState || 0) > 0) {
+                        const d = myPos.distanceTo(bot.pos);
+                        if (d < minDist) { minDist = d; target = bot; }
+                    }
+                });
             }
-        });
+        } else {
+            Object.keys(remotes).forEach(uid => {
+                const r = remotes.get(uid);
+                if (r && r.info && (r.info.role === "hider" || r.info.role === "fairy") && (r.target?.zombieState || 0) > 0) {
+                    const d = myPos.distanceTo(r.cur);
+                    if (d < minDist) { minDist = d; target = { uid, nick: r.info.nick }; }
+                }
+            });
+        }
+
         if (target) {
             Audio2.sfxRefill();
             burst(myPos.clone().add(new THREE.Vector3(0,1,0)), "#ffd700", 15, 2.5, 0.4);
-            toast(`🔔 땡! ${target.nick}님을 구했습니다!`);
-            if(Net.mode==="online") {
+            toast(`🔔 땡! ${target.nick || "동료"}님을 구했습니다!`);
+            if (target.uid && Net.mode === "online") {
                 Net.fb.update(Net.fb.ref(Net.db, `rooms/${Net.code}/players/${target.uid}`), {zombieState: 0}).catch(()=>{});
+            } else if (target.zombieState !== undefined) {
+                target.zombieState = 0;
+                if (target.fairy) applyZombieSkinToFairy(target.fairy, 0);
             }
         } else {
             toast("💡 구해줄 수 있는 동료가 근처에 없습니다.");
