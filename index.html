@@ -3604,6 +3604,12 @@ function moveVertical(delta,ignoreAssets=false){
 }
 function toggleFlight(force){
   if(G.role==="ghost")return;
+  if(typeof isIceMode === "function" && isIceMode() && (G.role === "hider" || G.role === "fairy") && G.zombieState > 0) {
+    if (force !== false) {
+      toast("🧊 얼음 상태에서는 비행할 수 없습니다!");
+      return;
+    }
+  }
   if(isCopsMode() && (!G.infiniteFlightTimer || G.infiniteFlightTimer <= 0)) {
     if (force !== false) {
       toast("🚫 경찰과 도둑 모드에서는 깃털/비행 아이템을 획득해야 날 수 있습니다!");
@@ -3632,6 +3638,9 @@ function toggleFlight(force){
 function handleJumpPress(){
   const now=performance.now();
   if(G.role==="ghost")return;
+  if(typeof isIceMode === "function" && isIceMode() && (G.role === "hider" || G.role === "fairy") && G.zombieState > 0) {
+    return;
+  }
 
   if(G.flying){
     // 비행 중 Space/위 버튼을 빠르게 두 번 누르면 비행을 끄고 즉시 낙하합니다.
@@ -3731,7 +3740,9 @@ function updateMovement(dt){
   if(typeof isIceMode === "function" && isIceMode() && (G.role === "hider" || G.role === "fairy") && G.zombieState > 0) {
       baseSpeed = 0;
       G.jumpReq = false;
+      G.flying = false;
       G.flyUp = false;
+      G.flyDown = false;
   }
 
   const speed=ghost?13.5:baseSpeed;
@@ -9287,6 +9298,9 @@ function doIceSelfAction() {
         return;
     }
     G.zombieState = 1;
+    G.flying = false;
+    G.flyUp = false;
+    G.flyDown = false;
     applyZombieSkinToFairy(myFairy, 1);
     Audio2.sfxRefill();
     toast("🧊 얼음! 술래가 잡을 수 없습니다. 구출을 기다리세요.");
