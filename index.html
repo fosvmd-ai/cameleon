@@ -3503,10 +3503,15 @@ const _camDir=new THREE.Vector3();
 const cameraCollisionRay=new THREE.Raycaster();
 
 function isHiderThirdPerson(){
-  return G.screen==="GAME"&&G.role==="hider"&&!G.found&&!G.spectating;
+  if (G.screen !== "GAME" || G.spectating) return false;
+  if (typeof isCopsMode === "function" && isCopsMode()) return true;
+  if (typeof isIceMode === "function" && isIceMode()) return true;
+  return G.role==="hider"&&!G.found;
 }
 function syncLocalFairy(){
-  const show=G.screen==="GAME"&&(G.mirror||(isInkMode()&&!G.spectating)||(G.role==="hider"&&!G.found));
+  const isCops = typeof isCopsMode === "function" && isCopsMode();
+  const isIce = typeof isIceMode === "function" && isIceMode();
+  const show=G.screen==="GAME"&&(G.mirror||(isInkMode()&&!G.spectating)||(isCops&&!G.spectating)||(isIce&&!G.spectating)||(G.role==="hider"&&!G.found));
   myFairy.group.visible=show;
   if(!show)return;
 
@@ -4342,7 +4347,9 @@ async function tryJudge(cx,cy){
 let pokeT=0;
 function pokePencil(){ pokeT=0.25; }
 function updatePencil(dt){
-  pencilFP.visible=(G.role==="seeker"&&G.phase==="SEEK"&&G.screen==="GAME");
+  const isCops = typeof isCopsMode === "function" && isCopsMode();
+  const isIce = typeof isIceMode === "function" && isIceMode();
+  pencilFP.visible=(G.role==="seeker"&&G.phase==="SEEK"&&G.screen==="GAME"&&!isCops&&!isIce);
   if(pokeT>0){ pokeT-=dt;
     const k=Math.sin((1-pokeT/0.25)*Math.PI);
     pencilFP.position.z=-1.1-k*0.7; pencilFP.position.x=0.55-k*0.25;
@@ -5697,7 +5704,7 @@ function enterPaint(){
     stopCaseGame();
   }else if(G.role==="seeker"){
     if (gm === "hide" || gm === "cops" || gm === "ice") {
-      showRoleCard(gm === "cops" ? "👮 경찰 대기 중!" : "✏️ 당신은 술래!","도망가는 동안 출동 대기!");
+      showRoleCard(gm === "cops" ? "👮 경찰 대기 중!" : (gm === "ice" ? "🧊 얼음땡 술래 대기 중!" : "✏️ 당신은 술래!"),"도망가는 동안 출동 대기!");
     }
     $("blockOverlay").classList.toggle("hidden", gm !== "hide" && gm !== "cops" && gm !== "ice");
     $("paintPanel").classList.toggle("hidden", gm === "hide" || gm === "cops" || gm === "ice");
@@ -5749,7 +5756,7 @@ function enterSeek(){
     } else if (gm === "cops") {
       showRoleCard("👮 경찰 출동!","도둑들을 추격하여 [F]키로 체포하고 감옥으로 연행하세요!");
     } else if (gm === "ice") {
-      showRoleCard("✏️ 술래 출발!","도망자들을 쫓아가 [F]키로 터치하여 얼리세요!");
+      showRoleCard("🧊 얼음땡 술래 출발!","도망자들을 쫓아가 [F]키나 터치로 얼리세요!");
     }
   }
   else if(G.role==="hider"){
