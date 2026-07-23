@@ -885,6 +885,10 @@ function canvasTex(w,h,draw,repX=1,repY=1){
 const R=mulberry32(20260705);
 const TEX={};
 function buildTextures(){
+  if(TEX.floor){
+    Object.values(TEX).forEach(t => { if(t && t.isTexture) t.needsUpdate = true; });
+    return;
+  }
   TEX.floor=canvasTex(256,256,(g,w,h)=>{ // 나무 마루판
     g.fillStyle="#c9a06b";g.fillRect(0,0,w,h);
     for(let i=0;i<4;i++){ const y=i*64;
