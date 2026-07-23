@@ -2643,18 +2643,18 @@ function buildGym(){
     if (t && t.isTexture) t.needsUpdate = true;
   });
 
-  // 바닥 (체육관 대형 마루 플로어)
-  const floorMat = lambert({map: TEX.gymFloor || TEX.floor});
+  // 바닥 (체육관 대형 마루 플로어 - 양면 렌더링 적용)
+  const floorMat = lambert({map: TEX.gymFloor || TEX.floor, side: THREE.DoubleSide});
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W, ROOM_D), floorMat);
   floor.rotation.x = -Math.PI / 2; mapRoot.add(floor); samplables.push(floor);
 
-  // 천장 (75m 높은 천장 - 차콜 슬레이트)
-  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W, ROOM_D), lambert({color: 0x1a202c}));
+  // 천장 (75m 높은 천장 - 차콜 슬레이트 - 양면 렌더링 적용)
+  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W, ROOM_D), lambert({color: 0x1a202c, side: THREE.DoubleSide}));
   ceil.rotation.x = Math.PI / 2; ceil.position.y = WALL_H; mapRoot.add(ceil);
 
-  // 벽 4면 (따뜻한 목재 체육관 벽 0xd6c5a0)
-  const wallMat = lambert({color: 0xd6c5a0});
-  const wallLowerMat = lambert({color: 0x2b4c7e}); // 로열 블루 벽면 하단 안전 쿠션 매트
+  // 벽 4면 (따뜻한 목재 체육관 벽 0xd6c5a0 - 양면 렌더링 적용)
+  const wallMat = lambert({color: 0xd6c5a0, side: THREE.DoubleSide});
+  const wallLowerMat = lambert({color: 0x2b4c7e, side: THREE.DoubleSide}); // 로열 블루 벽면 하단 안전 쿠션 매트
   addBox(ROOM_W, WALL_H, 2, wallMat, 0, WALL_H/2, -ROOM_D/2-1);
   addBox(ROOM_W, WALL_H, 2, wallMat, 0, WALL_H/2, ROOM_D/2+1);
   addBox(2, WALL_H, ROOM_D, wallMat, -ROOM_W/2-1, WALL_H/2, 0);
@@ -3076,7 +3076,7 @@ function loadGLBMap(mapDef){
 /* 로비에서 고른 맵으로 실제 씬을 다시 만듭니다. classroom은 즉시 완료, GLB 맵은 비동기로 로드합니다. */
 async function buildActiveMap(mapId, force = false){
   const def=MAPS[mapId]&&mapIsReady(mapId)?MAPS[mapId]:MAPS.classroom;
-  if(!force && currentMapId === def.id && mapRoot && mapRoot.children.length > 0) return;
+  if(!force && currentMapId === def.id && mapRoot && mapRoot.children.length > 5) return;
   clearMap();
   if(def.type==="canvas"){ def.build(); }
   else{
@@ -3084,6 +3084,7 @@ async function buildActiveMap(mapId, force = false){
     catch(err){ console.error("맵 로드 실패, 교실로 대체합니다:",err); clearMap(); MAPS.classroom.build(); currentMapId="classroom"; return; }
   }
   currentMapId=def.id;
+  Object.values(TEX).forEach(t => { if(t && t.isTexture) t.needsUpdate = true; });
 }
 
 /* ================= 캐릭터: 지우개 (UV 아틀라스 256) ================= */
