@@ -2628,7 +2628,7 @@ function updateGymGimmick(dt){
 }
 
 function buildGym(){
-  WALL_H = 64;
+  WALL_H = 96; // 웅장한 대형 체육관/강당 높이
   const ROOM_W = 140, ROOM_D = 100;
   buildTextures();
   gymCleanup();
@@ -2639,11 +2639,11 @@ function buildGym(){
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W, ROOM_D), floorMat);
   floor.rotation.x = -Math.PI / 2; mapRoot.add(floor); samplables.push(floor);
 
-  // 천장
+  // 천장 (높은 96m 천장)
   const ceil = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W, ROOM_D), lambert({color: 0x2d3748}));
   ceil.rotation.x = Math.PI / 2; ceil.position.y = WALL_H; mapRoot.add(ceil);
 
-  // 벽 4면 (앞: -z 무대/단상 / 뒤: +z 공랙·입구 / 좌: -x 뜀틀·매트 / 우: +x 관람석)
+  // 벽 4면
   const wallMat = lambert({color: 0xedf2f7});
   const wallLowerMat = lambert({color: 0x4a5568}); // 아랫부분 매트 벽
   addBox(ROOM_W, WALL_H, 2, wallMat, 0, WALL_H/2, -ROOM_D/2-1);
@@ -2651,11 +2651,11 @@ function buildGym(){
   addBox(2, WALL_H, ROOM_D, wallMat, -ROOM_W/2-1, WALL_H/2, 0);
   addBox(2, WALL_H, ROOM_D, wallMat, ROOM_W/2+1, WALL_H/2, 0);
 
-  // 벽 하단 안전 쿠션 매트 (높이 12)
-  addBox(ROOM_W-2, 12, 0.8, wallLowerMat, 0, 6, -ROOM_D/2+0.4, {collide:false});
-  addBox(ROOM_W-2, 12, 0.8, wallLowerMat, 0, 6, ROOM_D/2-0.4, {collide:false});
-  addBox(0.8, 12, ROOM_D-2, wallLowerMat, -ROOM_W/2+0.4, 6, 0, {collide:false});
-  addBox(0.8, 12, ROOM_D-2, wallLowerMat, ROOM_W/2-0.4, 6, 0, {collide:false});
+  // 벽 하단 안전 쿠션 매트 (높이 14)
+  addBox(ROOM_W-2, 14, 0.8, wallLowerMat, 0, 7, -ROOM_D/2+0.4, {collide:false});
+  addBox(ROOM_W-2, 14, 0.8, wallLowerMat, 0, 7, ROOM_D/2-0.4, {collide:false});
+  addBox(0.8, 14, ROOM_D-2, wallLowerMat, -ROOM_W/2+0.4, 7, 0, {collide:false});
+  addBox(0.8, 14, ROOM_D-2, wallLowerMat, ROOM_W/2-0.4, 7, 0, {collide:false});
 
   // 천장 조명 & 철골 트러스빔 (Truss Grid)
   const trussMat = lambert({color: 0x718096});
@@ -2747,7 +2747,6 @@ function buildGym(){
 
     mapRoot.add(hoopG);
 
-    // 농구골대 덩크 포털 좌표 기록
     const rimWorldX = hx + Math.sin(rotY) * 6.8;
     const rimWorldZ = hz + Math.cos(rotY) * 6.8;
     GymHoops.push({x: rimWorldX, y: 16.2, z: rimWorldZ});
@@ -2755,7 +2754,7 @@ function buildGym(){
   spawnBasketballHoop(-40, 0, Math.PI / 2); // 왼쪽 농구대
   spawnBasketballHoop(40, 0, -Math.PI / 2); // 오른쪽 농구대
 
-  // ================= 3. 공(Balls) 오브젝트 흩뿌리기 =================
+  // ================= 3. 공(Balls) 오브젝트 (부드러운 이동용 비충돌체) =================
   const ballMatSoccer = lambert({map: TEX.soccerBall});
   const ballMatBasket = lambert({map: TEX.basketball});
   const ballMatVolley = lambert({map: TEX.volleyball});
@@ -2773,15 +2772,13 @@ function buildGym(){
     ballMesh.position.set(x, y + r, z);
     ballMesh.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI);
     mapRoot.add(ballMesh);
-    samplables.push(ballMesh);
+    samplables.push(ballMesh); // 스포이트 대상 등록
 
-    const bBox = new THREE.Box3().setFromObject(ballMesh);
-    colliders.push(bBox);
-
+    // 공은 플레이어 이동을 막지 않도록 colliders에 넣지 않습니다 (자유로운 이동 및 트램펄린 슈퍼 점프 지원)
     GymBouncyBalls.push({mesh: ballMesh, radius: r, origY: y + r});
   };
 
-  // 체육관 곳곳에 공 흩뿌리기 (약 35개 이상의 공들!)
+  // 체육관 코트에 공 흩뿌리기
   const ballTypes = ["soccer", "basket", "volley", "dodge"];
   for (let i = 0; i < 20; i++) {
     const bt = ballTypes[i % ballTypes.length];
@@ -2861,14 +2858,14 @@ function buildGym(){
   // ================= 6. 전광판 (Digital Scoreboard) & 깃발 (Banners) =================
   const boardFrameMat = lambert({color: 0x1a202c});
   const boardDispMat = lambert({map: TEX.scoreboard || TEX.board});
-  addBox(24, 10, 1.2, boardFrameMat, 0, WALL_H - 14, ROOM_D/2 - 1.5, {collide:false});
-  addBox(22, 8, 1.4, boardDispMat, 0, WALL_H - 14, ROOM_D/2 - 1.4, {collide:false});
+  addBox(24, 10, 1.2, boardFrameMat, 0, WALL_H - 18, ROOM_D/2 - 1.5, {collide:false});
+  addBox(22, 8, 1.4, boardDispMat, 0, WALL_H - 18, ROOM_D/2 - 1.4, {collide:false});
 
   [-30, 30].forEach(bx => {
-    addBox(8, 16, 0.2, lambert({color: bx < 0 ? 0xdd6b20 : 0x3182ce}), bx, WALL_H - 16, -ROOM_D/2 + 1.2, {collide:false});
+    addBox(8, 16, 0.2, lambert({color: bx < 0 ? 0xdd6b20 : 0x3182ce}), bx, WALL_H - 22, -ROOM_D/2 + 1.2, {collide:false});
   });
 
-  addBox(5, 5, 0.4, lambert({color: 0xffffff}), 0, WALL_H - 10, -ROOM_D/2 + 1.2, {collide:false});
+  addBox(5, 5, 0.4, lambert({color: 0xffffff}), 0, WALL_H - 14, -ROOM_D/2 + 1.2, {collide:false});
 
   // ================= 스폰 지점 (Spawns) =================
   hiderSpawns.push(
@@ -2876,15 +2873,15 @@ function buildGym(){
     new THREE.Vector3(-32, 3.8, -ROOM_D/2 + 14), // 무대 왼쪽 스피커 뒤
     new THREE.Vector3(32, 3.8, -ROOM_D/2 + 14),  // 무대 오른쪽 스피커 뒤
     new THREE.Vector3(0, 3.8, -ROOM_D/2 + 17),   // 연단 뒤
-    new THREE.Vector3(-54, 0, -5),               // 뜀틀 사이
-    new THREE.Vector3(-54, 0, 20),              // 대형 매트 뒤
+    new THREE.Vector3(-35, 0, 15),               // 뜀틀 앞 코트
+    new THREE.Vector3(-54, 0, 32),              // 대형 매트 뒤
     new THREE.Vector3(-40, 0, 6),               // 왼쪽 농구대 받침대 뒤
     new THREE.Vector3(40, 0, -6),               // 오른쪽 농구대 받침대 뒤
     new THREE.Vector3(48, 0, -25),              // 탁구대 1 아래
     new THREE.Vector3(48, 0, -10),              // 탁구대 2 아래
     new THREE.Vector3(56, 0, 15),               // 관람석 2단 아래
-    new THREE.Vector3(15, 0, ROOM_D/2 - 16),   // 공 카트 1 뒤
-    new THREE.Vector3(24, 0, ROOM_D/2 - 16)    // 공 카트 2 뒤
+    new THREE.Vector3(0, 0, 10),                // 센터 코트
+    new THREE.Vector3(20, 0, 20)                // 코트 우측
   );
 
   seekerSpawns.push(
