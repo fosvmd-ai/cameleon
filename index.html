@@ -1040,6 +1040,10 @@ function buildTextures(){
     g.fillStyle="#38a169";g.font="900 48px monospace";g.fillText("AWAY 85",300,80);
     g.fillStyle="#ecc94b";g.font="900 64px monospace";g.fillText("03:45",180,180);
   });
+
+  Object.values(TEX).forEach(t => {
+    if (t && t.isTexture) t.needsUpdate = true;
+  });
 }
 
 /* ================= 렌더러 / 씬 ================= */
@@ -2635,25 +2639,28 @@ function buildGym(){
   buildTextures();
   gymCleanup();
 
+  Object.values(TEX).forEach(t => {
+    if (t && t.isTexture) t.needsUpdate = true;
+  });
+
   // 바닥 (체육관 대형 마루 플로어)
-  if (TEX.gymFloor) TEX.gymFloor.needsUpdate = true;
   const floorMat = lambert({map: TEX.gymFloor || TEX.floor});
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W, ROOM_D), floorMat);
   floor.rotation.x = -Math.PI / 2; mapRoot.add(floor); samplables.push(floor);
 
-  // 천장 (75m 높은 천장)
-  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W, ROOM_D), lambert({color: 0x2d3748}));
+  // 천장 (75m 높은 천장 - 차콜 슬레이트)
+  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W, ROOM_D), lambert({color: 0x1a202c}));
   ceil.rotation.x = Math.PI / 2; ceil.position.y = WALL_H; mapRoot.add(ceil);
 
-  // 벽 4면 (넓은 200x140 맵 외곽)
-  const wallMat = lambert({color: 0xedf2f7});
-  const wallLowerMat = lambert({color: 0x4a5568}); // 아랫부분 매트 벽
+  // 벽 4면 (따뜻한 목재 체육관 벽 0xd6c5a0)
+  const wallMat = lambert({color: 0xd6c5a0});
+  const wallLowerMat = lambert({color: 0x2b4c7e}); // 로열 블루 벽면 하단 안전 쿠션 매트
   addBox(ROOM_W, WALL_H, 2, wallMat, 0, WALL_H/2, -ROOM_D/2-1);
   addBox(ROOM_W, WALL_H, 2, wallMat, 0, WALL_H/2, ROOM_D/2+1);
   addBox(2, WALL_H, ROOM_D, wallMat, -ROOM_W/2-1, WALL_H/2, 0);
   addBox(2, WALL_H, ROOM_D, wallMat, ROOM_W/2+1, WALL_H/2, 0);
 
-  // 벽 하단 안전 쿠션 매트 (높이 14)
+  // 벽 하단 안전 쿠션 매트 (높이 14 - 로열 블루 0x2b4c7e)
   addBox(ROOM_W-2, 14, 0.8, wallLowerMat, 0, 7, -ROOM_D/2+0.4, {collide:false});
   addBox(ROOM_W-2, 14, 0.8, wallLowerMat, 0, 7, ROOM_D/2-0.4, {collide:false});
   addBox(0.8, 14, ROOM_D-2, wallLowerMat, -ROOM_W/2+0.4, 7, 0, {collide:false});
@@ -3295,14 +3302,14 @@ function buildFairy(canvas,isPencil=false){
       hatBadgeR.position.set(-0.035, 1.23, 0.24);
       const hatBadgeB = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.05, 0.04), lambert({color: 0x007aff}));
       hatBadgeB.position.set(0.035, 1.23, 0.24);
-      // (D) 모자 윗부분 (White Cap Top)
-      const hatTop = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.18, 0.48), lambert({color: 0xffffff}));
+      // (D) 모자 윗부분 (Navy Blue Cap Top)
+      const hatTop = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.18, 0.48), lambert({color: 0x1b2a4a}));
       hatTop.position.set(0, 1.32, 0);
       group.add(hatVisor, hatBand, hatBadgeR, hatBadgeB, hatTop);
       parts.push(hatVisor, hatBand, hatBadgeR, hatBadgeB, hatTop);
 
-      // 3. 경찰복 상의 (White Shirt Body)
-      const shirtMat = lambert({color: 0xffffff, flatShading: true});
+      // 3. 경찰복 상의 (Deep Navy Blue Police Shirt Body)
+      const shirtMat = lambert({color: 0x1b2a4a, flatShading: true});
       bodyM = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.55, 0.32), shirtMat);
       bodyM.position.y = 0.55;
       group.add(bodyM); parts.push(bodyM);
@@ -3319,25 +3326,25 @@ function buildFairy(canvas,isPencil=false){
       group.add(tieMesh, chestBadge, beltBuckle);
       parts.push(tieMesh, chestBadge, beltBuckle);
 
-      // (D) 어깨 네이비 패치/견장 (Navy Blue Shoulder Patches)
-      const patchMat = lambert({color: 0x1c3b5e});
+      // (D) 어깨 골드/네이비 견장 (Gold & Navy Shoulder Patches)
+      const patchMat = lambert({color: 0xf5c518});
       const patchL = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.14, 0.16), patchMat);
       patchL.position.set(-0.41, 1.05, 0);
       const patchR = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.14, 0.16), patchMat);
       patchR.position.set(0.41, 1.05, 0);
       group.add(patchL, patchR); parts.push(patchL, patchR);
 
-      // (E) 흰색 신발 (White Shoes)
-      const shoeMat = lambert({color: 0xeeeeee});
+      // (E) 검은색 경찰 구두 (Polished Black Shoes)
+      const shoeMat = lambert({color: 0x151515});
       const shoeL = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.08, 0.22), shoeMat);
       shoeL.position.set(-0.17, 0.04, 0.02);
       const shoeR = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.08, 0.22), shoeMat);
       shoeR.position.set(0.17, 0.04, 0.02);
       group.add(shoeL, shoeR); parts.push(shoeL, shoeR);
 
-      // 4. 소매 / 바지 재질
-      armMat = lambert({color: 0xffffff, flatShading: true});
-      legMat = lambert({color: 0x222222, flatShading: true});
+      // 4. 소매 / 바지 재질 (Deep Navy Blue Sleeves & Dark Trousers)
+      armMat = lambert({color: 0x1b2a4a, flatShading: true});
+      legMat = lambert({color: 0x111827, flatShading: true});
     } else if (typeof isIceMode === "function" && isIceMode()) {
       // 👹 얼음땡 모드 전용 붉은 불꽃 얼음 술래 3D 스킨
       const shaftMat = lambert({color: 0xff3b30, flatShading: true});
@@ -3653,11 +3660,19 @@ function applyZombieSkinToFairy(f, state){
   if (typeof isIceMode === "function" && isIceMode()) {
     if (state > 0) { // 얼음 상태
       f.parts.forEach(part => {
-        if(part.material) part.material.color.setHex(0xa9d9ee);
+        if(part.material) {
+          if(!part.userData.isOriginalColorSaved) {
+            part.userData.origColorHex = part.material.color.getHex();
+            part.userData.isOriginalColorSaved = true;
+          }
+          part.material.color.setHex(0xa9d9ee);
+        }
       });
-    } else { // 자유 상태
+    } else { // 자유 상태 (원래 각 파츠 고유 색상 복원)
       f.parts.forEach(part => {
-        if(part.material) part.material.color.setHex(0xffffff);
+        if(part.material && part.userData.isOriginalColorSaved) {
+          part.material.color.setHex(part.userData.origColorHex);
+        }
       });
     }
     if(f.zomEyes) f.zomEyes.visible = false;
@@ -3669,17 +3684,31 @@ function applyZombieSkinToFairy(f, state){
   
   if (isZombie) {
     f.parts.forEach(part => {
-      if(part.material) part.material.color.setHex(0x66aa66);
+      if(part.material) {
+        if(!part.userData.isOriginalColorSaved) {
+          part.userData.origColorHex = part.material.color.getHex();
+          part.userData.isOriginalColorSaved = true;
+        }
+        part.material.color.setHex(0x66aa66);
+      }
     });
     if(f.zomEyes) f.zomEyes.visible = true;
   } else if (isInfected) {
     f.parts.forEach(part => {
-      if(part.material) part.material.color.setHex(0xaacc88);
+      if(part.material) {
+        if(!part.userData.isOriginalColorSaved) {
+          part.userData.origColorHex = part.material.color.getHex();
+          part.userData.isOriginalColorSaved = true;
+        }
+        part.material.color.setHex(0xaacc88);
+      }
     });
     if(f.zomEyes) f.zomEyes.visible = false;
   } else {
     f.parts.forEach(part => {
-      if(part.material) part.material.color.setHex(0xffffff);
+      if(part.material && part.userData.isOriginalColorSaved) {
+        part.material.color.setHex(part.userData.origColorHex);
+      }
     });
     if(f.zomEyes) f.zomEyes.visible = false;
   }
