@@ -3543,7 +3543,7 @@ function rebuildMyFairy() {
     if (myFairy.tex) myFairy.tex.dispose();
   }
 
-  const isPencil = G.role === "seeker";
+  const isPencil = G.role === "seeker" || G.zombieState === 2;
   const isRobber = isCopsMode() && (G.role === "hider" || G.role === "fairy");
   let canvas;
   if (isPencil) canvas = makePencilCanvas();
@@ -3555,6 +3555,10 @@ function rebuildMyFairy() {
   newFairy.group.rotation.y = G.yaw + Math.PI;
   newFairy.group.visible = false;
   scene.add(newFairy.group);
+
+  if (G.zombieState > 0) {
+    applyZombieSkinToFairy(newFairy, G.zombieState);
+  }
 
   Object.assign(myFairy, newFairy);
 }
@@ -4049,12 +4053,14 @@ function isHiderThirdPerson(){
   if (G.screen !== "GAME" || G.spectating) return false;
   if (typeof isCopsMode === "function" && isCopsMode()) return true;
   if (typeof isIceMode === "function" && isIceMode()) return true;
+  if (typeof isZombieMode === "function" && isZombieMode()) return true;
   return G.role==="hider"&&!G.found;
 }
 function syncLocalFairy(){
   const isCops = typeof isCopsMode === "function" && isCopsMode();
   const isIce = typeof isIceMode === "function" && isIceMode();
-  const show=G.screen==="GAME"&&(G.mirror||(isCops&&!G.spectating)||(isIce&&!G.spectating)||(G.role==="hider"&&!G.found));
+  const isZombie = typeof isZombieMode === "function" && isZombieMode();
+  const show=G.screen==="GAME"&&(G.mirror||(isCops&&!G.spectating)||(isIce&&!G.spectating)||(isZombie&&!G.spectating)||(G.role==="hider"&&!G.found));
   myFairy.group.visible=show;
   if(!show)return;
 
@@ -5451,9 +5457,17 @@ const Net={
       this.players[s.key]=after;
       ensureRemote(s.key,after);
       if (s.key === this.uid) {
+        const prevZ = G.zombieState;
         G.zombieState = after.zombieState || 0;
         G.teamId = after.teamId || "team1";
         G.teamColor = TEAM_COLORS[G.teamId]?.color || "#FF3B30";
+        if (G.zombieState !== prevZ) {
+          rebuildMyFairy();
+          if (G.zombieState === 2) {
+            toast("🧟 숙주 좀비로 변신했습니다! 다른 인간들을 덮치세요!");
+            Audio2.sfxFound();
+          }
+        }
       }
       if(!before.found&&after.found) onSomeoneFound(s.key,after);
       onPlayersChange(s.key,"change");
@@ -5911,6 +5925,12 @@ const Net={
         if (allInfected || now >= m.phaseEndsAt) {
           gameOver = true;
           winner = allInfected ? "seeker" : "hider";
+        }
+      } else if (copsMode) {
+        const allArrested = hiders.length > 0 && hiders.every(([u,p])=>p.imprisoned || p.escortedBy);
+        if (allArrested || now >= m.phaseEndsAt) {
+          gameOver = true;
+          winner = allArrested ? "seeker" : "hider";
         }
       } else {
         const allFound=hiders.length>0&&hiders.every(([u,p])=>p.found);
@@ -8832,9 +8852,15 @@ function checkCopsWinConditions() {
   }
 
   if (freeCount === 0) {
-    if (Net.mode === "practice" || G.isHost) {
-      showRoleCard("👮 경찰 팀 승리!", "모든 도둑을 체포하여 감옥에 수감시켰습니다!");
-      Audio2.sfxFound();
+    if (Net.mode === "practice") {
+      if (G.phase === "SEEK") {
+        G.phase = "RESULT";
+        showRoleCard("👮 경찰 팀 승리!", "모든 도둑을 체포하였습니다! 경찰 승리!");
+        Audio2.sfxFound();
+        setTimeout(() => { if (G.screen === "GAME") enterResult("seeker"); }, 1200);
+      }
+    } else if (G.isHost && G.phase === "SEEK") {
+      Net.setPhase("RESULT", 0, { winner: "seeker" });
     }
   }
 }
