@@ -3520,15 +3520,26 @@ function buildFairy(canvas,isPencil=false){
   return {group,parts,tex,mat,canvas,bodyM,arms:[aL,aR],legs:[lL,lR],shadow:sh,hitbox,nameLabel,zomEyes:zomEyesGroup,wings:{group:wingGroup,left:wingL,right:wingR},weaponHolder,currentWeaponType:null,walkPhase:Math.random()*Math.PI*2};
 }
 function rebuildMyFairy() {
-  if (window.myFairy) {
+  if (typeof myFairy !== "undefined" && myFairy && myFairy.group) {
     scene.remove(myFairy.group);
-    myFairy.parts.forEach(p => {
-      if (p.geometry) p.geometry.dispose();
-      if (p.material) {
-        if (Array.isArray(p.material)) p.material.forEach(m => m.dispose());
-        else p.material.dispose();
-      }
-    });
+    if (myFairy.group.parent) myFairy.group.parent.remove(myFairy.group);
+    if (myFairy.shadow) {
+      scene.remove(myFairy.shadow);
+      if (myFairy.shadow.parent) myFairy.shadow.parent.remove(myFairy.shadow);
+    }
+    if (myFairy.nameLabel) {
+      scene.remove(myFairy.nameLabel);
+      if (myFairy.nameLabel.parent) myFairy.nameLabel.parent.remove(myFairy.nameLabel);
+    }
+    if (myFairy.parts) {
+      myFairy.parts.forEach(p => {
+        if (p.geometry) p.geometry.dispose();
+        if (p.material) {
+          if (Array.isArray(p.material)) p.material.forEach(m => m.dispose());
+          else p.material.dispose();
+        }
+      });
+    }
     if (myFairy.tex) myFairy.tex.dispose();
   }
 
@@ -3922,17 +3933,8 @@ function ensureRemote(uid,info){
   
   const isPencil=info.role==="seeker";
   if(r && r.lastRole !== info.role){
-    scene.remove(r.fairy.group);
-    r.fairy.parts.forEach(p => {
-      if (p.geometry) p.geometry.dispose();
-      if (p.material) {
-        if (Array.isArray(p.material)) p.material.forEach(m => m.dispose());
-        else p.material.dispose();
-      }
-    });
-    if (r.fairy.tex) r.fairy.tex.dispose();
+    removeRemote(uid);
     r = null;
-    remotes.delete(uid);
   }
 
   if(!r){
@@ -9569,6 +9571,10 @@ function clearPracticeAI() {
         if (bot.fairy.shadow.parent) bot.fairy.shadow.parent.remove(bot.fairy.shadow);
         if (bot.fairy.shadow.geometry) bot.fairy.shadow.geometry.dispose();
         if (bot.fairy.shadow.material) bot.fairy.shadow.material.dispose();
+      }
+      if (bot.fairy.nameLabel) {
+        scene.remove(bot.fairy.nameLabel);
+        if (bot.fairy.nameLabel.parent) bot.fairy.nameLabel.parent.remove(bot.fairy.nameLabel);
       }
       if (bot.fairy.parts) {
         bot.fairy.parts.forEach(p => {
