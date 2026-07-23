@@ -389,7 +389,7 @@ const firebaseConfig = {
 
 /* 학생이 함부로 방을 만들지 못하게 막는 "선생님 코드"입니다.
    원하는 말로 자유롭게 바꿔서 쓰세요. */
-const TEACHER_CODE = "김지훈";
+const TEACHER_CODE = "중앙초";
 /* ▲▲▲ 여기까지 ▲▲▲  (이 아래로는 수정하지 마세요) */
 
 window.FIREBASE_CONFIG = firebaseConfig;
@@ -403,7 +403,7 @@ window.onerror = function(msg, url, line, col, error) {
 /* 위 설정 구역에 문법 오류(붙여넣기 실수 등)가 있어도
    게임이 완전히 멈추지 않고 안내 메시지를 띄울 수 있게 하는 안전장치입니다. */
 if (typeof window.FIREBASE_CONFIG === "undefined") window.FIREBASE_CONFIG = null;
-if (typeof window.TEACHER_CODE === "undefined" || !window.TEACHER_CODE) window.TEACHER_CODE = "선생님";
+if (typeof window.TEACHER_CODE === "undefined" || !window.TEACHER_CODE) window.TEACHER_CODE = "중앙초";
 </script>
 </head>
 <body>
