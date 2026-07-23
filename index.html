@@ -5052,7 +5052,7 @@ addEventListener("mousemove",e=>{
 addEventListener("mouseup",()=>{
   mirrorDrag=null;mirrorLast=null;lastPaintPx=null;
   if(seekerLookDrag){
-    if(!seekerDragMoved && !isCopsMode() && !isIceMode()) tryJudge(mouseX,mouseY);
+    if(!seekerDragMoved && !isCopsMode() && !isIceMode()) tryJudge();
     seekerLookDrag=null;
   }
 });
@@ -6821,12 +6821,8 @@ function updateHUD(){
   ch.textContent=G.role==="seeker"?"":"＋";
   const cw=$("crossWrap");
   cw.style.visibility=G.mirror?"hidden":"visible";
-  // PC 술래: 조준점이 마우스 커서를 그대로 따라다닙니다.
-  if(!IS_TOUCH&&G.role==="seeker"&&G.phase==="SEEK"&&!G.mirror){
-    cw.style.left=mouseX+"px"; cw.style.top=mouseY+"px";
-  }else{
-    cw.style.left=""; cw.style.top="";
-  }
+  // 십자선 조준점: 3D 술래 시점 조준점은 화면 중앙(50%, 50%)에 항상 안정적으로 고정합니다.
+  cw.style.left=""; cw.style.top="";
   // 쿨다운 링
   const cd=Math.max(0,G.cdUntil-performance.now());
   $("cdArc").style.strokeDashoffset=String(150.8*(1-cd/1500));
