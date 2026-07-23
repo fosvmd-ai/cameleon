@@ -2880,27 +2880,26 @@ function buildGym(){
 
   addBox(7, 7, 0.5, lambert({color: 0xffffff}), 0, WALL_H - 16, -ROOM_D/2 + 1.5, {collide:false});
 
-  // ================= 스폰 지점 (Spawns) =================
+  // ================= 스폰 지점 (Spawns - 100% 개활지 공간 배치) =================
   hiderSpawns.push(
-    new THREE.Vector3(-25, 4.2, -ROOM_D/2 + 14), // 피아노 뒤
-    new THREE.Vector3(-44, 4.2, -ROOM_D/2 + 18), // 무대 왼쪽 스피커 뒤
-    new THREE.Vector3(44, 4.2, -ROOM_D/2 + 18),  // 무대 오른쪽 스피커 뒤
-    new THREE.Vector3(0, 4.2, -ROOM_D/2 + 20),   // 연단 뒤
-    new THREE.Vector3(-55, 0, 20),               // 뜀틀 앞 코트
-    new THREE.Vector3(-82, 0, 42),              // 대형 매트 뒤
-    new THREE.Vector3(-65, 0, 8),               // 왼쪽 농구대 받침대 뒤
-    new THREE.Vector3(65, 0, -8),               // 오른쪽 농구대 받침대 뒤
-    new THREE.Vector3(68, 0, -35),              // 탁구대 1 아래
-    new THREE.Vector3(68, 0, -15),              // 탁구대 2 아래
-    new THREE.Vector3(82, 0, 25),               // 관람석 2단 아래
-    new THREE.Vector3(0, 0, 0),                 // 메인 센터 코트
-    new THREE.Vector3(30, 0, 25)                // 코트 우측
+    new THREE.Vector3(0, 0, 0),                 // 메인 센터 코트 (스폰 시 100% 트인 개활지)
+    new THREE.Vector3(-30, 0, -20),             // 무대 좌측 앞 코트
+    new THREE.Vector3(30, 0, -20),              // 무대 우측 앞 코트
+    new THREE.Vector3(-25, 4.1, -40),           // 무대 위 개활 공간 (피아노 앞)
+    new THREE.Vector3(25, 4.1, -40),            // 무대 우측 위 개활 공간
+    new THREE.Vector3(-55, 0, 20),              // 뜀틀 앞 코트
+    new THREE.Vector3(-70, 0, 42),              // 대형 매트 앞
+    new THREE.Vector3(-50, 0, 8),               // 왼쪽 농구대 옆 코트
+    new THREE.Vector3(50, 0, -8),               // 오른쪽 농구대 옆 코트
+    new THREE.Vector3(68, 0, -45),              // 탁구대 1 옆 코트
+    new THREE.Vector3(68, 0, 20),               // 관람석 앞 코트
+    new THREE.Vector3(20, 0, 25)                // 코트 우측 센터
   );
 
   seekerSpawns.push(
-    new THREE.Vector3(0, 0, ROOM_D/2 - 25),
-    new THREE.Vector3(-12, 0, ROOM_D/2 - 25),
-    new THREE.Vector3(12, 0, ROOM_D/2 - 25)
+    new THREE.Vector3(0, 0, 50),
+    new THREE.Vector3(-15, 0, 50),
+    new THREE.Vector3(15, 0, 50)
   );
 }
 
