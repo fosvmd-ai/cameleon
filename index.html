@@ -2705,10 +2705,10 @@ function buildGym(){
   GymSpotlight.position.set(0, 0.12, -20);
   mapRoot.add(GymSpotlight);
 
-  // 무대 레드 벨벳 커튼 (천장 고도 50m 위 상단 배치)
+  // 무대 레드 벨벳 커튼 (측면 커튼 통과 및 매립 숨기 방지 충돌체 적용)
   const curtainMat = lambert({color: 0x9b2c2c});
-  addBox(16, 42, 2, curtainMat, -42, 25.0, -ROOM_D/2 + 27, {collide:false});
-  addBox(16, 42, 2, curtainMat, 42, 25.0, -ROOM_D/2 + 27, {collide:false});
+  addBox(16, 42, 2, curtainMat, -42, 25.0, -ROOM_D/2 + 27);
+  addBox(16, 42, 2, curtainMat, 42, 25.0, -ROOM_D/2 + 27);
   addBox(100, 10, 2, curtainMat, 0, 52.0, -ROOM_D/2 + 27, {collide:false});
 
   // 무대 계단 (좌우 4단)
@@ -2734,44 +2734,46 @@ function buildGym(){
   addBox(5.5, 12, 5.5, speakerMat, -44, 10.1, -ROOM_D/2 + 15);
   addBox(5.5, 12, 5.5, speakerMat, 44, 10.1, -ROOM_D/2 + 15);
 
-  // ================= 2. 대형 농구대 2개 (Basketball Hoops) =================
+  // ================= 2. 대형 농구대 2개 (Basketball Hoops - 정밀 월드 충돌체 적용) =================
   const hoopSteelMat = lambert({color: 0xe53e3e});
   const hoopPadMat = lambert({color: 0x3182ce});
   const hoopBackboardMat = lambert({color: 0xffffff, transparent:true, opacity:0.85});
   const hoopRimMat = lambert({color: 0xdd6b20});
 
   const spawnBasketballHoop = (hx, hz, rotY) => {
-    const hoopG = new THREE.Group();
-    hoopG.position.set(hx, 0, hz);
-    hoopG.rotation.y = rotY;
+    const isSideways = Math.abs(rotY) > 0.1;
 
-    const baseMesh = new THREE.Mesh(new THREE.BoxGeometry(5.5, 8.5, 5.5), hoopPadMat);
-    baseMesh.position.set(0, 4.25, 0); hoopG.add(baseMesh); samplables.push(baseMesh);
-    const baseBox = new THREE.Box3().setFromObject(baseMesh); colliders.push(baseBox);
+    // 농구대 패딩 받침대 (5.5 x 8.5 x 5.5)
+    addBox(5.5, 8.5, 5.5, hoopPadMat, hx, 4.25, hz);
 
-    const poleMesh = new THREE.Mesh(new THREE.BoxGeometry(1.4, 22, 1.4), hoopSteelMat);
-    poleMesh.position.set(0, 11, 0); hoopG.add(poleMesh);
+    // 메인 스틸 기둥 (1.4 x 22 x 1.4)
+    addBox(1.4, 22, 1.4, hoopSteelMat, hx, 11, hz);
 
-    const armMesh = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 7.5), hoopSteelMat);
-    armMesh.position.set(0, 21, 3.2); hoopG.add(armMesh);
+    // 연결 아암 (Arm)
+    const armOffsetX = Math.sin(rotY) * 3.2;
+    const armOffsetZ = Math.cos(rotY) * 3.2;
+    addBox(isSideways ? 7.5 : 1.2, 1.2, isSideways ? 1.2 : 7.5, hoopSteelMat, hx + armOffsetX, 21, hz + armOffsetZ);
 
-    const bbMesh = new THREE.Mesh(new THREE.BoxGeometry(8.5, 5.5, 0.5), hoopBackboardMat);
-    bbMesh.position.set(0, 21.5, 7.0); hoopG.add(bbMesh); samplables.push(bbMesh);
+    // 백보드 (Backboard)
+    const bbOffsetX = Math.sin(rotY) * 7.0;
+    const bbOffsetZ = Math.cos(rotY) * 7.0;
+    addBox(isSideways ? 0.5 : 8.5, 5.5, isSideways ? 8.5 : 0.5, hoopBackboardMat, hx + bbOffsetX, 21.5, hz + bbOffsetZ);
 
-    const rimMesh = new THREE.Mesh(new THREE.TorusGeometry(1.6, 0.15, 8, 16), hoopRimMat);
-    rimMesh.rotation.x = Math.PI / 2;
-    rimMesh.position.set(0, 20.0, 8.5); hoopG.add(rimMesh);
-
-    mapRoot.add(hoopG);
-
+    // 림 (Rim)
     const rimWorldX = hx + Math.sin(rotY) * 8.5;
     const rimWorldZ = hz + Math.cos(rotY) * 8.5;
+    const rimMesh = new THREE.Mesh(new THREE.TorusGeometry(1.6, 0.15, 8, 16), hoopRimMat);
+    rimMesh.rotation.x = Math.PI / 2;
+    rimMesh.position.set(rimWorldX, 20.0, rimWorldZ);
+    mapRoot.add(rimMesh);
+    samplables.push(rimMesh);
+
     GymHoops.push({x: rimWorldX, y: 20.0, z: rimWorldZ});
   };
   spawnBasketballHoop(-65, 0, Math.PI / 2); // 왼쪽 농구대
   spawnBasketballHoop(65, 0, -Math.PI / 2); // 오른쪽 농구대
 
-  // ================= 3. 공(Balls) 오브젝트 (부드러운 이동용 비충돌체) =================
+  // ================= 3. 공(Balls) 오브젝트 (파고들기 방지 충돌체 & 트램펄린) =================
   const ballMatSoccer = lambert({map: TEX.soccerBall});
   const ballMatBasket = lambert({map: TEX.basketball});
   const ballMatVolley = lambert({map: TEX.volleyball});
@@ -2791,7 +2793,14 @@ function buildGym(){
     mapRoot.add(ballMesh);
     samplables.push(ballMesh); // 스포이트 대상 등록
 
-    // 공은 플레이어 이동을 막지 않도록 colliders에 넣지 않고 자유 이동 및 트램펄린 슈팅 지원
+    // 공 메쉬 내부 파고들기 및 통과 숨기 방지용 충돌체 등록
+    const colW = r * 1.4;
+    const box = new THREE.Box3(
+      new THREE.Vector3(x - colW*0.5, y, z - colW*0.5),
+      new THREE.Vector3(x + colW*0.5, y + r * 1.8, z + colW*0.5)
+    );
+    colliders.push(box);
+
     GymBouncyBalls.push({mesh: ballMesh, radius: r, origY: y + r});
   };
 
