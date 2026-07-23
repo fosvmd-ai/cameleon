@@ -3083,7 +3083,6 @@ function rebuildMyFairy() {
 }
 function applyPoseToFairy(f,pose){
   f.group.rotation.x=0;
-  f.group.rotation.y=0;
   f.group.rotation.z=0;
   f.group.position.y=f.group.userData.baseY;
   f.bodyM.scale.set(1,1,1);
@@ -3532,8 +3531,8 @@ function updateRemotes(dt){
     r.cur.z=lerp(r.cur.z,r.target.z,k); r.cur.ry=lerp(r.cur.ry,r.target.ry,k);
     r.fairy.group.position.set(r.cur.x,r.cur.y,r.cur.z);
     r.fairy.group.userData.baseY=r.cur.y;
-    r.fairy.group.rotation.y=r.cur.ry+Math.PI;
     applyPoseToFairy(r.fairy,r.target.pose);
+    r.fairy.group.rotation.y=r.cur.ry+Math.PI;
     applyZombieSkinToFairy(r.fairy,r.target.zombieState||0); // 좀비 스킨 적용
     const remoteSpeed=dt>0?Math.hypot(r.cur.x-oldX,r.cur.z-oldZ)/dt:0;
     animateFairyMovement(r.fairy,dt,remoteSpeed,r.target.pose,true,r.target.flying,r.target.zombieState||0);
@@ -3575,8 +3574,8 @@ function syncLocalFairy(){
   const pose=G.spectating?G.specAnchorPose:G.pose;
   myFairy.group.position.set(p.x,p.y,p.z);
   myFairy.group.userData.baseY=p.y;
-  myFairy.group.rotation.y=yaw+Math.PI;
   applyPoseToFairy(myFairy,pose);
+  myFairy.group.rotation.y=yaw+Math.PI;
   applyZombieSkinToFairy(myFairy, G.zombieState || 0); // 로컬 좀비 도색
   const isSeeker = G.role === "seeker";
   const showLocalNameLabel = (G.role === "hider" && !G.found && !G.spectating) && (!isSeeker && (G.flying || flyEnergy < 100));
@@ -4006,13 +4005,13 @@ function updateMovement(dt){
         let diff = targetYaw - G.fairyYaw;
         while(diff < -Math.PI) diff += Math.PI * 2;
         while(diff > Math.PI) diff -= Math.PI * 2;
-        G.fairyYaw += diff * dt * 8.5; // 자연스러운 보간 속도
+        G.fairyYaw += diff * dt * 14.0; // 자연스러운 보간 속도
       }else{
         // 정지 시 마우스 드래그(G.yaw)에 맞춰 몸을 스무스하게 시선 정면으로 회전 정렬
         let diff = G.yaw - G.fairyYaw;
         while(diff < -Math.PI) diff += Math.PI * 2;
         while(diff > Math.PI) diff -= Math.PI * 2;
-        G.fairyYaw += diff * dt * 8.5;
+        G.fairyYaw += diff * dt * 10.0;
       }
     } else {
       // 1인칭 뷰에서는 시선 방향과 일치
