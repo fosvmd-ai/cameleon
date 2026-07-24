@@ -345,6 +345,45 @@ label.chk input{width:20px;height:20px;}
   color:#fff;font-size:14px;text-shadow:1px 1px 0 #000;pointer-events:none;text-align:center;}
 #deskHint{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);z-index:32;
   color:#fff;font-size:12px;text-shadow:1px 1px 0 #000;opacity:.8;pointer-events:none;text-align:center;}
+
+/* ===== 🧟 좀비 시야 비넷 오버레이 (Zombie Red Vision Vignette) ===== */
+#zombieVignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 44;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  background: radial-gradient(
+    circle at center,
+    rgba(0, 0, 0, 0) 20%,
+    rgba(140, 10, 10, 0.5) 50%,
+    rgba(100, 0, 0, 0.8) 75%,
+    rgba(40, 0, 0, 0.96) 100%
+  );
+  box-shadow: inset 0 0 120px rgba(120, 0, 0, 0.95);
+}
+#zombieVignette.active {
+  opacity: 1;
+  animation: zombieHeartbeatPulse 1.8s ease-in-out infinite alternate;
+}
+@keyframes zombieHeartbeatPulse {
+  0% {
+    opacity: 0.82;
+    transform: scale(1.0);
+    filter: contrast(110%) brightness(95%);
+  }
+  50% {
+    opacity: 0.98;
+    transform: scale(1.015);
+    filter: contrast(125%) brightness(90%);
+  }
+  100% {
+    opacity: 0.85;
+    transform: scale(1.0);
+    filter: contrast(115%) brightness(95%);
+  }
+}
 </style>
 <script type="importmap">
 { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
@@ -407,6 +446,7 @@ if (typeof window.TEACHER_CODE === "undefined" || !window.TEACHER_CODE) window.T
 </script>
 </head>
 <body>
+<div id="zombieVignette"></div>
 
 <!-- 타이틀 -->
 <div id="screenTitle" class="screen">
@@ -4486,11 +4526,11 @@ function updateMovement(dt){
 
   if (G.role === "seeker") {
     if (typeof isIceMode === "function" && isIceMode()) {
-      baseSpeed = 5.6 * 1.2; // 6.72 (일반 도망자 5.6 대비 정확히 1.2배)
+      baseSpeed = 8.0; // 🧊 얼음땡 술래 속도 상향 (8.0m/s)
     } else if (isCopsMode()) {
-      baseSpeed = 6.8;
+      baseSpeed = 8.2; // 👮 경찰과 도둑 술래(경찰) 속도 상향 (8.2m/s)
     } else {
-      baseSpeed = 7.2;
+      baseSpeed = 7.8; // ✏️ 일반 술래 속도 상향 (7.8m/s)
     }
   } else {
     baseSpeed = normalSpeed;
@@ -4500,13 +4540,13 @@ function updateMovement(dt){
   if(G.pose==="roll"||G.pose==="roll_lie") baseSpeed=0;
   if(G.onSprinkler) baseSpeed *= 0.5;
   if(isZombieMode() && G.zombieState === 2) {
-    baseSpeed = isNight ? 7.8 : 4.2;
+    baseSpeed = 8.2; // 🧟 좀비 패스트 이동속도 (8.2m/s)
   }
   if(isCopsMode()) {
     if(G.imprisoned || G.escortedBy) {
       baseSpeed = 0;
     } else if(G.role === "seeker") {
-      baseSpeed = 6.8;
+      baseSpeed = 8.2; // 👮 경찰 속도 상향 (8.2m/s)
     } else {
       baseSpeed = 5.6;
       if(G.speedBoostTimer > 0) baseSpeed *= 2.0;
@@ -4609,6 +4649,11 @@ function updateMovement(dt){
   }
   if(myFairy.group.visible&&!G.spectating){
     animateFairyMovement(myFairy,dt,dir.length()*speed,G.pose,G.grounded,G.flying,G.zombieState||0);
+  }
+  const zv = $("zombieVignette");
+  if (zv) {
+    const isZombieVision = G.screen === "GAME" && typeof isZombieMode === "function" && isZombieMode() && G.zombieState === 2 && !G.spectating;
+    zv.classList.toggle("active", isZombieVision);
   }
   G.paint=1000; G.refillOn=false; G.refillT=0;
 }
@@ -9680,6 +9725,60 @@ function clearPracticeAI() {
   practiceAIList = [];
 }
 
+function initOfflinePracticeObjects() {
+  clearPracticeAI();
+  initGameItems();
+  localCureTimer = 0;
+  localWeaponBoxTimer = 0;
+  
+  const gm = G.practiceGameMode || "hide";
+  if (gm === "zombie") {
+    // 인간 봇 2마리, 좀비 봇 1마리 스폰
+    spawnPracticeAI("hider", 0, "team1", "none");
+    spawnPracticeAI("hider", 0, "team1", "none");
+    spawnPracticeAI("hider", 2, "team1", "none");
+    spawnCureLocally();
+  } else if (gm === "cops") {
+    initCopsGame();
+    // 경찰 봇 1마리, 도둑 봇 3마리 스폰
+    spawnPracticeAI("seeker", 0, "team2", "none");
+    spawnPracticeAI("hider", 0, "team1", "none");
+    spawnPracticeAI("hider", 0, "team1", "none");
+    spawnPracticeAI("hider", 0, "team1", "none");
+  }
+}
+
+function spawnCureLocally() {
+  let sp;
+  if (typeof hiderSpawns !== "undefined" && hiderSpawns.length > 0) {
+    sp = hiderSpawns[Math.floor(Math.random() * hiderSpawns.length)];
+  } else {
+    sp = { x: (Math.random() - 0.5) * 58, z: (Math.random() - 0.5) * 42 };
+  }
+  const id = "local_cure_" + Math.floor(Math.random() * 1000000);
+  const mesh = buildCureMesh();
+  mesh.position.set(sp.x, 1.0, sp.z);
+  scene.add(mesh);
+  cureSpawns.push({ id, x: sp.x, y: 1.0, z: sp.z, mesh });
+}
+
+function spawnWeaponBoxLocally() {
+  let sp;
+  if (typeof hiderSpawns !== "undefined" && hiderSpawns.length > 0) {
+    sp = hiderSpawns[Math.floor(Math.random() * hiderSpawns.length)];
+  } else {
+    sp = { x: (Math.random() - 0.5) * 58, z: (Math.random() - 0.5) * 42 };
+  }
+  const id = "local_weaponbox_" + Math.floor(Math.random() * 10000000);
+  const types = ["rifle", "grenade", "cannon", "shotgun", "roller"];
+  const rType = types[Math.floor(Math.random() * types.length)];
+  
+  const buildResult = buildWeaponBoxMesh(rType);
+  buildResult.group.position.set(sp.x, 0.5, sp.z);
+  scene.add(buildResult.group);
+  weaponBoxSpawns.push({ id, x: sp.x, y: 0.5, z: sp.z, weaponType: rType, group: buildResult.group, topMark: buildResult.topMark });
+}
+
 function spawnPracticeAI(role, zombieState, teamId, inkWeapon) {
   const rx = (Math.random() - 0.5) * 60;
   const rz = (Math.random() - 0.5) * 44;
@@ -9855,12 +9954,12 @@ function updatePracticeAI(dt) {
     
     let speed = 5.6;
     if (gm === "ice") {
-      speed = bot.role === "seeker" ? (5.6 * 1.2) : 5.6;
+      speed = bot.role === "seeker" ? 8.0 : 5.6;
     } else if (gm === "cops") {
-      speed = bot.role === "seeker" ? 6.8 : 5.6;
+      speed = bot.role === "seeker" ? 8.2 : 5.6;
       if (bot.speedBoostTimer > 0) speed *= 2.0;
     } else if (gm === "zombie") {
-      speed = bot.zombieState === 2 ? 6.8 : 5.0;
+      speed = bot.zombieState === 2 ? 8.2 : 5.0;
     } else if (gm === "splatoon" && bot.speedBoostTimer > 0) {
       speed *= 1.5;
     }
