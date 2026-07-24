@@ -3531,6 +3531,19 @@ function buildFairy(canvas,isPencil=false){
   return {group,parts,tex,mat,canvas,bodyM,arms:[aL,aR],legs:[lL,lR],shadow:sh,hitbox,nameLabel,zomEyes:zomEyesGroup,wings:{group:wingGroup,left:wingL,right:wingR},weaponHolder,currentWeaponType:null,walkPhase:Math.random()*Math.PI*2};
 }
 function rebuildMyFairy() {
+  // 1. 기존에 칠해둔 캔버스 백업 (지우개 요정인 경우 유지)
+  let backupCanvas = null;
+  const isPencil = G.role === "seeker" || G.zombieState === 2;
+  const isRobber = typeof isCopsMode === "function" && isCopsMode() && (G.role === "hider" || G.role === "fairy");
+  
+  // 연필이나 도둑이 아닐 때만 기존 캔버스 백업
+  if (!isPencil && !isRobber && typeof myFairy !== "undefined" && myFairy && myFairy.canvas) {
+    backupCanvas = document.createElement("canvas");
+    backupCanvas.width = 256; backupCanvas.height = 256;
+    backupCanvas.getContext("2d").drawImage(myFairy.canvas, 0, 0);
+  }
+
+  // 2. 기존 메쉬 완전 제거
   if (typeof myFairy !== "undefined" && myFairy && myFairy.group) {
     scene.remove(myFairy.group);
     if (myFairy.group.parent) myFairy.group.parent.remove(myFairy.group);
@@ -3554,13 +3567,22 @@ function rebuildMyFairy() {
     if (myFairy.tex) myFairy.tex.dispose();
   }
 
-  const isPencil = G.role === "seeker" || G.zombieState === 2;
-  const isRobber = isCopsMode() && (G.role === "hider" || G.role === "fairy");
+  // 3. 새 캔버스 생성 (백업이 있으면 복원)
   let canvas;
-  if (isPencil) canvas = makePencilCanvas();
-  else if (isRobber) canvas = makeRobberCanvas();
-  else canvas = makeEraserCanvas("#FFFFFF");
+  if (isPencil) {
+    canvas = makePencilCanvas();
+  } else if (isRobber) {
+    canvas = makeRobberCanvas();
+  } else {
+    if (backupCanvas) {
+      canvas = backupCanvas; // 칠했던 색상 그대로 복원!
+    } else {
+      const bgColor = (typeof isInkMode === "function" && isInkMode()) ? G.teamColor : "#FFFFFF";
+      canvas = makeEraserCanvas(bgColor);
+    }
+  }
 
+  // 4. 캐릭터 다시 빌드
   const newFairy = buildFairy(canvas, isPencil);
   newFairy.group.position.copy(G.pos);
   newFairy.group.rotation.y = G.yaw + Math.PI;
@@ -3568,7 +3590,9 @@ function rebuildMyFairy() {
   scene.add(newFairy.group);
 
   if (G.zombieState > 0) {
-    applyZombieSkinToFairy(newFairy, G.zombieState);
+    if (typeof applyZombieSkinToFairy === "function") {
+      applyZombieSkinToFairy(newFairy, G.zombieState);
+    }
   }
 
   Object.assign(myFairy, newFairy);
