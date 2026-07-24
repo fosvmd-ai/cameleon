@@ -6425,13 +6425,14 @@ function describeLavaPosition(p){
 }
 function describeMazePosition(p){
   const dist = Math.hypot(p.x, p.z);
-  if (dist < 15) return "미로 중앙 세계수 광장";
-  if (p.x < -30 && p.z < -30) return "북서쪽 미로 덤불 통로";
-  if (p.x > 30 && p.z < -30) return "동북쪽 순간이동 마법진 구역";
-  if (p.x < -30 && p.z > 30) return "남서쪽 순간이동 마법진 구역";
-  if (p.x > 30 && p.z > 30) return "남동쪽 살아있는 미로 벽 구역";
-  if (Math.abs(p.x) < 15) return "중앙 십자형 미로 통로";
-  return "마법 미로 덤불 숲속";
+  const high = p.y > 18 ? " · 벽 상단 덤불 둥지 은신처" : p.y > 11 ? " · 공중 나뭇가지 다리 위" : p.y > 6 ? " · 벽 부착 발코니/석상 선반" : "";
+  if (dist < 18) return "미로 중앙 고대 세계수 광장" + high;
+  if (p.x < -35 && p.z < -25) return "북서쪽 분홍 벚꽃 덤불 존" + high;
+  if (p.x > 35 && p.z < -25) return "동북쪽 고대 룬 문양 덤불 존" + high;
+  if (p.x < -35 && p.z > 25) return "남서쪽 보라 자수정 결정 덤불 존" + high;
+  if (p.x > 35 && p.z > 25) return "남동쪽 황금꽃 & 마법 열매 덤불 존" + high;
+  if (Math.abs(p.x) < 25) return "중앙 십자형 마법 통로" + high;
+  return "마법 미로 덤불 숲속" + high;
 }
 /* 결과 화면 위치 설명 — 현재 맵에 맞는 설명 함수로 분기 */
 function describeHidePosition(p){
@@ -9705,55 +9706,6 @@ function spawnPracticeAI(role, zombieState, teamId, inkWeapon) {
   });
 }
 
-function initOfflinePracticeObjects() {
-  clearPracticeAI();
-  initGameItems();
-  localCureTimer = 0;
-  localWeaponBoxTimer = 0;
-  
-  const gm = G.practiceGameMode || "hide";
-  if (gm === "zombie") {
-    // 인간 봇 2마리, 좀비 봇 1마리 스폰
-    spawnPracticeAI("hider", 0, "team1", "none");
-    spawnPracticeAI("hider", 0, "team1", "none");
-    spawnPracticeAI("hider", 2, "team1", "none");
-    spawnCureLocally();
-  } else if (gm === "cops") {
-    initCopsGame();
-    // 경찰 봇 1마리, 도둑 봇 3마리 스폰
-    spawnPracticeAI("seeker", 0, "team2", "none");
-    spawnPracticeAI("hider", 0, "team1", "none");
-    spawnPracticeAI("hider", 0, "team1", "none");
-    spawnPracticeAI("hider", 0, "team1", "none");
-  }
-}
-
-function spawnCureLocally() {
-  const rx = (Math.random() - 0.5) * 58;
-  const rz = (Math.random() - 0.5) * 42;
-  const ry = 0.5;
-  const id = "local_cure_" + Math.floor(Math.random() * 1000000);
-  const mesh = buildCureMesh();
-  mesh.position.set(rx, ry, rz);
-  scene.add(mesh);
-  cureSpawns.push({ id, x: rx, y: ry, z: rz, mesh });
-}
-
-function spawnWeaponBoxLocally() {
-  const rx = (Math.random() - 0.5) * 58;
-  const rz = (Math.random() - 0.5) * 42;
-  const ry = 0.5;
-  const id = "local_weaponbox_" + Math.floor(Math.random() * 10000000);
-  
-  const types = ["rifle", "grenade", "cannon", "shotgun", "roller"];
-  const rType = types[Math.floor(Math.random() * types.length)];
-  
-  const buildResult = buildWeaponBoxMesh(rType);
-  buildResult.group.position.set(rx, ry, rz);
-  scene.add(buildResult.group);
-  weaponBoxSpawns.push({ id, x: rx, y: ry, z: rz, weaponType: rType, group: buildResult.group, topMark: buildResult.topMark });
-}
-
 function updatePracticeAI(dt) {
   if (Net.mode !== "practice" || G.screen !== "GAME") return;
   const gm = G.practiceGameMode || "hide";
@@ -10506,30 +10458,100 @@ function lavaCleanup() {
 }
 
 /* ================================================================
-   🌿 맵 6. 마법 미로 (Magical Maze) - 전용 기믹 4종 포함
+   🌿 맵 6. 화사하고 신비로운 마법 미로 (Bright Magical Labyrinth)
    ================================================================ */
 function buildMazeMap() {
-  WALL_H = 30; // 미로의 답답함을 위해 천장을 낮게 설정
+  WALL_H = 30;
   MAZE_SHIFTING_WALLS = [];
   MAZE_PORTALS = [];
   mazePortalCooldown = 0;
 
-  // 1) 전용 텍스처 (흙길 바닥, 덤불 벽, 마법진)
+  // 1) 신비롭고 화사한 전용 텍스처 (마법 이끼 바닥, 꽃 덤불 벽, 룬 문양 벽, 결정 덤불 벽)
   const texDirt = canvasTex(256, 256, (g, w, h) => {
-    g.fillStyle = "#4a3c31"; g.fillRect(0, 0, w, h);
-    for (let i = 0; i < 800; i++) {
-      g.fillStyle = `rgba(${50+Math.random()*30},${40+Math.random()*20},${30+Math.random()*15},0.6)`;
-      g.fillRect(Math.random() * w, Math.random() * h, 2 + Math.random() * 3, 2 + Math.random() * 3);
+    g.fillStyle = "#3b4737"; g.fillRect(0, 0, w, h);
+    // 화사한 이끼와 마법 잔디 알갱이
+    for (let i = 0; i < 900; i++) {
+      g.fillStyle = Math.random() > 0.4 ? "rgba(90,140,80,0.6)" : "rgba(120,170,100,0.5)";
+      g.fillRect(Math.random() * w, Math.random() * h, 3 + Math.random() * 4, 3 + Math.random() * 4);
+    }
+    // 마법 꽃가루 자국
+    for (let i = 0; i < 60; i++) {
+      g.fillStyle = Math.random() > 0.5 ? "rgba(255,182,193,0.8)" : "rgba(255,235,140,0.8)";
+      g.beginPath();
+      g.arc(Math.random() * w, Math.random() * h, 1 + Math.random() * 2, 0, Math.PI * 2);
+      g.fill();
     }
   }, 6, 6);
 
+  // 기본 에메랄드 덤불 + 다채로운 꽃/열매
   const texHedge = canvasTex(128, 128, (g, w, h) => {
-    g.fillStyle = "#1e3620"; g.fillRect(0, 0, w, h);
-    for (let i = 0; i < 600; i++) {
-      g.fillStyle = Math.random() > 0.5 ? "#2a4a2c" : "#142415";
+    g.fillStyle = "#1b4d2e"; g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 500; i++) {
+      g.fillStyle = Math.random() > 0.5 ? "#2a6e43" : "#133820";
       g.beginPath();
       g.arc(Math.random() * w, Math.random() * h, 2 + Math.random() * 4, 0, Math.PI * 2);
       g.fill();
+    }
+    // 알록달록한 분홍/노랑 꽃과 푸른 마법 열매
+    for (let i = 0; i < 70; i++) {
+      const p = Math.random();
+      g.fillStyle = p < 0.4 ? "#ff66cc" : (p < 0.7 ? "#ffea00" : "#00e5ff");
+      g.beginPath();
+      g.arc(Math.random() * w, Math.random() * h, 1.5 + Math.random() * 2, 0, Math.PI * 2);
+      g.fill();
+    }
+  }, 4, 4);
+
+  // 분홍빛 마법 꽃 덤불 (Flower Hedge)
+  const texFlowerHedge = canvasTex(128, 128, (g, w, h) => {
+    g.fillStyle = "#2d442c"; g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 400; i++) {
+      g.fillStyle = Math.random() > 0.5 ? "#3f613e" : "#1e331d";
+      g.beginPath();
+      g.arc(Math.random() * w, Math.random() * h, 3 + Math.random() * 3, 0, Math.PI * 2);
+      g.fill();
+    }
+    // 풍성한 핑크 벚꽃/장미 문양
+    for (let i = 0; i < 120; i++) {
+      g.fillStyle = Math.random() > 0.3 ? "#ff4da6" : "#ff99dd";
+      g.beginPath();
+      g.arc(Math.random() * w, Math.random() * h, 2 + Math.random() * 2.5, 0, Math.PI * 2);
+      g.fill();
+    }
+  }, 4, 4);
+
+  // 고대 룬 문양 덤불 (Rune Hedge)
+  const texRuneHedge = canvasTex(128, 128, (g, w, h) => {
+    g.fillStyle = "#183e38"; g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 400; i++) {
+      g.fillStyle = Math.random() > 0.5 ? "#245951" : "#102d29";
+      g.beginPath();
+      g.arc(Math.random() * w, Math.random() * h, 3 + Math.random() * 3, 0, Math.PI * 2);
+      g.fill();
+    }
+    // 빛나는 민트/청록 고대 룬 문자 덩굴
+    g.strokeStyle = "#00ffff"; g.lineWidth = 1.5;
+    for (let i = 0; i < 12; i++) {
+      g.beginPath();
+      g.moveTo(Math.random() * w, Math.random() * h);
+      g.lineTo(Math.random() * w, Math.random() * h);
+      g.stroke();
+    }
+  }, 4, 4);
+
+  // 자수정 결정 덤불 (Crystal Hedge)
+  const texCrystalHedge = canvasTex(128, 128, (g, w, h) => {
+    g.fillStyle = "#272445"; g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 400; i++) {
+      g.fillStyle = Math.random() > 0.5 ? "#393563" : "#19172e";
+      g.beginPath();
+      g.arc(Math.random() * w, Math.random() * h, 3 + Math.random() * 3, 0, Math.PI * 2);
+      g.fill();
+    }
+    // 보라색 결정 보석 알갱이
+    for (let i = 0; i < 80; i++) {
+      g.fillStyle = Math.random() > 0.4 ? "#d966ff" : "#9933ff";
+      g.fillRect(Math.random() * w, Math.random() * h, 2 + Math.random() * 3, 2 + Math.random() * 3);
     }
   }, 4, 4);
 
@@ -10554,34 +10576,42 @@ function buildMazeMap() {
     g.resetTransform();
   });
 
-  // 2) 맵 껍데기 및 안개 (Fog of War) 세팅
-  buildRoomShell(lambert({map: texDirt}), 0x111612, 0x050806, 0x223322);
+  // 2) 화사하고 신비로운 안개 및 조명 세팅
+  buildRoomShell(lambert({map: texDirt}), 0x223a2d, 0x14241b, 0x2d4d3c);
   
-  // 어둡고 푸른/초록빛 안개
+  // 밝고 은은한 에메랄드 신비 안개 (시야확보 넉넉함)
   if (typeof scene !== "undefined" && scene) {
-    scene.fog = new THREE.Fog(0x111612, 5, 45);
+    scene.fog = new THREE.Fog(0x223a2d, 25, 110);
   }
   if (typeof ambientLight !== "undefined" && ambientLight && ambientLight.color) {
-    ambientLight.color.setHex(0x668877);
-    ambientLight.intensity = 0.5;
+    ambientLight.color.setHex(0x99e6b3); // 따뜻하고 화사한 연초록빛
+    ambientLight.intensity = 0.85;
   }
   if (typeof sun !== "undefined" && sun && sun.color) {
-    sun.color.setHex(0xaaccbb);
-    sun.intensity = 0.3;
+    sun.color.setHex(0xffe299); // 숲 사이로 비치는 따스한 햇살
+    sun.intensity = 0.8;
   }
 
-  const hedgeMat = lambert({map: texHedge});
-  const glassMat = lambert({color: 0x88ccff, transparent: true, opacity: 0.1, depthWrite: false});
+  // 3) 구역별 다채로운 덤불 재질들
+  const hedgeMat = lambert({map: texHedge}); // 기본 에메랄드 꽃 덤불
+  const flowerHedgeMat = lambert({map: texFlowerHedge}); // 핑크 벚꽃 덤불
+  const runeHedgeMat = lambert({map: texRuneHedge, emissive: 0x003333, emissiveIntensity: 0.4}); // 청록 룬 덤불
+  const crystalHedgeMat = lambert({map: texCrystalHedge, emissive: 0x220044, emissiveIntensity: 0.5}); // 보라 결정 덤불
+  const glassMat = lambert({color: 0x66ffff, transparent: true, opacity: 0.25, depthWrite: false});
 
-  // 3) 중앙 광장 (세계수)
-  addCyl(4, 30, lambert({color: 0x3d2817}), 0, 15, 0, {collide: true}); // 나무 기둥
-  addCyl(12, 8, lambert({color: 0x1e3620}), 0, 24, 0, {collide: true}); // 잎
-  addCyl(18, 8, lambert({color: 0x2a4a2c}), 0, 16, 0, {collide: false}); // 아래쪽 잎
+  // 4) 중앙 광장 (화려한 고대 세계수)
+  addCyl(4, 30, lambert({color: 0x4a321a}), 0, 15, 0, {collide: true}); // 나무 기둥
+  addCyl(14, 9, lambert({color: 0x2d5937}), 0, 24, 0, {collide: true}); // 메인 잎
+  addCyl(20, 9, lambert({color: 0x3d734b}), 0, 16, 0, {collide: false}); // 하단 잎
+  // 세계수 빛나는 열매/영혼 구체
+  const treeCoreLight = new THREE.PointLight(0xffea00, 1.2, 25);
+  treeCoreLight.position.set(0, 12, 0);
+  mapRoot.add(treeCoreLight);
 
-  // 미로 벽 생성 헬퍼 함수
-  function addHedge(x, z, w, d, isShifting = false) {
+  // 미로 벽 생성 헬퍼 함수 (재질 선택 가능)
+  function addHedge(x, z, w, d, isShifting = false, customMat = hedgeMat) {
     const h = 20;
-    const mesh = addBox(w, h, d, hedgeMat, x, h/2, z, {collide: !isShifting});
+    const mesh = addBox(w, h, d, customMat, x, h/2, z, {collide: !isShifting});
     if (isShifting) {
       const box = new THREE.Box3();
       box.setFromObject(mesh);
@@ -10590,43 +10620,148 @@ function buildMazeMap() {
     }
   }
 
-  // 4) 십자형 베이스 미로 구조 (정적 벽)
-  // 좌상단 구역
-  addHedge(-20, -20, 20, 4);
-  addHedge(-30, -35, 4, 30);
-  addHedge(-45, -15, 20, 4);
-  // 우상단 구역
-  addHedge(20, -20, 20, 4);
-  addHedge(30, -35, 4, 30);
-  addHedge(45, -15, 20, 4);
-  // 좌하단 구역
-  addHedge(-20, 20, 20, 4);
-  addHedge(-30, 35, 4, 30);
-  addHedge(-45, 15, 20, 4);
-  // 우하단 구역
-  addHedge(20, 20, 20, 4);
-  addHedge(30, 35, 4, 30);
-  addHedge(45, 15, 20, 4);
+  // 5) [확장 180x140] 미로 벽 레이아웃 (복잡한 5개 링 & 갈림길)
+  const woodMat = lambert({color: 0x5a3d28});
+  const stoneMat = lambert({color: 0x737a77});
 
-  // 5) 기믹 1: 살아 움직이는 벽 (Shifting Walls)
-  // 주기에 따라 오르락 내리락하여 길을 열고 닫음
-  addHedge(0, -30, 16, 4, true);  // 북쪽 통로
-  addHedge(0, 30, 16, 4, true);   // 남쪽 통로
-  addHedge(-30, 0, 4, 16, true);  // 서쪽 통로
-  addHedge(30, 0, 4, 16, true);   // 동쪽 통로
-  
-  addHedge(-40, -40, 12, 4, true);
-  addHedge(40, 40, 12, 4, true);
+  // (A) 좌상단 분홍 벚꽃 덤불 존 (-x, -z)
+  addHedge(-25, -20, 30, 4, false, flowerHedgeMat);
+  addHedge(-40, -40, 4, 40, false, flowerHedgeMat);
+  addHedge(-60, -20, 35, 4, false, flowerHedgeMat);
+  addHedge(-20, -55, 4, 30, false, flowerHedgeMat);
+  addHedge(-75, -45, 20, 4, false, flowerHedgeMat);
+  addHedge(-55, -60, 4, 25, false, flowerHedgeMat);
 
-  // 6) 기믹 2: 보이지 않는 투명 벽 (Invisible Glass Walls)
-  // 거의 안 보여서 뛰어가다 부딪히는 함정 벽
-  addBox(16, 20, 2, glassMat, -12, 10, -10, {collide: true, sample: true});
-  addBox(16, 20, 2, glassMat, 12, 10, 10, {collide: true, sample: true});
-  addBox(2, 20, 16, glassMat, -10, 10, 12, {collide: true, sample: true});
-  addBox(2, 20, 16, glassMat, 10, 10, -12, {collide: true, sample: true});
+  // (B) 우상단 청록 고대 룬 덤불 존 (+x, -z)
+  addHedge(25, -20, 30, 4, false, runeHedgeMat);
+  addHedge(40, -40, 4, 40, false, runeHedgeMat);
+  addHedge(60, -20, 35, 4, false, runeHedgeMat);
+  addHedge(20, -55, 4, 30, false, runeHedgeMat);
+  addHedge(75, -45, 20, 4, false, runeHedgeMat);
+  addHedge(55, -60, 4, 25, false, runeHedgeMat);
 
-  // 7) 기믹 3: 마법진 순간이동 (Teleport Portals)
-  // 바닥에 깔리는 빛나는 데칼
+  // (C) 좌하단 보라 자수정 결정 덤불 존 (-x, +z)
+  addHedge(-25, 20, 30, 4, false, crystalHedgeMat);
+  addHedge(-40, 40, 4, 40, false, crystalHedgeMat);
+  addHedge(-60, 20, 35, 4, false, crystalHedgeMat);
+  addHedge(-20, 55, 4, 30, false, crystalHedgeMat);
+  addHedge(-75, 45, 20, 4, false, crystalHedgeMat);
+  addHedge(-55, 60, 4, 25, false, crystalHedgeMat);
+
+  // (D) 우하단 황금꽃 & 마법 열매 덤불 존 (+x, +z)
+  addHedge(25, 20, 30, 4, false, hedgeMat);
+  addHedge(40, 40, 4, 40, false, hedgeMat);
+  addHedge(60, 20, 35, 4, false, hedgeMat);
+  addHedge(20, 55, 4, 30, false, hedgeMat);
+  addHedge(75, 45, 20, 4, false, hedgeMat);
+  addHedge(55, 60, 4, 25, false, hedgeMat);
+
+  // 6) 기믹 1: 살아 움직이는 벽 (Shifting Walls)
+  addHedge(0, -35, 20, 4, true, flowerHedgeMat);  // 북쪽 중앙 통로
+  addHedge(0, 35, 20, 4, true, crystalHedgeMat);  // 남쪽 중앙 통로
+  addHedge(-35, 0, 4, 20, true, runeHedgeMat);    // 서쪽 중앙 통로
+  addHedge(35, 0, 4, 20, true, hedgeMat);         // 동쪽 중앙 통로
+  addHedge(-60, -40, 16, 4, true, runeHedgeMat);
+  addHedge(60, 40, 16, 4, true, flowerHedgeMat);
+
+  // 7) 기믹 2: 보이지 않는 신비로운 투명 벽 (Invisible Magic Barrier Walls)
+  addBox(20, 20, 2, glassMat, -15, 10, -12, {collide: true, sample: true});
+  addBox(20, 20, 2, glassMat, 15, 10, 12, {collide: true, sample: true});
+  addBox(2, 20, 20, glassMat, -12, 10, 15, {collide: true, sample: true});
+  addBox(2, 20, 20, glassMat, 12, 10, -15, {collide: true, sample: true});
+
+  // 8) 🪜 [핵심 신기능] 벽에 설치된 발판 & 올라타는 구조물들 (Climbable Wall Platforms)
+  // (A) 나무 선반 발코니 (Wall Balconies) - 높이 Y=8, Y=12
+  function addWallBalcony(x, y, z, w, d) {
+    const balc = addBox(w, 1.2, d, woodMat, x, y, z, {collide: true, sample: true});
+    // 난간 펜스
+    addBox(w, 1.5, 0.4, woodMat, x, y + 1.2, z - d/2);
+    addBox(w, 1.5, 0.4, woodMat, x, y + 1.2, z + d/2);
+    // 디딤돌 계단
+    for (let step = 1; step <= 3; step++) {
+      addBox(2.5, 0.8, 2.5, woodMat, x - w/2 - 1.5, (y * step) / 3, z + (step - 2) * 1.5);
+    }
+  }
+  addWallBalcony(-25, 8, -22, 10, 6);
+  addWallBalcony(25, 9, -22, 10, 6);
+  addWallBalcony(-25, 8, 22, 10, 6);
+  addWallBalcony(25, 9, 22, 10, 6);
+  addWallBalcony(-60, 12, -22, 12, 6);
+  addWallBalcony(60, 12, 22, 12, 6);
+
+  // (B) 고대 석상 & 기둥 주두 발판 (Owl & Gargoyle Statue Platforms)
+  function addStatuePlatform(x, y, z) {
+    const base = addBox(6, 1.5, 6, stoneMat, x, y, z);
+    const statue = addCyl(1.5, 5, stoneMat, x, y + 3.25, z);
+    samplables.push(statue);
+  }
+  addStatuePlatform(-40, 10, -40);
+  addStatuePlatform(40, 10, -40);
+  addStatuePlatform(-40, 10, 40);
+  addStatuePlatform(40, 10, 40);
+
+  // (C) 벽 위를 가로지르는 나뭇가지 공중 통로 (Overhanging Tree Branch Catwalks)
+  function addBranchCatwalk(x1, z1, x2, z2, y) {
+    const dX = x2 - x1, dZ = z2 - z1;
+    const len = Math.hypot(dX, dZ);
+    const branch = addCyl(1.8, len, woodMat, (x1 + x2)/2, y, (z1 + z2)/2, {collide: true});
+    branch.rotation.y = Math.atan2(dX, dZ);
+    branch.rotation.z = Math.PI / 2;
+    samplables.push(branch);
+  }
+  addBranchCatwalk(-25, -20, -40, -40, 14); // 북서 나뭇가지 다리
+  addBranchCatwalk(25, -20, 40, -40, 14);  // 북동 나뭇가지 다리
+  addBranchCatwalk(-25, 20, -40, 40, 14);   // 남서 나뭇가지 다리
+  addBranchCatwalk(25, 20, 40, 40, 14);    // 남동 나뭇가지 다리
+
+  // (D) 벽 상단 덤불 둥지 은신처 (Wall Top Ivy Nests, Y=20.5)
+  function addWallNest(x, z) {
+    const nest = addBox(8, 1.0, 8, lambert({color: 0x1e4726}), x, 20.5, z);
+    // 주위 가림막
+    addBox(8, 2.5, 0.6, lambert({color: 0x2e6638}), x, 22.0, z - 4);
+    addBox(8, 2.5, 0.6, lambert({color: 0x2e6638}), x, 22.0, z + 4);
+    samplables.push(nest);
+  }
+  addWallNest(-40, -20);
+  addWallNest(40, -20);
+  addWallNest(-40, 20);
+  addWallNest(40, 20);
+
+  // 9) 🍄 마법 점핑 버섯 기믹 (Jumping Mushrooms for Vertical Mobility)
+  window.MAZE_JUMP_MUSHROOMS = [];
+  function createJumpMushroom(x, z) {
+    const stem = addCyl(0.8, 2, lambert({color: 0xffffff}), x, 1, z);
+    const cap = addCyl(2.8, 1.2, lambert({color: 0xff3399, emissive: 0xaa0066, emissiveIntensity: 0.8}), x, 2.2, z, {collide: false});
+    window.MAZE_JUMP_MUSHROOMS.push({x, z, radius: 2.8});
+  }
+  createJumpMushroom(-25, -15);
+  createJumpMushroom(25, -15);
+  createJumpMushroom(-25, 15);
+  createJumpMushroom(25, 15);
+  createJumpMushroom(-60, -35);
+  createJumpMushroom(60, 35);
+
+  // 10) 신비로운 이정표 도깨비불 등불 (Fairy Lantern Orbs)
+  function createFairyLantern(x, y, z, colorHex) {
+    const orb = new THREE.Mesh(
+      new THREE.SphereGeometry(1.4, 12, 12),
+      lambert({color: colorHex, emissive: colorHex, emissiveIntensity: 1.0})
+    );
+    orb.position.set(x, y, z);
+    const pLight = new THREE.PointLight(colorHex, 1.2, 18);
+    pLight.position.set(x, y, z);
+    mapRoot.add(orb);
+    mapRoot.add(pLight);
+    samplables.push(orb);
+  }
+  createFairyLantern(-40, 5, -40, 0xff4da6); // 북서 분홍 등불
+  createFairyLantern(40, 5, -40, 0x00ffff);  // 북동 청록 등불
+  createFairyLantern(-40, 5, 40, 0xd966ff);  // 남서 보라 등불
+  createFairyLantern(40, 5, 40, 0xffea00);   // 남동 황금 등불
+  createFairyLantern(0, 5, -60, 0x00ffaa);   // 북쪽 등불
+  createFairyLantern(0, 5, 60, 0xff9900);    // 남쪽 등불
+
+  // 11) 기믹 3: 마법진 순간이동 (Teleport Portals - 4개 코너)
   function createPortal(x, z, targetIndex) {
     const portal = new THREE.Mesh(
       new THREE.PlaneGeometry(8, 8),
@@ -10634,31 +10769,30 @@ function buildMazeMap() {
     );
     portal.rotation.x = -Math.PI / 2;
     portal.position.set(x, 0.1, z);
-    
-    // 중앙에 살짝 빛나는 빛 추가
-    const light = new THREE.PointLight(0xaa55ff, 0.8, 6);
+    const light = new THREE.PointLight(0xaa55ff, 0.9, 8);
     light.position.set(x, 2, z);
-    
     mapRoot.add(portal);
     mapRoot.add(light);
-    
     MAZE_PORTALS.push({mesh: portal, x, z, targetIndex});
   }
+  createPortal(-70, -50, 1); // index 0 (북서 <-> 남동)
+  createPortal(70, 50, 0);   // index 1
+  createPortal(70, -50, 3);  // index 2 (북동 <-> 남서)
+  createPortal(-70, 50, 2);  // index 3
 
-  // 포털 4개 (북서 <-> 남동, 북동 <-> 남서)
-  createPortal(-50, -35, 1); // index 0
-  createPortal(50, 35, 0);   // index 1
-  createPortal(50, -35, 3);  // index 2
-  createPortal(-50, 35, 2);  // index 3
-
-  // 8) 스폰 지점
-  seekerSpawns.push(new THREE.Vector3(0, 0, 0)); // 술래는 중앙 광장 스폰
+  // 12) 넉넉한 스폰 지점 (Spawns)
+  seekerSpawns.push(
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(60, 0, -40),
+    new THREE.Vector3(-60, 0, 40)
+  );
   hiderSpawns = [
-    [-50, -40], [50, -40], [-50, 40], [50, 40],
-    [-20, -40], [20, -40], [-40, -20], [40, -20],
-    [-20, 40], [20, 40], [-40, 20], [40, 20],
-    [-15, 0], [15, 0], [0, -15], [0, 15]
-  ].map(p => new THREE.Vector3(p[0], 0, p[1]));
+    [-25, -22, 8.5], [25, -22, 9.5], [-60, -22, 12.5], [60, 22, 12.5],
+    [-40, -40, 14.5], [40, -40, 14.5], [-40, 40, 14.5], [40, 40, 14.5],
+    [-40, -20, 21.0], [40, -20, 21.0], [-40, 20, 21.0], [40, 20, 21.0],
+    [-70, -50, 0.1], [70, 50, 0.1], [-70, 50, 0.1], [70, -50, 0.1],
+    [-55, -60, 0.1], [55, -60, 0.1], [-55, 60, 0.1], [55, 60, 0.1]
+  ].map(p => new THREE.Vector3(p[0], p[2], p[1]));
 }
 
 function updateMazeGimmick(dt) {
@@ -10723,6 +10857,21 @@ function updateMazeGimmick(dt) {
         break;
       }
     }
+  }
+
+  // 4. 마법 점핑 버섯 수직 점프 (벽 상단 발판으로 튀어오름)
+  if (window.MAZE_JUMP_MUSHROOMS && G.screen === "GAME" && G.role !== "ghost" && !G.spectating) {
+    window.MAZE_JUMP_MUSHROOMS.forEach(m => {
+      const dx = G.pos.x - m.x;
+      const dz = G.pos.z - m.z;
+      if (Math.hypot(dx, dz) < m.radius && Math.abs(G.pos.y - 1.0) < 1.8) {
+        G.vy = 24.0; // 벽 위 발코니로 슈퍼 점프!
+        G.grounded = false;
+        Audio2.sfxJump();
+        burst(G.pos.clone(), "#ff3399", 15, 5.0, 0.5);
+        toast("🍄 뿅! 마법 점핑 버섯을 밟고 벽 위로 점프했습니다!");
+      }
+    });
   }
 }
 
