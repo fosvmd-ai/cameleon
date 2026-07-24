@@ -1071,6 +1071,13 @@ let hiderSpawns=[], seekerSpawns=[new THREE.Vector3(50,0,0)];
 let splatDecals=[];
 let practiceAIList=[];
 let currentPrisonMesh=null;
+let LAVA_SINKERS=[];
+let LAVA_GEYSERS=[];
+let lavaPlaneMesh=null;
+let currentLavaLevel=0.5;
+let MAZE_SHIFTING_WALLS=[];
+let MAZE_PORTALS=[];
+let mazePortalCooldown=0;
 
 /* v2: 맵 전환을 위한 컨테이너. buildMap()/GLB 맵이 만드는 오브젝트는 모두 이 그룹 안에 들어갑니다. */
 let mapRoot=new THREE.Group(); scene.add(mapRoot);
@@ -3011,6 +3018,8 @@ function updateMapGimmicks(dt){
   if(currentMapId!=="library") cartCleanup(); else updateBookCarts(dt);
   if(currentMapId==="playground") updatePlaygroundGimmick(dt); else playgroundCleanup();
   if(currentMapId==="gym") updateGymGimmick(dt); else gymCleanup();
+  if(currentMapId==="lava") updateLavaGimmick(dt); else lavaCleanup();
+  if(currentMapId==="maze") updateMazeGimmick(dt); else mazeCleanup();
 
   if(typeof updateCopsGame === "function") updateCopsGame(dt);
   if(typeof updateIceGame === "function") updateIceGame(dt);
@@ -3026,6 +3035,8 @@ const MAPS={
   library:{ id:"library", name:"도서관", icon:"📚", type:"canvas", build:buildLibrary },
   playground:{ id:"playground", name:"운동장", icon:"🛝", type:"canvas", build:buildPlayground },
   gym:{ id:"gym", name:"체육관(강당)", icon:"🏀", type:"canvas", build:buildGym },
+  lava:{ id:"lava", name:"화산 동굴", icon:"🌋", type:"canvas", build:buildLavaMap },
+  maze:{ id:"maze", name:"마법 미로", icon:"🌿", type:"canvas", build:buildMazeMap },
 };
 function mapIsReady(id){ const m=MAPS[id]; if(!m)return false; return m.type==="canvas"?true:!!(m.glbBase64&&m.glbBase64.length>100); }
 let currentMapId="classroom";
@@ -6397,6 +6408,31 @@ function describeGymPosition(p){
   if(Math.abs(p.x)>30&&Math.abs(p.z)<20)return "농구골대 근처"+high;
   return "체육관 중앙 코트"+high;
 }
+function describeLavaPosition(p){
+  const high=p.y>22?" · 하늘 고지대 망루":p.y>12?" · 상층 바위 평원":p.y>5?" · 바위섬 위":"";
+  if(p.y<2)return "🔥 용암 바닥 위험지대";
+  if(Math.hypot(p.x, p.z)<25)return "중앙 화산 주봉 분화구"+high;
+  if(p.x<-50&&p.z<-35)return "북서쪽 흑요석 요새"+high;
+  if(p.x>50&&p.z<-35)return "동북쪽 발광 용암 결정 동굴"+high;
+  if(p.x<-50&&p.z>35)return "남서쪽 현무암 유적지"+high;
+  if(p.x>50&&p.z>35)return "남동쪽 화산 암석 아치"+high;
+  if(p.z<-10&&p.z>-25&&Math.abs(p.x)<30)return "고대 용암룡 터널 갈비뼈 근처"+high;
+  if(p.x<-30)return "서쪽 간헐천 바위 지대"+high;
+  if(p.x>30)return "동쪽 광산 궤도 수레 지대"+high;
+  if(p.z<-35)return "북쪽 용암 하천 징검다리"+high;
+  if(p.z>35)return "남쪽 화산 기둥 숲"+high;
+  return "화산 동굴 내부 바위섬"+high;
+}
+function describeMazePosition(p){
+  const dist = Math.hypot(p.x, p.z);
+  if (dist < 15) return "미로 중앙 세계수 광장";
+  if (p.x < -30 && p.z < -30) return "북서쪽 미로 덤불 통로";
+  if (p.x > 30 && p.z < -30) return "동북쪽 순간이동 마법진 구역";
+  if (p.x < -30 && p.z > 30) return "남서쪽 순간이동 마법진 구역";
+  if (p.x > 30 && p.z > 30) return "남동쪽 살아있는 미로 벽 구역";
+  if (Math.abs(p.x) < 15) return "중앙 십자형 미로 통로";
+  return "마법 미로 덤불 숲속";
+}
 /* 결과 화면 위치 설명 — 현재 맵에 맞는 설명 함수로 분기 */
 function describeHidePosition(p){
   if(currentMapId==="science")return describeSciencePosition(p);
@@ -6404,6 +6440,8 @@ function describeHidePosition(p){
   if(currentMapId==="library")return describeLibraryPosition(p);
   if(currentMapId==="playground")return describePlaygroundPosition(p);
   if(currentMapId==="gym")return describeGymPosition(p);
+  if(currentMapId==="lava")return describeLavaPosition(p);
+  if(currentMapId==="maze")return describeMazePosition(p);
   return describeClassroomPosition(p);
 }
 function buildResultRevealList(){
@@ -10116,6 +10154,593 @@ function checkIceWinConditions() {
 function updateIceGame(dt) {
     if (!isIceMode() || G.screen !== "GAME") return;
     checkIceWinConditions();
+}
+
+/* ================================================================
+   🌋 맵 5. 확장된 대형 화산 동굴 (Vast Lava Cave Map) - 다채로운 지형지물 & 전용 기믹 4종
+   ================================================================ */
+function buildLavaMap() {
+  ROOM_W = 220;
+  ROOM_D = 160;
+  WALL_H = 80;
+  LAVA_SINKERS = [];
+  LAVA_GEYSERS = [];
+  currentLavaLevel = 0.5;
+
+  // 1) 전용 텍스처 생성
+  const texLava = canvasTex(256, 256, (g, w, h) => {
+    g.fillStyle = "#e62e00"; g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 500; i++) {
+      g.fillStyle = Math.random() > 0.5 ? "#ff5500" : "#ffaa00";
+      g.fillRect(Math.random() * w, Math.random() * h, 4 + Math.random() * 8, 4 + Math.random() * 8);
+    }
+  }, 6, 6);
+  texLava.wrapS = THREE.RepeatWrapping;
+  texLava.wrapT = THREE.RepeatWrapping;
+
+  const texRock = canvasTex(128, 128, (g, w, h) => {
+    g.fillStyle = "#2c2c34"; g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 300; i++) {
+      g.fillStyle = "rgba(60,60,70,0.6)";
+      g.fillRect(Math.random() * w, Math.random() * h, 3 + Math.random() * 4, 3 + Math.random() * 4);
+    }
+    g.strokeStyle = "#1a1a20"; g.lineWidth = 2;
+    for(let i=0; i<10; i++) {
+        g.beginPath(); g.moveTo(Math.random()*w, 0); g.lineTo(Math.random()*w, h); g.stroke();
+    }
+  }, 6, 6);
+
+  // 2) 어두운 화산 동굴 외벽 생성 (바닥은 투명하게 처리하고 용암을 깐다)
+  buildRoomShell(new THREE.MeshBasicMaterial({transparent:true, opacity:0}), 0x111111, 0x0a0a0a, 0x1a1a1a);
+
+  // 3) 넓은 용암 바닥
+  lavaPlaneMesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(ROOM_W + 20, ROOM_D + 20),
+    lambert({map: texLava, emissive: 0xff3300, emissiveIntensity: 0.6})
+  );
+  lavaPlaneMesh.rotation.x = -Math.PI / 2;
+  lavaPlaneMesh.position.y = currentLavaLevel;
+  mapRoot.add(lavaPlaneMesh);
+  samplables.push(lavaPlaneMesh);
+
+  // 조명 분위기 세팅 (붉은빛 웅장함)
+  if (typeof ambientLight !== "undefined" && ambientLight && ambientLight.color) {
+    ambientLight.color.setHex(0xffaa88);
+    ambientLight.intensity = 0.5;
+  }
+  if (typeof sun !== "undefined" && sun && sun.color) {
+    sun.color.setHex(0xff4400);
+    sun.intensity = 0.8;
+  }
+
+  const rockMat = lambert({map: texRock});
+  const obsMat = lambert({color: 0x14141a, flatShading: true});
+  const magmaCrystalMat = lambert({color: 0xff6600, emissive: 0xff3300, emissiveIntensity: 0.8});
+  const purpleCrystalMat = lambert({color: 0x9933ff, emissive: 0x6600cc, emissiveIntensity: 0.9});
+  const ironCartMat = lambert({color: 0x3a3a45, metallic: 0.8});
+  const boneMat = lambert({color: 0xd9d5c5});
+
+  // 4) [지형 1] 중앙 화산 주봉 & 거대 분화구 (Volcano Central Crater)
+  addCyl(24, 12, rockMat, 0, 6, 0, {collide: true}); // 외곽 산기슭
+  addCyl(18, 16, rockMat, 0, 14, 0, {collide: true}); // 주봉 정상
+  // 정상 용암 웅덩이
+  const mainCraterLava = new THREE.Mesh(
+    new THREE.CylinderGeometry(11, 11, 0.4, 16),
+    lambert({color: 0xff3300, emissive: 0xff4500, emissiveIntensity: 0.9})
+  );
+  mainCraterLava.position.set(0, 21.8, 0);
+  mapRoot.add(mainCraterLava);
+  samplables.push(mainCraterLava);
+
+  // 5) [지형 2] 4대 모서리 거대 요새 고지대 (4 Major Corner Citadels)
+  // (A) 북서쪽 흑요석 요새 (NW Obsidian Citadel, Y=22)
+  addBox(36, 22, 36, rockMat, -80, 11, -55);
+  addBox(24, 6, 24, obsMat, -80, 25, -55); // 최상층 망루
+  addBox(12, 12, 12, rockMat, -65, 28, -40); // 보조 감시탑
+
+  // (B) 동북쪽 발광 용암 결정 동굴 (NE Crystal Cave Plateau, Y=28)
+  addBox(32, 28, 32, rockMat, 80, 14, -55);
+  addBox(20, 8, 20, rockMat, 80, 32, -55); // 결정 동굴 상단
+
+  // (C) 남서쪽 현무암 유적 기둥군 (SW Basalt Ruins, Y=18)
+  addBox(38, 18, 38, rockMat, -80, 9, 55);
+  addBox(22, 6, 22, obsMat, -80, 21, 55);
+
+  // (D) 남동쪽 화산 암석 아치 고지대 (SE Volcanic Arch Ridge, Y=24)
+  addBox(34, 24, 34, rockMat, 80, 12, 55);
+  addBox(20, 8, 20, rockMat, 80, 28, 55);
+
+  // 6) [지형 3] 중층 단계 바위섬 & 기단 (Mid-tier Stepping Plateaus)
+  addBox(26, 10, 22, rockMat, -40, 5, 0);   // 서쪽 중층 섬 (Y=10)
+  addBox(26, 12, 22, rockMat, 40, 6, 0);    // 동쪽 중층 섬 (Y=12)
+  addBox(24, 14, 28, rockMat, 0, 7, -52);   // 북쪽 중층 섬 (Y=14)
+  addBox(26, 10, 24, rockMat, 0, 5, 52);    // 남쪽 중층 섬 (Y=10)
+  addBox(20, 16, 20, rockMat, -45, 8, -45); // 북서 중계섬 (Y=16)
+  addBox(20, 20, 20, rockMat, 45, 10, -45); // 동북 중계섬 (Y=20)
+  addBox(22, 14, 22, rockMat, -45, 7, 45);  // 남서 중계섬 (Y=14)
+  addBox(20, 18, 20, rockMat, 45, 9, 45);   // 남동 중계섬 (Y=18)
+
+  // 7) [지형 4] 하늘 구름다리 & 좁은 외나무다리 (Skywalk Bridges)
+  addBox(35, 2, 8, rockMat, -60, 22, -55); // 북서 요새 연결 다리
+  addBox(8, 2, 40, rockMat, 80, 28, -32);  // 동북 요새 연결 다리
+  addBox(35, 2, 8, rockMat, 60, 24, 55);   // 남동 요새 연결 다리
+  addBox(8, 2, 35, rockMat, -80, 18, 30);  // 남서 유적 연결 다리
+
+  // 8) [오브젝트 1] 고대 용암룡 골격 갈비뼈 터널 (Dragon Ribcage Tunnel)
+  for (let i = -3; i <= 3; i++) {
+    const rX = i * 6;
+    const ribL = addCyl(1.2, 16, boneMat, rX, 10, -18, {collide: true});
+    ribL.rotation.z = 0.35;
+    const ribR = addCyl(1.2, 16, boneMat, rX, 10, -6, {collide: true});
+    ribR.rotation.z = -0.35;
+  }
+  // 거대 용암룡 두개골 (Dragon Skull)
+  addBox(8, 6, 10, boneMat, 24, 15, -12);
+  addCyl(1.0, 6, boneMat, 22, 19, -15, {collide: true}); // 뿔 1
+  addCyl(1.0, 6, boneMat, 26, 19, -15, {collide: true}); // 뿔 2
+
+  // 9) [오브젝트 2] 발광 용암 결정체 군집 (Glowing Magma Crystals)
+  function createCrystalCluster(x, y, z, mat, count = 5) {
+    for (let i = 0; i < count; i++) {
+      const c = addCyl(0.8 + Math.random() * 0.8, 4 + Math.random() * 5, mat, x + (Math.random() - 0.5) * 3, y + 2, z + (Math.random() - 0.5) * 3, {collide: true});
+      c.rotation.x = (Math.random() - 0.5) * 0.5;
+      c.rotation.z = (Math.random() - 0.5) * 0.5;
+    }
+  }
+  createCrystalCluster(80, 28, -55, purpleCrystalMat, 7); // 동북 결정 동굴
+  createCrystalCluster(85, 28, -48, magmaCrystalMat, 5);
+  createCrystalCluster(-80, 22, -55, magmaCrystalMat, 6); // 북서 요새
+  createCrystalCluster(-40, 10, 0, magmaCrystalMat, 4);   // 서쪽 중층 섬
+  createCrystalCluster(40, 12, 0, purpleCrystalMat, 4);   // 동쪽 중층 섬
+  createCrystalCluster(0, 22, 0, magmaCrystalMat, 6);     // 분화구 정상
+
+  // 10) [오브젝트 3] 광산 궤도 수레 & 철제 광산 장비 (Magma Mining Carts)
+  function createMiningCart(x, y, z) {
+    const cart = addBox(4.5, 2.5, 3.5, ironCartMat, x, y + 1.25, z);
+    // 바퀴 4개
+    addCyl(0.7, 0.4, obsMat, x - 1.5, y + 0.35, z - 1.8);
+    addCyl(0.7, 0.4, obsMat, x + 1.5, y + 0.35, z - 1.8);
+    addCyl(0.7, 0.4, obsMat, x - 1.5, y + 0.35, z + 1.8);
+    addCyl(0.7, 0.4, obsMat, x + 1.5, y + 0.35, z + 1.8);
+    samplables.push(cart);
+  }
+  createMiningCart(42, 12, 4);
+  createMiningCart(36, 12, -4);
+  createMiningCart(-38, 10, -4);
+  createMiningCart(-42, 10, 4);
+
+  // 11) [오브젝트 4] 흑요석 기둥 & 주상절리 기둥 숲 (Basalt Columns & Obsidian Pillars)
+  function createColumnForest(cx, cz, count, hMin, hMax) {
+    for (let i = 0; i < count; i++) {
+      const px = cx + (Math.random() - 0.5) * 16;
+      const pz = cz + (Math.random() - 0.5) * 16;
+      const h = hMin + Math.random() * (hMax - hMin);
+      addCyl(1.8 + Math.random() * 1.2, h, obsMat, px, h / 2, pz, {collide: true});
+    }
+  }
+  createColumnForest(-80, 55, 8, 12, 22);  // 남서 유적 기둥 숲
+  createColumnForest(80, 55, 8, 14, 26);   // 남동 아치 기둥 숲
+  createColumnForest(0, 52, 6, 8, 18);     // 남쪽 중앙 기둥 숲
+  createColumnForest(0, -52, 6, 10, 20);   // 북쪽 중앙 기둥 숲
+
+  // 12) [기믹 1] 가라앉는 징검다리 (Sinking Stones - 8개 코스)
+  function createSinker(x, y, z, w, h, d) {
+    const mesh = addBox(w, h, d, rockMat, x, y, z, {collide: false});
+    const box = new THREE.Box3();
+    box.setFromObject(mesh);
+    colliders.push(box);
+    LAVA_SINKERS.push({mesh, box, baseY: y, h, currentY: y});
+  }
+  // 북서쪽 연결 징검다리
+  createSinker(-55, 6.0, -30, 7, 12, 7);
+  createSinker(-68, 8.0, -42, 7, 16, 7);
+  // 동북쪽 연결 징검다리
+  createSinker(55, 7.0, -30, 7, 14, 7);
+  createSinker(68, 9.0, -42, 7, 18, 7);
+  // 남서쪽 연결 징검다리
+  createSinker(-55, 5.0, 30, 7, 10, 7);
+  createSinker(-68, 7.0, 42, 7, 14, 7);
+  // 남동쪽 연결 징검다리
+  createSinker(55, 6.0, 30, 7, 12, 7);
+  createSinker(68, 8.0, 42, 7, 16, 7);
+
+  // 13) [기믹 2] 상승 기류 간헐천 (Thermal Updraft - 6개 구역)
+  function createGeyser(x, z, r, baseY) {
+    addCyl(r + 0.5, 0.4, rockMat, x, baseY, z); // 분화구 테두리
+    addCyl(r, 0.6, lambert({color: 0xffaa00, emissive: 0xff4500, emissiveIntensity: 1.0}), x, baseY+0.1, z, {collide: false}); // 빛나는 구멍
+    LAVA_GEYSERS.push({x, z, r, y: baseY});
+  }
+  createGeyser(-60, 0, 4.0, 5);  // 서쪽 간헐천
+  createGeyser(60, 0, 4.0, 6);   // 동쪽 간헐천
+  createGeyser(0, -65, 4.5, 7);  // 북쪽 간헐천
+  createGeyser(0, 65, 4.5, 5);   // 남쪽 간헐천
+  createGeyser(-35, -50, 3.5, 8);// 북서 간헐천
+  createGeyser(35, 50, 3.5, 9);  // 남동 간헐천
+
+  // 14) 넉넉하고 다양한 스폰 지점 (Spawns)
+  seekerSpawns.push(
+    new THREE.Vector3(0, 22.1, 0),        // 분화구 정상
+    new THREE.Vector3(80, 28.1, -55),     // 동북 결정 동굴
+    new THREE.Vector3(-80, 22.1, -55)     // 북서 요새
+  );
+  hiderSpawns = [
+    [-80, -55, 25.1], [80, -55, 32.1], [-80, 55, 21.1], [80, 55, 28.1],
+    [-60, -55, 23.1], [80, -32, 29.1], [60, 55, 25.1], [-80, 30, 19.1],
+    [-40, 0, 10.1], [40, 0, 12.1], [0, -52, 14.1], [0, 52, 10.1],
+    [24, -12, 18.1], [42, 4, 13.5], [-42, 4, 11.5], [-65, -40, 29.1]
+  ].map(p => new THREE.Vector3(p[0], p[2], p[1]));
+}
+
+function updateLavaGimmick(dt) {
+  if (currentMapId !== "lava") return;
+
+  const t = (Net.now ? Net.now() : Date.now()) / 1000;
+
+  // 흐르는 용암 애니메이션
+  if (lavaPlaneMesh && lavaPlaneMesh.material.map) {
+    lavaPlaneMesh.material.map.offset.x += dt * 0.15;
+    lavaPlaneMesh.material.map.offset.y += dt * 0.1;
+  }
+
+  // 1. 주기적인 용암 상승 (Rising Lava)
+  const cycle = 60; // 60초 주기
+  const sec = t % cycle;
+  
+  let targetLavaLevel = 0.5; // 기본 용암 수위
+  
+  if (sec > 40 && sec < 45) {
+    // ⚠️ 경고 타이밍
+    const alertDiv = $("centerAlert");
+    if(alertDiv && G.screen === "GAME") {
+      alertDiv.textContent = `⚠️ 화산 폭발 임박! 용암이 차오릅니다!`;
+      alertDiv.classList.remove("hidden");
+    }
+  } else if (sec >= 45 && sec < 55) {
+    // 🌋 용암 상승 (Y = 8.0 까지 오름 -> 중앙 평원이 완전히 잠김)
+    targetLavaLevel = 8.0; 
+    const alertDiv = $("centerAlert");
+    if(alertDiv && alertDiv.textContent.includes("화산")) {
+      alertDiv.classList.add("hidden");
+    }
+  } else {
+    // 평시
+    const alertDiv = $("centerAlert");
+    if(alertDiv && alertDiv.textContent.includes("화산")) alertDiv.classList.add("hidden");
+  }
+
+  // 용암 수위 부드럽게 보간
+  currentLavaLevel = lerp(currentLavaLevel, targetLavaLevel, dt * 1.5);
+  if (lavaPlaneMesh) lavaPlaneMesh.position.y = currentLavaLevel;
+
+  // 2. 앗 뜨거! (Lava Bounce)
+  if (G.screen === "GAME" && G.role !== "ghost" && !G.spectating) {
+    // 플레이어의 Y좌표가 현재 용암 수위보다 낮으면 용암에 빠진 것!
+    if (G.pos.y < currentLavaLevel + 0.1) {
+      G.vy = 22; // 하늘로 강하게 튀어 오름!
+      G.grounded = false;
+      G.pos.y = currentLavaLevel + 0.2; // 끼임 방지
+      Audio2.sfxSpray(); // 치직 거리는 소리
+      burst(G.pos.clone().add(new THREE.Vector3(0,1,0)), "#ff4400", 15, 4.0, 0.5); // 용암 이펙트
+      toast("🔥 앗 뜨거! 용암에 빠졌습니다!");
+
+      // 체력이 있는 모드라면 화상 데미지
+      if (typeof G.hp !== 'undefined' && (!G.invincibleTimer || G.invincibleTimer <= 0)) {
+        G.hp = Math.max(0, G.hp - 1);
+        G.invincibleTimer = 1.5;
+        if(G.hp <= 0 && typeof splatOutPlayer === "function") {
+            splatOutPlayer();
+            G.splatTimer = 10.0;
+            G.hp = 3;
+            toast("💀 용암에 타버려 기절했습니다!");
+        }
+      }
+    }
+  }
+
+  // 3. 간헐천 상승 기류 (Thermal Updraft)
+  if (G.screen === "GAME" && !G.spectating && G.role !== "ghost") {
+    LAVA_GEYSERS.forEach(g => {
+      const dx = G.pos.x - g.x;
+      const dz = G.pos.z - g.z;
+      // 간헐천 반경 내에 있고, 너무 높이 떠있지 않을 때 발동
+      if (Math.hypot(dx, dz) < g.r && G.pos.y >= g.y && G.pos.y < g.y + 3.0) {
+        G.vy = 35; // 평소보다 3~4배 높은 슈퍼 점프!
+        G.grounded = false;
+        Audio2.sfxJump();
+        burst(G.pos.clone(), "#dddddd", 12, 6.0, 0.5); // 연기 이펙트
+      }
+      
+      // 간헐천 파티클 지속 연출
+      if (Math.random() < 0.15) {
+        burst(new THREE.Vector3(g.x, g.y + 0.5, g.z), "#ff6600", 2, 8.0, 0.6);
+      }
+    });
+  }
+
+  // 4. 가라앉는 징검다리 (Sinking Stones)
+  const playerDimsData = typeof playerDims === "function" ? playerDims() : {hx:0.3, hz:0.3, H:1.45};
+  LAVA_SINKERS.forEach(s => {
+    let isStoodOn = false;
+    if (G.screen === "GAME" && !G.spectating && G.role !== "ghost") {
+      // 플레이어가 이 발판 영역 내에 있는지 검사
+      if (G.pos.x + playerDimsData.hx > s.box.min.x + 0.05 && 
+          G.pos.x - playerDimsData.hx < s.box.max.x - 0.05 &&
+          G.pos.z + playerDimsData.hz > s.box.min.z + 0.05 && 
+          G.pos.z - playerDimsData.hz < s.box.max.z - 0.05) {
+            // Y좌표가 발판 바로 위인지 검사 (약간의 오차 허용)
+            if (Math.abs(G.pos.y - s.box.max.y) < 0.3) {
+              isStoodOn = true;
+            }
+      }
+    }
+
+    if (isStoodOn) {
+      s.currentY -= dt * 2.5; // 밟고 있으면 빠르게 가라앉음
+    } else {
+      s.currentY += dt * 1.0; // 안 밟고 있으면 천천히 떠오름
+    }
+    
+    // Y축 가동 범위 제한 (기본 높이 ~ 지하 6m 까지)
+    s.currentY = clamp(s.currentY, s.baseY - 6.0, s.baseY);
+
+    // 메쉬와 충돌 박스 업데이트
+    s.mesh.position.y = s.currentY;
+    s.box.min.y = s.currentY - s.h/2;
+    s.box.max.y = s.currentY + s.h/2;
+  });
+}
+
+function lavaCleanup() {
+  LAVA_SINKERS = [];
+  LAVA_GEYSERS = [];
+  currentLavaLevel = 0.5;
+  // 다른 맵으로 돌아갈 때 조명 원상복구
+  if (typeof ambientLight !== "undefined" && ambientLight && ambientLight.color && typeof ambientLight.color.setHex === "function") {
+    ambientLight.color.setHex(0xffffff);
+    ambientLight.intensity = 0.7;
+  }
+  if (typeof sun !== "undefined" && sun && sun.color && typeof sun.color.setHex === "function") {
+    sun.color.setHex(0xffe0b8);
+    sun.intensity = 0.5;
+  }
+}
+
+/* ================================================================
+   🌿 맵 6. 마법 미로 (Magical Maze) - 전용 기믹 4종 포함
+   ================================================================ */
+function buildMazeMap() {
+  WALL_H = 30; // 미로의 답답함을 위해 천장을 낮게 설정
+  MAZE_SHIFTING_WALLS = [];
+  MAZE_PORTALS = [];
+  mazePortalCooldown = 0;
+
+  // 1) 전용 텍스처 (흙길 바닥, 덤불 벽, 마법진)
+  const texDirt = canvasTex(256, 256, (g, w, h) => {
+    g.fillStyle = "#4a3c31"; g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 800; i++) {
+      g.fillStyle = `rgba(${50+Math.random()*30},${40+Math.random()*20},${30+Math.random()*15},0.6)`;
+      g.fillRect(Math.random() * w, Math.random() * h, 2 + Math.random() * 3, 2 + Math.random() * 3);
+    }
+  }, 6, 6);
+
+  const texHedge = canvasTex(128, 128, (g, w, h) => {
+    g.fillStyle = "#1e3620"; g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 600; i++) {
+      g.fillStyle = Math.random() > 0.5 ? "#2a4a2c" : "#142415";
+      g.beginPath();
+      g.arc(Math.random() * w, Math.random() * h, 2 + Math.random() * 4, 0, Math.PI * 2);
+      g.fill();
+    }
+  }, 4, 4);
+
+  const texPortal = canvasTex(256, 256, (g, w, h) => {
+    g.fillStyle = "transparent"; g.fillRect(0, 0, w, h);
+    g.strokeStyle = "#aa55ff"; g.lineWidth = 6;
+    g.beginPath(); g.arc(w/2, h/2, w/2 - 10, 0, Math.PI * 2); g.stroke();
+    g.beginPath(); g.arc(w/2, h/2, w/2 - 30, 0, Math.PI * 2); g.stroke();
+    
+    // 육망성 별 그리기
+    g.translate(w/2, h/2);
+    for(let j=0; j<2; j++){
+      g.beginPath();
+      for(let i=0; i<3; i++){
+        const angle = (i * Math.PI * 2 / 3) + (j * Math.PI / 3) - Math.PI / 2;
+        const px = Math.cos(angle) * (w/2 - 30);
+        const py = Math.sin(angle) * (w/2 - 30);
+        if(i===0) g.moveTo(px, py); else g.lineTo(px, py);
+      }
+      g.closePath(); g.stroke();
+    }
+    g.resetTransform();
+  });
+
+  // 2) 맵 껍데기 및 안개 (Fog of War) 세팅
+  buildRoomShell(lambert({map: texDirt}), 0x111612, 0x050806, 0x223322);
+  
+  // 어둡고 푸른/초록빛 안개
+  if (typeof scene !== "undefined" && scene) {
+    scene.fog = new THREE.Fog(0x111612, 5, 45);
+  }
+  if (typeof ambientLight !== "undefined" && ambientLight && ambientLight.color) {
+    ambientLight.color.setHex(0x668877);
+    ambientLight.intensity = 0.5;
+  }
+  if (typeof sun !== "undefined" && sun && sun.color) {
+    sun.color.setHex(0xaaccbb);
+    sun.intensity = 0.3;
+  }
+
+  const hedgeMat = lambert({map: texHedge});
+  const glassMat = lambert({color: 0x88ccff, transparent: true, opacity: 0.1, depthWrite: false});
+
+  // 3) 중앙 광장 (세계수)
+  addCyl(4, 30, lambert({color: 0x3d2817}), 0, 15, 0, {collide: true}); // 나무 기둥
+  addCyl(12, 8, lambert({color: 0x1e3620}), 0, 24, 0, {collide: true}); // 잎
+  addCyl(18, 8, lambert({color: 0x2a4a2c}), 0, 16, 0, {collide: false}); // 아래쪽 잎
+
+  // 미로 벽 생성 헬퍼 함수
+  function addHedge(x, z, w, d, isShifting = false) {
+    const h = 20;
+    const mesh = addBox(w, h, d, hedgeMat, x, h/2, z, {collide: !isShifting});
+    if (isShifting) {
+      const box = new THREE.Box3();
+      box.setFromObject(mesh);
+      colliders.push(box);
+      MAZE_SHIFTING_WALLS.push({mesh, box, h, targetY: h/2});
+    }
+  }
+
+  // 4) 십자형 베이스 미로 구조 (정적 벽)
+  // 좌상단 구역
+  addHedge(-20, -20, 20, 4);
+  addHedge(-30, -35, 4, 30);
+  addHedge(-45, -15, 20, 4);
+  // 우상단 구역
+  addHedge(20, -20, 20, 4);
+  addHedge(30, -35, 4, 30);
+  addHedge(45, -15, 20, 4);
+  // 좌하단 구역
+  addHedge(-20, 20, 20, 4);
+  addHedge(-30, 35, 4, 30);
+  addHedge(-45, 15, 20, 4);
+  // 우하단 구역
+  addHedge(20, 20, 20, 4);
+  addHedge(30, 35, 4, 30);
+  addHedge(45, 15, 20, 4);
+
+  // 5) 기믹 1: 살아 움직이는 벽 (Shifting Walls)
+  // 주기에 따라 오르락 내리락하여 길을 열고 닫음
+  addHedge(0, -30, 16, 4, true);  // 북쪽 통로
+  addHedge(0, 30, 16, 4, true);   // 남쪽 통로
+  addHedge(-30, 0, 4, 16, true);  // 서쪽 통로
+  addHedge(30, 0, 4, 16, true);   // 동쪽 통로
+  
+  addHedge(-40, -40, 12, 4, true);
+  addHedge(40, 40, 12, 4, true);
+
+  // 6) 기믹 2: 보이지 않는 투명 벽 (Invisible Glass Walls)
+  // 거의 안 보여서 뛰어가다 부딪히는 함정 벽
+  addBox(16, 20, 2, glassMat, -12, 10, -10, {collide: true, sample: true});
+  addBox(16, 20, 2, glassMat, 12, 10, 10, {collide: true, sample: true});
+  addBox(2, 20, 16, glassMat, -10, 10, 12, {collide: true, sample: true});
+  addBox(2, 20, 16, glassMat, 10, 10, -12, {collide: true, sample: true});
+
+  // 7) 기믹 3: 마법진 순간이동 (Teleport Portals)
+  // 바닥에 깔리는 빛나는 데칼
+  function createPortal(x, z, targetIndex) {
+    const portal = new THREE.Mesh(
+      new THREE.PlaneGeometry(8, 8),
+      new THREE.MeshBasicMaterial({map: texPortal, transparent: true, depthWrite: false, side: THREE.DoubleSide})
+    );
+    portal.rotation.x = -Math.PI / 2;
+    portal.position.set(x, 0.1, z);
+    
+    // 중앙에 살짝 빛나는 빛 추가
+    const light = new THREE.PointLight(0xaa55ff, 0.8, 6);
+    light.position.set(x, 2, z);
+    
+    mapRoot.add(portal);
+    mapRoot.add(light);
+    
+    MAZE_PORTALS.push({mesh: portal, x, z, targetIndex});
+  }
+
+  // 포털 4개 (북서 <-> 남동, 북동 <-> 남서)
+  createPortal(-50, -35, 1); // index 0
+  createPortal(50, 35, 0);   // index 1
+  createPortal(50, -35, 3);  // index 2
+  createPortal(-50, 35, 2);  // index 3
+
+  // 8) 스폰 지점
+  seekerSpawns.push(new THREE.Vector3(0, 0, 0)); // 술래는 중앙 광장 스폰
+  hiderSpawns = [
+    [-50, -40], [50, -40], [-50, 40], [50, 40],
+    [-20, -40], [20, -40], [-40, -20], [40, -20],
+    [-20, 40], [20, 40], [-40, 20], [40, 20],
+    [-15, 0], [15, 0], [0, -15], [0, 15]
+  ].map(p => new THREE.Vector3(p[0], 0, p[1]));
+}
+
+function updateMazeGimmick(dt) {
+  if (currentMapId !== "maze") return;
+
+  const t = (Net.now ? Net.now() : Date.now()) / 1000;
+
+  // 1. 살아 움직이는 벽 (Shifting Walls)
+  const cycle = 20; // 20초 단위로 벽이 바뀜
+  const sec = t % cycle;
+  const phase = sec < 10 ? 0 : 1; // 10초마다 열림/닫힘 교차
+
+  MAZE_SHIFTING_WALLS.forEach((w, i) => {
+    // i의 짝수/홀수 여부와 현재 phase에 따라 위아래 상태 결정
+    const shouldBeUp = (i % 2 === phase);
+    w.targetY = shouldBeUp ? w.h / 2 : -(w.h / 2) + 0.5; // 내려갈 땐 바닥 살짝 아래로
+    
+    w.mesh.position.y = lerp(w.mesh.position.y, w.targetY, dt * 3.0);
+    
+    // 콜라이더 업데이트
+    w.box.min.y = w.mesh.position.y - w.h / 2;
+    w.box.max.y = w.mesh.position.y + w.h / 2;
+  });
+
+  // 2. 마법진 빙글빙글 애니메이션
+  MAZE_PORTALS.forEach((p, i) => {
+    p.mesh.rotation.z += dt * (i % 2 === 0 ? 1.5 : -1.5);
+  });
+
+  // 3. 마법진 순간이동 처리 (본인 캐릭터만 적용)
+  if (mazePortalCooldown > 0) {
+    mazePortalCooldown -= dt;
+  }
+  
+  if (mazePortalCooldown <= 0 && G.screen === "GAME" && G.role !== "ghost" && !G.spectating) {
+    for (let i = 0; i < MAZE_PORTALS.length; i++) {
+      const p = MAZE_PORTALS[i];
+      const dx = G.pos.x - p.x;
+      const dz = G.pos.z - p.z;
+      
+      // 포털 중심 반경 2.5m 내에 들어가고, 지상에 있을 때 발동
+      if (Math.hypot(dx, dz) < 2.5 && Math.abs(G.pos.y) < 1.0) {
+        const target = MAZE_PORTALS[p.targetIndex];
+        
+        // 도착 지점으로 플레이어 위치 덮어쓰기
+        G.pos.set(target.x, G.pos.y, target.z);
+        
+        // 카메라 부드러운 전환 무시 및 즉시 업데이트 강제
+        if (isHiderThirdPerson()) {
+          G.fairyYaw += Math.PI; // 시야 반전
+        }
+        
+        Audio2.sfxFanfare(); // 마법진 발동 소리용 임시 차용
+        
+        // 양쪽 포털에 화려한 파티클 이펙트 터뜨리기
+        burst(new THREE.Vector3(p.x, 1, p.z), "#aa55ff", 20, 6.0, 0.6, true, 0.4);
+        burst(new THREE.Vector3(target.x, 1, target.z), "#aa55ff", 20, 6.0, 0.6, true, 0.4);
+        
+        toast("✨ 마법진을 타고 반대편으로 순간이동했습니다!");
+        
+        mazePortalCooldown = 5.0; // 연속 텔레포트 방지 5초 쿨다운
+        break;
+      }
+    }
+  }
+}
+
+function mazeCleanup() {
+  MAZE_SHIFTING_WALLS = [];
+  MAZE_PORTALS = [];
+  mazePortalCooldown = 0;
+  
+  // 안개 제거 및 조명 원상 복구
+  if (typeof scene !== "undefined" && scene && scene.fog) scene.fog = null;
+  if (typeof ambientLight !== "undefined" && ambientLight && ambientLight.color && typeof ambientLight.color.setHex === "function") {
+    ambientLight.color.setHex(0xffffff);
+    ambientLight.intensity = 0.7;
+  }
+  if (typeof sun !== "undefined" && sun && sun.color && typeof sun.color.setHex === "function") {
+    sun.color.setHex(0xffe0b8);
+    sun.intensity = 0.5;
+  }
 }
 
 window.G = G;
