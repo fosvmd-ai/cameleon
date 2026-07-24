@@ -10608,7 +10608,7 @@ function buildMazeMap() {
   treeCoreLight.position.set(0, 12, 0);
   mapRoot.add(treeCoreLight);
 
-  // 미로 벽 생성 헬퍼 함수 (재질 선택 가능)
+  // 미로 벽 생성 헬퍼 함수
   function addHedge(x, z, w, d, isShifting = false, customMat = hedgeMat) {
     const h = 20;
     const mesh = addBox(w, h, d, customMat, x, h/2, z, {collide: !isShifting});
@@ -10618,89 +10618,146 @@ function buildMazeMap() {
       colliders.push(box);
       MAZE_SHIFTING_WALLS.push({mesh, box, h, targetY: h/2});
     }
+    return mesh;
   }
 
-  // 5) [확장 180x140] 미로 벽 레이아웃 (복잡한 5개 링 & 갈림길)
+  // 🕳️ [핵심 신기능] 벽 중간 구멍/터널 뚫기 헬퍼 함수 (Wall Hole Passages)
+  function addHedgeWithHole(x, z, w, d, holeOffset = 0, holeSize = 4.5, customMat = hedgeMat) {
+    const h = 20;
+    const holeH = 7.0; // 구멍 터널 높이 7m
+    const frameMat = lambert({color: 0xaa55ff, emissive: 0xaa55ff, emissiveIntensity: 0.8});
+
+    if (w >= d) {
+      // 가로 벽에 구멍 뚫기
+      const leftW = Math.max(1, (w / 2) + holeOffset - (holeSize / 2));
+      const rightW = Math.max(1, (w / 2) - holeOffset - (holeSize / 2));
+      const leftX = x - (w / 2) + (leftW / 2);
+      const rightX = x + (w / 2) - (rightW / 2);
+      
+      addBox(leftW, h, d, customMat, leftX, h/2, z, {collide: true});
+      addBox(rightW, h, d, customMat, rightX, h/2, z, {collide: true});
+      const archH = h - holeH;
+      addBox(holeSize, archH, d, customMat, x + holeOffset, holeH + archH/2, z, {collide: true});
+      
+      // 마법 룬 테두리 프레임
+      const holeX = x + holeOffset;
+      addBox(0.5, holeH, d + 0.4, frameMat, holeX - holeSize/2, holeH/2, z);
+      addBox(0.5, holeH, d + 0.4, frameMat, holeX + holeSize/2, holeH/2, z);
+      addBox(holeSize + 0.4, 0.5, d + 0.4, frameMat, holeX, holeH, z);
+    } else {
+      // 세로 벽에 구멍 뚫기
+      const frontD = Math.max(1, (d / 2) + holeOffset - (holeSize / 2));
+      const backD = Math.max(1, (d / 2) - holeOffset - (holeSize / 2));
+      const frontZ = z - (d / 2) + (frontD / 2);
+      const backZ = z + (d / 2) - (backD / 2);
+      
+      addBox(w, h, frontD, customMat, x, h/2, frontZ, {collide: true});
+      addBox(w, h, backD, customMat, x, h/2, backZ, {collide: true});
+      const archH = h - holeH;
+      addBox(w, archH, holeSize, customMat, x, holeH + archH/2, z + holeOffset, {collide: true});
+      
+      const holeZ = z + holeOffset;
+      addBox(w + 0.4, holeH, 0.5, frameMat, x, holeH/2, holeZ - holeSize/2);
+      addBox(w + 0.4, holeH, 0.5, frameMat, x, holeH/2, holeZ + holeSize/2);
+      addBox(w + 0.4, 0.5, holeSize + 0.4, frameMat, x, holeH, holeZ);
+    }
+  }
+
+  // 5) 🧩 [사진 참고 180x180 정통 격자 미로 레이아웃]
   const woodMat = lambert({color: 0x5a3d28});
   const stoneMat = lambert({color: 0x737a77});
 
-  // (A) 좌상단 분홍 벚꽃 덤불 존 (-x, -z)
-  addHedge(-25, -20, 30, 4, false, flowerHedgeMat);
-  addHedge(-40, -40, 4, 40, false, flowerHedgeMat);
-  addHedge(-60, -20, 35, 4, false, flowerHedgeMat);
-  addHedge(-20, -55, 4, 30, false, flowerHedgeMat);
-  addHedge(-75, -45, 20, 4, false, flowerHedgeMat);
-  addHedge(-55, -60, 4, 25, false, flowerHedgeMat);
+  // (A) 외곽 둘레 벽 (입구/출구 개구부 포함)
+  addHedgeWithHole(0, -72, 144, 4, 18, 9, hedgeMat);  // 북쪽 외곽 (입구)
+  addHedgeWithHole(0, 72, 144, 4, -18, 9, hedgeMat);  // 남쪽 외곽 (출구)
+  addHedgeWithHole(-72, 0, 4, 144, 18, 9, hedgeMat);  // 서쪽 외곽
+  addHedgeWithHole(72, 0, 4, 144, -18, 9, hedgeMat);  // 동쪽 외곽
 
-  // (B) 우상단 청록 고대 룬 덤불 존 (+x, -z)
-  addHedge(25, -20, 30, 4, false, runeHedgeMat);
-  addHedge(40, -40, 4, 40, false, runeHedgeMat);
-  addHedge(60, -20, 35, 4, false, runeHedgeMat);
-  addHedge(20, -55, 4, 30, false, runeHedgeMat);
-  addHedge(75, -45, 20, 4, false, runeHedgeMat);
-  addHedge(55, -60, 4, 25, false, runeHedgeMat);
+  // (B) 가로 미로 벽들 (사진 패턴 반영 + 벽 구멍 통로 다수 배치)
+  addHedgeWithHole(-36, -54, 36, 4, 0, 5, flowerHedgeMat);
+  addHedge(18, -54, 36, 4, false, runeHedgeMat);
+  addHedgeWithHole(54, -54, 36, 4, 0, 5, runeHedgeMat);
 
-  // (C) 좌하단 보라 자수정 결정 덤불 존 (-x, +z)
-  addHedge(-25, 20, 30, 4, false, crystalHedgeMat);
-  addHedge(-40, 40, 4, 40, false, crystalHedgeMat);
-  addHedge(-60, 20, 35, 4, false, crystalHedgeMat);
-  addHedge(-20, 55, 4, 30, false, crystalHedgeMat);
-  addHedge(-75, 45, 20, 4, false, crystalHedgeMat);
-  addHedge(-55, 60, 4, 25, false, crystalHedgeMat);
+  addHedge(-54, -36, 36, 4, false, flowerHedgeMat);
+  addHedgeWithHole(0, -36, 36, 4, 0, 5, runeHedgeMat);
+  addHedge(36, -36, 36, 4, false, runeHedgeMat);
 
-  // (D) 우하단 황금꽃 & 마법 열매 덤불 존 (+x, +z)
-  addHedge(25, 20, 30, 4, false, hedgeMat);
-  addHedge(40, 40, 4, 40, false, hedgeMat);
-  addHedge(60, 20, 35, 4, false, hedgeMat);
-  addHedge(20, 55, 4, 30, false, hedgeMat);
-  addHedge(75, 45, 20, 4, false, hedgeMat);
-  addHedge(55, 60, 4, 25, false, hedgeMat);
+  addHedgeWithHole(-36, -18, 36, 4, 0, 5, flowerHedgeMat);
+  addHedge(18, -18, 36, 4, false, crystalHedgeMat);
+  addHedgeWithHole(54, -18, 36, 4, 0, 5, hedgeMat);
+
+  addHedgeWithHole(-54, 0, 36, 4, 0, 5, crystalHedgeMat);
+  addHedgeWithHole(54, 0, 36, 4, 0, 5, hedgeMat);
+
+  addHedge(-36, 18, 36, 4, false, crystalHedgeMat);
+  addHedgeWithHole(0, 18, 36, 4, 0, 5, crystalHedgeMat);
+  addHedge(36, 18, 36, 4, false, hedgeMat);
+
+  addHedgeWithHole(-54, 36, 36, 4, 0, 5, crystalHedgeMat);
+  addHedge(0, 36, 36, 4, false, hedgeMat);
+  addHedgeWithHole(54, 36, 36, 4, 0, 5, hedgeMat);
+
+  addHedge(-36, 54, 36, 4, false, crystalHedgeMat);
+  addHedgeWithHole(18, 54, 36, 4, 0, 5, hedgeMat);
+  addHedge(54, 54, 36, 4, false, hedgeMat);
+
+  // (C) 세로 미로 벽들 (사진 패턴 반영 + 벽 구멍 통로)
+  addHedgeWithHole(-54, -36, 4, 36, 0, 5, flowerHedgeMat);
+  addHedge(-54, 36, 4, 36, false, crystalHedgeMat);
+
+  addHedge(-36, -18, 4, 36, false, flowerHedgeMat);
+  addHedgeWithHole(-36, 18, 4, 36, 0, 5, crystalHedgeMat);
+
+  addHedgeWithHole(-18, -45, 4, 36, 0, 5, flowerHedgeMat);
+  addHedge(-18, 45, 4, 36, false, crystalHedgeMat);
+
+  addHedge(18, -45, 4, 36, false, runeHedgeMat);
+  addHedgeWithHole(18, 45, 4, 36, 0, 5, hedgeMat);
+
+  addHedgeWithHole(36, -18, 4, 36, 0, 5, runeHedgeMat);
+  addHedge(36, 18, 4, 36, false, hedgeMat);
+
+  addHedge(54, -36, 4, 36, false, runeHedgeMat);
+  addHedgeWithHole(54, 36, 4, 36, 0, 5, hedgeMat);
 
   // 6) 기믹 1: 살아 움직이는 벽 (Shifting Walls)
-  addHedge(0, -35, 20, 4, true, flowerHedgeMat);  // 북쪽 중앙 통로
-  addHedge(0, 35, 20, 4, true, crystalHedgeMat);  // 남쪽 중앙 통로
-  addHedge(-35, 0, 4, 20, true, runeHedgeMat);    // 서쪽 중앙 통로
-  addHedge(35, 0, 4, 20, true, hedgeMat);         // 동쪽 중앙 통로
-  addHedge(-60, -40, 16, 4, true, runeHedgeMat);
-  addHedge(60, 40, 16, 4, true, flowerHedgeMat);
+  addHedge(0, -36, 18, 4, true, flowerHedgeMat);  // 북쪽 중앙 통로
+  addHedge(0, 36, 18, 4, true, crystalHedgeMat);  // 남쪽 중앙 통로
+  addHedge(-36, 0, 4, 18, true, runeHedgeMat);    // 서쪽 중앙 통로
+  addHedge(36, 0, 4, 18, true, hedgeMat);         // 동쪽 중앙 통로
 
   // 7) 기믹 2: 보이지 않는 신비로운 투명 벽 (Invisible Magic Barrier Walls)
-  addBox(20, 20, 2, glassMat, -15, 10, -12, {collide: true, sample: true});
-  addBox(20, 20, 2, glassMat, 15, 10, 12, {collide: true, sample: true});
-  addBox(2, 20, 20, glassMat, -12, 10, 15, {collide: true, sample: true});
-  addBox(2, 20, 20, glassMat, 12, 10, -15, {collide: true, sample: true});
+  addBox(18, 20, 2, glassMat, -18, 10, -18, {collide: true, sample: true});
+  addBox(18, 20, 2, glassMat, 18, 10, 18, {collide: true, sample: true});
+  addBox(2, 20, 18, glassMat, -18, 10, 18, {collide: true, sample: true});
+  addBox(2, 20, 18, glassMat, 18, 10, -18, {collide: true, sample: true});
 
-  // 8) 🪜 [핵심 신기능] 벽에 설치된 발판 & 올라타는 구조물들 (Climbable Wall Platforms)
-  // (A) 나무 선반 발코니 (Wall Balconies) - 높이 Y=8, Y=12
+  // 8) 🪜 벽에 설치된 발판 & 올라타는 구조물들 (Climbable Wall Platforms)
   function addWallBalcony(x, y, z, w, d) {
     const balc = addBox(w, 1.2, d, woodMat, x, y, z, {collide: true, sample: true});
-    // 난간 펜스
     addBox(w, 1.5, 0.4, woodMat, x, y + 1.2, z - d/2);
     addBox(w, 1.5, 0.4, woodMat, x, y + 1.2, z + d/2);
-    // 디딤돌 계단
     for (let step = 1; step <= 3; step++) {
       addBox(2.5, 0.8, 2.5, woodMat, x - w/2 - 1.5, (y * step) / 3, z + (step - 2) * 1.5);
     }
   }
-  addWallBalcony(-25, 8, -22, 10, 6);
-  addWallBalcony(25, 9, -22, 10, 6);
-  addWallBalcony(-25, 8, 22, 10, 6);
-  addWallBalcony(25, 9, 22, 10, 6);
-  addWallBalcony(-60, 12, -22, 12, 6);
-  addWallBalcony(60, 12, 22, 12, 6);
+  addWallBalcony(-27, 8, -27, 10, 6);
+  addWallBalcony(27, 9, -27, 10, 6);
+  addWallBalcony(-27, 8, 27, 10, 6);
+  addWallBalcony(27, 9, 27, 10, 6);
+  addWallBalcony(-54, 12, -27, 12, 6);
+  addWallBalcony(54, 12, 27, 12, 6);
 
-  // (B) 고대 석상 & 기둥 주두 발판 (Owl & Gargoyle Statue Platforms)
   function addStatuePlatform(x, y, z) {
     const base = addBox(6, 1.5, 6, stoneMat, x, y, z);
     const statue = addCyl(1.5, 5, stoneMat, x, y + 3.25, z);
     samplables.push(statue);
   }
-  addStatuePlatform(-40, 10, -40);
-  addStatuePlatform(40, 10, -40);
-  addStatuePlatform(-40, 10, 40);
-  addStatuePlatform(40, 10, 40);
+  addStatuePlatform(-36, 10, -36);
+  addStatuePlatform(36, 10, -36);
+  addStatuePlatform(-36, 10, 36);
+  addStatuePlatform(36, 10, 36);
 
-  // (C) 벽 위를 가로지르는 나뭇가지 공중 통로 (Overhanging Tree Branch Catwalks)
   function addBranchCatwalk(x1, z1, x2, z2, y) {
     const dX = x2 - x1, dZ = z2 - z1;
     const len = Math.hypot(dX, dZ);
@@ -10709,39 +10766,37 @@ function buildMazeMap() {
     branch.rotation.z = Math.PI / 2;
     samplables.push(branch);
   }
-  addBranchCatwalk(-25, -20, -40, -40, 14); // 북서 나뭇가지 다리
-  addBranchCatwalk(25, -20, 40, -40, 14);  // 북동 나뭇가지 다리
-  addBranchCatwalk(-25, 20, -40, 40, 14);   // 남서 나뭇가지 다리
-  addBranchCatwalk(25, 20, 40, 40, 14);    // 남동 나뭇가지 다리
+  addBranchCatwalk(-27, -18, -45, -45, 14);
+  addBranchCatwalk(27, -18, 45, -45, 14);
+  addBranchCatwalk(-27, 18, -45, 45, 14);
+  addBranchCatwalk(27, 18, 45, 45, 14);
 
-  // (D) 벽 상단 덤불 둥지 은신처 (Wall Top Ivy Nests, Y=20.5)
   function addWallNest(x, z) {
     const nest = addBox(8, 1.0, 8, lambert({color: 0x1e4726}), x, 20.5, z);
-    // 주위 가림막
     addBox(8, 2.5, 0.6, lambert({color: 0x2e6638}), x, 22.0, z - 4);
     addBox(8, 2.5, 0.6, lambert({color: 0x2e6638}), x, 22.0, z + 4);
     samplables.push(nest);
   }
-  addWallNest(-40, -20);
-  addWallNest(40, -20);
-  addWallNest(-40, 20);
-  addWallNest(40, 20);
+  addWallNest(-36, -18);
+  addWallNest(36, -18);
+  addWallNest(-36, 18);
+  addWallNest(36, 18);
 
-  // 9) 🍄 마법 점핑 버섯 기믹 (Jumping Mushrooms for Vertical Mobility)
+  // 9) 🍄 마법 점핑 버섯 기믹
   window.MAZE_JUMP_MUSHROOMS = [];
   function createJumpMushroom(x, z) {
     const stem = addCyl(0.8, 2, lambert({color: 0xffffff}), x, 1, z);
     const cap = addCyl(2.8, 1.2, lambert({color: 0xff3399, emissive: 0xaa0066, emissiveIntensity: 0.8}), x, 2.2, z, {collide: false});
     window.MAZE_JUMP_MUSHROOMS.push({x, z, radius: 2.8});
   }
-  createJumpMushroom(-25, -15);
-  createJumpMushroom(25, -15);
-  createJumpMushroom(-25, 15);
-  createJumpMushroom(25, 15);
-  createJumpMushroom(-60, -35);
-  createJumpMushroom(60, 35);
+  createJumpMushroom(-27, -18);
+  createJumpMushroom(27, -18);
+  createJumpMushroom(-27, 18);
+  createJumpMushroom(27, 18);
+  createJumpMushroom(-54, -36);
+  createJumpMushroom(54, 36);
 
-  // 10) 신비로운 이정표 도깨비불 등불 (Fairy Lantern Orbs)
+  // 10) 신비로운 이정표 도깨비불 등불
   function createFairyLantern(x, y, z, colorHex) {
     const orb = new THREE.Mesh(
       new THREE.SphereGeometry(1.4, 12, 12),
@@ -10754,14 +10809,14 @@ function buildMazeMap() {
     mapRoot.add(pLight);
     samplables.push(orb);
   }
-  createFairyLantern(-40, 5, -40, 0xff4da6); // 북서 분홍 등불
-  createFairyLantern(40, 5, -40, 0x00ffff);  // 북동 청록 등불
-  createFairyLantern(-40, 5, 40, 0xd966ff);  // 남서 보라 등불
-  createFairyLantern(40, 5, 40, 0xffea00);   // 남동 황금 등불
-  createFairyLantern(0, 5, -60, 0x00ffaa);   // 북쪽 등불
-  createFairyLantern(0, 5, 60, 0xff9900);    // 남쪽 등불
+  createFairyLantern(-36, 5, -36, 0xff4da6);
+  createFairyLantern(36, 5, -36, 0x00ffff);
+  createFairyLantern(-36, 5, 36, 0xd966ff);
+  createFairyLantern(36, 5, 36, 0xffea00);
+  createFairyLantern(0, 5, -54, 0x00ffaa);
+  createFairyLantern(0, 5, 54, 0xff9900);
 
-  // 11) 기믹 3: 마법진 순간이동 (Teleport Portals - 4개 코너)
+  // 11) 기믹 3: 마법진 순간이동
   function createPortal(x, z, targetIndex) {
     const portal = new THREE.Mesh(
       new THREE.PlaneGeometry(8, 8),
@@ -10775,23 +10830,23 @@ function buildMazeMap() {
     mapRoot.add(light);
     MAZE_PORTALS.push({mesh: portal, x, z, targetIndex});
   }
-  createPortal(-70, -50, 1); // index 0 (북서 <-> 남동)
-  createPortal(70, 50, 0);   // index 1
-  createPortal(70, -50, 3);  // index 2 (북동 <-> 남서)
-  createPortal(-70, 50, 2);  // index 3
+  createPortal(-63, -45, 1);
+  createPortal(63, 45, 0);
+  createPortal(63, -45, 3);
+  createPortal(-63, 45, 2);
 
-  // 12) 넉넉한 스폰 지점 (Spawns)
+  // 12) 스폰 지점
   seekerSpawns.push(
     new THREE.Vector3(0, 0, 0),
-    new THREE.Vector3(60, 0, -40),
-    new THREE.Vector3(-60, 0, 40)
+    new THREE.Vector3(54, 0, -36),
+    new THREE.Vector3(-54, 0, 36)
   );
   hiderSpawns = [
-    [-25, -22, 8.5], [25, -22, 9.5], [-60, -22, 12.5], [60, 22, 12.5],
-    [-40, -40, 14.5], [40, -40, 14.5], [-40, 40, 14.5], [40, 40, 14.5],
-    [-40, -20, 21.0], [40, -20, 21.0], [-40, 20, 21.0], [40, 20, 21.0],
-    [-70, -50, 0.1], [70, 50, 0.1], [-70, 50, 0.1], [70, -50, 0.1],
-    [-55, -60, 0.1], [55, -60, 0.1], [-55, 60, 0.1], [55, 60, 0.1]
+    [-27, -27, 8.5], [27, -27, 9.5], [-54, -27, 12.5], [54, 27, 12.5],
+    [-36, -36, 14.5], [36, -36, 14.5], [-36, 36, 14.5], [36, 36, 14.5],
+    [-36, -18, 21.0], [36, -18, 21.0], [-36, 18, 21.0], [36, 18, 21.0],
+    [-63, -45, 0.1], [63, 45, 0.1], [-63, 45, 0.1], [63, -45, 0.1],
+    [-54, -54, 0.1], [54, -54, 0.1], [-54, 54, 0.1], [54, 54, 0.1]
   ].map(p => new THREE.Vector3(p[0], p[2], p[1]));
 }
 
