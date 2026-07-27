@@ -214,6 +214,10 @@ label.chk input{width:20px;height:20px;}
   font-size:13px;padding:9px 12px;border-radius:12px;background:rgba(255,248,231,.94);
   z-index:41;max-width:min(46vw,210px);white-space:normal;line-height:1.25;}
 #btnSpectate.on{background:var(--yellow);}
+#btnWallStick{position:absolute;top:110px;right:12px;left:auto;pointer-events:auto;
+  font-size:13px;padding:9px 12px;border-radius:12px;background:rgba(255,248,231,.94);
+  z-index:41;max-width:min(46vw,210px);white-space:normal;line-height:1.25;}
+#btnWallStick.on{background:#e53e3e;color:#fff;font-weight:bold;}
 #btnShowQR{position:absolute;top:40px;right:12px;left:auto;pointer-events:auto;
   font-size:13px;padding:8px 12px;border-radius:12px;background:rgba(255,248,231,.94);
   z-index:55;white-space:normal;line-height:1.25;}
@@ -676,6 +680,7 @@ if (typeof window.TEACHER_CODE === "undefined" || !window.TEACHER_CODE) window.T
   </div>
   <div id="netStatus"></div>
   <button id="btnSpectate" class="hidden">👀 숨기 완료 · 구경하기</button>
+  <button id="btnWallStick" class="hidden">🕷️ 벽 붙기[R]</button>
   <button id="btnShowQR" class="hidden">🔗 QR 보여주기</button>
   <button id="btnPracticeReturn" class="hidden">↩ 우리 반 게임방으로 돌아가기</button>
 </div>
@@ -1122,6 +1127,8 @@ let mazePortalCooldown=0;
 /* v2: 맵 전환을 위한 컨테이너. buildMap()/GLB 맵이 만드는 오브젝트는 모두 이 그룹 안에 들어갑니다. */
 let mapRoot=new THREE.Group(); scene.add(mapRoot);
 function clearMap(){
+  G.wallStuck = false;
+  if(typeof updateWallStickButton === "function") updateWallStickButton();
   while(mapRoot.children.length) mapRoot.remove(mapRoot.children[0]);
   colliders.length=0; samplables.length=0; refillZones.length=0;
   hiderSpawns=[]; seekerSpawns.length=0;
@@ -1656,9 +1663,9 @@ function buildScienceLab(){
   const CAB_Y=22;   // 낮아진 천장(33)에 맞춰 벽장을 사람 눈높이로 내림(전엔 40으로 너무 높았음)
   // 유리문 상부 벽장(뒷벽, 유리 안 실험기구 2단 선반) — 이미지 1·2
   [-18,-2,14,30].forEach((cx,ci)=>{
-    addBox(14,10,3,lambert({color:0xf2f4f6}),cx,CAB_Y,ROOM_D/2-2.5,{collide:false,sample:false});          // 장 몸체(통과 허용 — 안으로 들어가 숨을 수 있음)
-    addBox(13,9,0.3,glassDoor,cx,CAB_Y,ROOM_D/2-4.1,{collide:false,sample:false});                         // 유리문(통과 허용)
-    addBox(13.6,9.6,0.35,lambert({color:0xe4e8ea}),cx,CAB_Y,ROOM_D/2-1.15,{collide:true,sample:false});    // 장 뒷벽(실제 충돌) — 도구 뒤로 빠져나가 못 나가게 막음
+    addBox(14,10,3,lambert({color:0xf2f4f6}),cx,CAB_Y,ROOM_D/2-2.5,{collide:true,sample:false});           // 장 몸체(실제 충돌체 적용하여 통과/매립 방지)
+    addBox(13,9,0.3,glassDoor,cx,CAB_Y,ROOM_D/2-4.1,{collide:true,sample:false});                          // 유리문(실제 충돌체 적용)
+    addBox(13.6,9.6,0.35,lambert({color:0xe4e8ea}),cx,CAB_Y,ROOM_D/2-1.15,{collide:true,sample:false});    // 장 뒷벽(실제 충돌)
     [CAB_Y+2.6,CAB_Y-2.8].forEach((sy,ri)=>{
       addBox(12.6,0.2,2.2,lambert({color:0xdfe3e6}),cx,sy,ROOM_D/2-4.3,{collide:true,sample:false});       // 유리 선반(실제 충돌)
       [-3.9,-1.3,1.3,3.9].forEach((ox,k)=>{                                                                // 4칸 고르게 배치(빈 공간 없이 옆으로 펼침)
@@ -1671,8 +1678,8 @@ function buildScienceLab(){
   });
   // 시약 냉장고(유리문 키큰장) — 이미지 3
   addBox(6,16,6,lambert({color:0xdfe3e6}),6,8,ROOM_D/2-4);
-  addBox(5.4,13,0.3,glassDoor,6,9,ROOM_D/2-6.9,{collide:false,sample:false});
-  [3,7,11].forEach(sy=>{ addBox(5.2,0.3,5,lambert({color:0xeef1f3}),6,sy,ROOM_D/2-4,{collide:false,sample:false});
+  addBox(5.4,13,0.3,glassDoor,6,9,ROOM_D/2-6.9,{collide:true,sample:false});
+  [3,7,11].forEach(sy=>{ addBox(5.2,0.3,5,lambert({color:0xeef1f3}),6,sy,ROOM_D/2-4,{collide:true,sample:false});
     [0x2f8fd6,0x3fb6a8,0xff7eb0].forEach((cc,i)=>addCyl(0.45,1.6,lambert({color:cc}),4.2+i*1.8,sy+1,ROOM_D/2-6.1,{rt:0.32,collide:false,sample:true})); });
   // 교사 책상 + 모니터 + 의자 (앞 우측 코너) — 이미지 3
   addBox(10,3,5,lambert({color:0x3a3f45}),40,1.5,-ROOM_D/2+7);
@@ -1791,10 +1798,10 @@ function buildCafeteria(){
   addBox(60,0.5,6,lambert({color:0x2b2b2f}),0,4.6,czf,{collide:false}); // 검정 화강암 상판
   // 유리 가림막(스니즈 가드): 뒤 유리 + 위 경사 유리 + 지지 기둥
   const guard=lambert({color:0xcfe8f2,transparent:true,opacity:0.26});
-  addBox(60,5,0.15,guard,0,7.4,czf-2.7,{collide:false,sample:false});
-  addBox(60,0.25,3.2,guard,0,9.8,czf-1.1,{collide:false,sample:false});
-  addBox(60,0.25,0.25,lambert({color:0xbfc7cc}),0,9.9,czf-2.7,{collide:false,sample:false});
-  for(let gx=-28;gx<=28;gx+=14) addCyl(0.12,5,lambert({color:0x9aa2a8}),gx,7,czf-2.7,{collide:false,sample:false});
+  addBox(60,5,0.15,guard,0,7.4,czf-2.7,{collide:true,sample:false});
+  addBox(60,0.25,3.2,guard,0,9.8,czf-1.1,{collide:true,sample:false});
+  addBox(60,0.25,0.25,lambert({color:0xbfc7cc}),0,9.9,czf-2.7,{collide:true,sample:false});
+  for(let gx=-28;gx<=28;gx+=14) addCyl(0.12,5,lambert({color:0x9aa2a8}),gx,7,czf-2.7,{collide:true,sample:false});
   // 요리별 트레이 헬퍼: 스테인리스 트레이 + 베이스 마운드 + 덩어리 질감 + 고명 + 소스 + 서빙 스푼
   const dish=(tx,base,chunk,garnish,sauce)=>{
     addBox(5,0.6,4.6,lambert({color:0x9aa2a8}),tx,4.95,czf,{collide:false,sample:false});     // 트레이 테두리
@@ -1852,7 +1859,7 @@ function buildCafeteria(){
 
   // ── 우측: 우유냉장고(파랑, 등반 9) + 정수기(리필) + 우유 상자 계단 ──
   addBox(9,9,6,lambert({color:0x2f6fb0}),48,4.5,-ROOM_D/2+8);            // 냉장고(top 9)
-  addBox(9,5.5,0.4,lambert({color:0xa9d9ee,transparent:true,opacity:0.5}),48,4.6,-ROOM_D/2+11,{collide:false});
+  addBox(9,5.5,0.4,lambert({color:0xa9d9ee,transparent:true,opacity:0.5}),48,4.6,-ROOM_D/2+11,{collide:true});
   addBox(4,6.5,4,lambert({color:0x4A7FB5}),41,3.25,-ROOM_D/2+8,{sample:true});   // 우유상자(top 6.5)
   addBox(4,8.3,4,lambert({color:0x6f8fd6}),44.5,4.15,-ROOM_D/2+8,{sample:true}); // 우유상자(top 8.3)
   addCyl(2,7,lambert({color:0xdfe4e8}),52,3.5,10,{rt:2});                        // 정수기
@@ -2060,8 +2067,8 @@ function buildLibrary(){
   [[-7,-15],[7,-15],[-7,15],[7,15]].forEach(([tx,tz])=>{
     addBox(9,0.5,6,lambert({color:0x9a6b3f}),tx,3.0,tz);                  // 테이블
     [[-3.7,-2.4],[3.7,-2.4],[-3.7,2.4],[3.7,2.4]].forEach(([lx,lz])=>addBox(0.6,3,0.6,lambert({color:0x7a5230}),tx+lx,1.5,tz+lz));
-    addCyl(0.2,2,lambert({color:0x3f9d5a}),tx,4.2,tz,{rt:0.2,collide:false});
-    addCyl(1.1,1,lambert({color:0x2f8f4e}),tx,5.4,tz,{rt:0.6,collide:false,sample:true}); // 초록 갓 스탠드(얇은 램프, 통과 허용)
+    addCyl(0.2,2,lambert({color:0x3f9d5a}),tx,4.2,tz,{rt:0.2,collide:true});
+    addCyl(1.1,1,lambert({color:0x2f8f4e}),tx,5.4,tz,{rt:0.6,collide:true,sample:true}); // 초록 갓 스탠드
     // 천장에서 내려오는 펜던트 조명(참고 이미지의 매달린 등)
     addCyl(0.05,WALL_H-11,cordMat,tx,(WALL_H+11)/2,tz,{collide:false,sample:false});        // 전선
     addCyl(1.5,2.4,lambert({color:0xf6efd8,emissive:0x2a2820,emissiveIntensity:0.3}),tx,11,tz,{rt:0.4,collide:false,sample:false}); // 갓
@@ -2089,7 +2096,7 @@ function buildLibrary(){
   addCyl(2,4,lambert({color:0x9aa2a8}),44,2,ROOM_D/2-6,{rt:0.4});        // 지구본 받침
   addCyl(2,2,lambert({color:0x2f8fd6}),44,5.2,ROOM_D/2-6,{rt:2,collide:true,sample:true}); // 지구본(파고들어 숨지 못하게 충돌)
   addCyl(2,0.9,lambert({color:0x3f9d5a}),44,6.4,ROOM_D/2-6,{rt:2,collide:true,sample:true});
-  addBox(3.2,3.2,0.6,lambert({color:0xff7eb0}),-30,3.6,ROOM_D/2-3,{collide:false,sample:true}); // 미술책 표지
+  addBox(3.2,3.2,0.6,lambert({color:0xff7eb0}),-30,3.6,ROOM_D/2-3,{collide:true,sample:true}); // 미술책 표지
   refillZones.push({x:-30,z:ROOM_D/2-4,r:6,yMin:0,yMax:6,label:"물감 선반"});
 
   // ── 구석: 빈백존(원색 4개, 등반 1.2) + 소파존(주황) ──
@@ -2147,8 +2154,8 @@ function buildLibrary(){
   // 실내 화분 나무(도서관 곳곳의 초록, 이미지 4) — 화분=낮은 장애물, 잎=머리 위 장식
   const libTree=(x,z,s)=>{
     addCyl(0.9*s,1.0*s,lambert({color:0x8a5a33}),x,0.5*s,z,{rt:1.0*s});                                  // 화분(장애물)
-    addCyl(0.95*s,0.3*s,lambert({color:0x5a3f28}),x,1.05*s,z,{rt:0.9*s,collide:false,sample:false});     // 흙
-    addCyl(0.24*s,2.6*s,lambert({color:0x7a5a3a}),x,2.5*s,z,{collide:false});                            // 줄기
+    addCyl(0.95*s,0.3*s,lambert({color:0x5a3f28}),x,1.05*s,z,{rt:0.9*s,collide:true,sample:false});     // 흙
+    addCyl(0.24*s,2.6*s,lambert({color:0x7a5a3a}),x,2.5*s,z,{collide:true});                            // 줄기(실제 충돌체 적용)
     // 캐노피: 참고 그림처럼 둥글고 풍성한 잎 뭉치. 큰 구 하나를 중심으로 작은 구를 바싹 겹쳐
     // 하나의 부풀은 공처럼 보이게 하고(전엔 작은 구 4개가 따로 떨어져 보여 어색했음),
     // 위쪽엔 밝은 초록을 얹어 볕 든 잎 느낌만 살짝 추가.
@@ -2715,10 +2722,10 @@ function buildGym(){
   addBox(2, WALL_H, ROOM_D, wallMat, ROOM_W/2+1, WALL_H/2, 0);
 
   // 벽 하단 안전 쿠션 매트 (높이 14 - 로열 블루 0x2b4c7e)
-  addBox(ROOM_W-2, 14, 0.8, wallLowerMat, 0, 7, -ROOM_D/2+0.4, {collide:false});
-  addBox(ROOM_W-2, 14, 0.8, wallLowerMat, 0, 7, ROOM_D/2-0.4, {collide:false});
-  addBox(0.8, 14, ROOM_D-2, wallLowerMat, -ROOM_W/2+0.4, 7, 0, {collide:false});
-  addBox(0.8, 14, ROOM_D-2, wallLowerMat, ROOM_W/2-0.4, 7, 0, {collide:false});
+  addBox(ROOM_W-2, 14, 0.8, wallLowerMat, 0, 7, -ROOM_D/2+0.4, {collide:true});
+  addBox(ROOM_W-2, 14, 0.8, wallLowerMat, 0, 7, ROOM_D/2-0.4, {collide:true});
+  addBox(0.8, 14, ROOM_D-2, wallLowerMat, -ROOM_W/2+0.4, 7, 0, {collide:true});
+  addBox(0.8, 14, ROOM_D-2, wallLowerMat, ROOM_W/2-0.4, 7, 0, {collide:true});
 
   // 천장 조명 & 철골 트러스빔 (Truss Grid)
   const trussMat = lambert({color: 0x718096});
@@ -2892,8 +2899,8 @@ function buildGym(){
 
   const beamMat = lambert({color: 0xd69e2e});
   addBox(1.0, 2.8, 24, beamMat, -65, 1.4, -35);
-  addBox(2.2, 1.2, 2.2, lambert({color:0x4a5568}), -65, 0.6, -45, {collide:false});
-  addBox(2.2, 1.2, 2.2, lambert({color:0x4a5568}), -65, 0.6, -25, {collide:false});
+  addBox(2.2, 1.2, 2.2, lambert({color:0x4a5568}), -65, 0.6, -45, {collide:true});
+  addBox(2.2, 1.2, 2.2, lambert({color:0x4a5568}), -65, 0.6, -25, {collide:true});
 
   // ================= 5. 관람석 스탠드 & 탁구대 존 (+X 방향) =================
   const seatMatRed = lambert({color: 0xe53e3e});
@@ -2916,10 +2923,11 @@ function buildGym(){
   const pingpongWhite = lambert({color: 0xffffff});
   const spawnPingPongTable = (tx, tz) => {
     addBox(18, 0.4, 10, pingpongGreen, tx, 3.5, tz);
-    addBox(0.3, 1.5, 10.4, pingpongWhite, tx, 4.25, tz, {collide:false});
+    addBox(0.3, 1.5, 10.4, pingpongWhite, tx, 4.25, tz, {collide:true});
     [[-7.5,-4.5],[7.5,-4.5],[-7.5,4.5],[7.5,4.5]].forEach(([dx,dz]) => {
-      addBox(0.5, 3.3, 0.5, lambert({color: 0x2d3748}), tx+dx, 1.65, tz+dz, {collide:false});
+      addBox(0.5, 3.3, 0.5, lambert({color: 0x2d3748}), tx+dx, 1.65, tz+dz, {collide:true});
     });
+    addAABBCollider(tx, 1.75, tz, 18, 3.5, 10);
   };
   spawnPingPongTable(68, -35);
   spawnPingPongTable(68, -15);
@@ -3971,7 +3979,99 @@ const G={
   joinedMidgame:false,                            // v2: 게임 도중 합류(재입장) 시 스폰 재배치 표시
   onSprinkler:false,                              // 운동장 스프링클러 적용 여부
   zombieState:0,                                  // 좀비 상태 (0: 인간, 1: 감염중, 2: 좀비)
+  wallStuck:false, wallNormal:new THREE.Vector3(0,0,1), wallPoint:new THREE.Vector3(0,0,0),
 };
+
+function findNearestWallFace(pos, maxDist = 2.8) {
+  let closest = null;
+  let minDist = maxDist;
+
+  // 1) 4개 맵 외곽 벽면 (Outer boundary walls)
+  const roomWalls = [
+    { normal: new THREE.Vector3(0, 0, 1), point: new THREE.Vector3(pos.x, pos.y, -ROOM_D/2 + 0.35), dist: Math.abs(pos.z - (-ROOM_D/2 + 0.35)) },
+    { normal: new THREE.Vector3(0, 0, -1), point: new THREE.Vector3(pos.x, pos.y, ROOM_D/2 - 0.35), dist: Math.abs(pos.z - (ROOM_D/2 - 0.35)) },
+    { normal: new THREE.Vector3(1, 0, 0), point: new THREE.Vector3(-ROOM_W/2 + 0.35, pos.y, pos.z), dist: Math.abs(pos.x - (-ROOM_W/2 + 0.35)) },
+    { normal: new THREE.Vector3(-1, 0, 0), point: new THREE.Vector3(ROOM_W/2 - 0.35, pos.y, pos.z), dist: Math.abs(pos.x - (ROOM_W/2 - 0.35)) }
+  ];
+  roomWalls.forEach(w => {
+    if (w.dist < minDist) {
+      minDist = w.dist;
+      closest = { normal: w.normal, point: w.point };
+    }
+  });
+
+  // 2) 맵 내부 덤불/건물/구조체 충돌체 (Scene colliders)
+  const pBox = new THREE.Box3().setFromCenterAndSize(pos, new THREE.Vector3(maxDist * 2, 4, maxDist * 2));
+  for (const c of colliders) {
+    if (!c.intersectsBox(pBox)) continue;
+    const faces = [
+      { normal: new THREE.Vector3(-1, 0, 0), point: new THREE.Vector3(c.min.x - 0.35, pos.y, pos.z), dist: Math.abs(pos.x - (c.min.x - 0.35)) },
+      { normal: new THREE.Vector3(1, 0, 0), point: new THREE.Vector3(c.max.x + 0.35, pos.y, pos.z), dist: Math.abs(pos.x - (c.max.x + 0.35)) },
+      { normal: new THREE.Vector3(0, 0, -1), point: new THREE.Vector3(pos.x, pos.y, c.min.z - 0.35), dist: Math.abs(pos.z - (c.min.z - 0.35)) },
+      { normal: new THREE.Vector3(0, 0, 1), point: new THREE.Vector3(pos.x, pos.y, c.max.z + 0.35), dist: Math.abs(pos.z - (c.max.z + 0.35)) }
+    ];
+    faces.forEach(f => {
+      if (pos.y >= c.min.y - 0.5 && pos.y <= c.max.y + 0.5 && f.dist < minDist) {
+        minDist = f.dist;
+        closest = { normal: f.normal, point: f.point };
+      }
+    });
+  }
+  return closest;
+}
+
+function updateWallStickButton() {
+  const isZom = typeof isZombieMode === "function" && isZombieMode() && (G.zombieState || 0) > 0;
+  const can = G.screen === "GAME" && (G.role === "hider" || G.role === "fairy") && !G.found && !isZom && (G.phase === "PAINT" || G.phase === "SEEK");
+  const b = $("btnWallStick");
+  if (!b) return;
+  b.classList.toggle("hidden", !can);
+  b.classList.toggle("on", G.wallStuck);
+  b.textContent = G.wallStuck ? "🕸️ 벽 탈출 (Space)" : "🕷️ 벽 붙기 [R]";
+}
+
+function toggleWallStick(force) {
+  if (G.screen !== "GAME" || G.spectating || G.role === "ghost" || (G.zombieState || 0) > 0) {
+    if (G.wallStuck) detachFromWall(false);
+    return;
+  }
+  const next = typeof force === "boolean" ? force : !G.wallStuck;
+  if (!next) {
+    detachFromWall(true);
+    return;
+  }
+
+  const wallInfo = findNearestWallFace(G.pos, 2.8);
+  if (!wallInfo) {
+    toast("🧗 근처에 달라붙을 수 있는 벽이나 구조체가 없습니다! 벽 가까이 이동하세요.");
+    return;
+  }
+
+  G.wallStuck = true;
+  G.wallNormal.copy(wallInfo.normal);
+  G.wallPoint.copy(wallInfo.point);
+  G.pos.copy(wallInfo.point);
+  G.vy = 0;
+  G.grounded = true;
+  G.flying = false;
+
+  Audio2.sfxRefill();
+  burst(G.pos.clone().add(new THREE.Vector3(0, 0.6, 0)), "#33aaff", 16, 2.2, 0.4);
+  toast("🕷️ 스파이더맨 벽 붙기 성공! [상/하/좌/우] 기어다니기, [점프/Space] 탈출!");
+  updateWallStickButton();
+}
+
+function detachFromWall(jumpLaunch = false) {
+  if (!G.wallStuck) return;
+  G.wallStuck = false;
+  if (jumpLaunch) {
+    G.vy = 14.0;
+    G.pos.add(G.wallNormal.clone().multiplyScalar(0.6));
+    burst(G.pos.clone(), "#ffffff", 12, 1.8, 0.4);
+    toast("🕸️ 벽에서 점프하여 착지했습니다!");
+  }
+  updateWallStickButton();
+}
 let foundLog=[];  // v2: TV HUD용 최근 발견 로그 (최대 5개)
 let tvYaw=0, tvDragActive=false, tvDragStartX=0, tvDragStartYaw=0;
 // v2: TV 술래 추적 — tvFollowIdx가 -1이면 기존 전체 조망, 0 이상이면 seekerOrder[idx] 술래를 비춥니다.
@@ -4147,6 +4247,11 @@ function syncLocalFairy(){
   myFairy.group.userData.baseY=p.y;
   applyPoseToFairy(myFairy,pose);
   myFairy.group.rotation.y=yaw+Math.PI;
+  if (G.wallStuck && G.wallNormal) {
+    myFairy.group.rotation.x = Math.PI / 3;
+  } else {
+    myFairy.group.rotation.x = 0;
+  }
   applyZombieSkinToFairy(myFairy, G.zombieState || 0); // 로컬 좀비 도색
   const isSeeker = G.role === "seeker";
   const showLocalNameLabel = (G.role === "hider" && !G.found && !G.spectating) && (!isSeeker && (G.flying || flyEnergy < 100));
@@ -4203,15 +4308,20 @@ function updateThirdPersonCamera(){
 
 /* ================= 자유 관전 모드 ================= */
 function updateSpectatorButton(){
-  const can=G.screen==="GAME"&&G.role==="hider"&&!G.found&&(G.phase==="PAINT"||G.phase==="SEEK");
-  const b=$("btnSpectate");
-  b.classList.toggle("hidden",!can);
-  b.classList.toggle("on",G.spectating);
-  b.textContent=G.spectating?"↩ 숨은 지우개로 돌아가기":"👀 숨기 완료 · 구경하기";
+  const isZom = typeof isZombieMode === "function" && isZombieMode() && G.zombieState > 0;
+  const can = G.screen === "GAME" && G.role === "hider" && !G.found && !isZom && (G.phase === "PAINT" || G.phase === "SEEK");
+  const b = $("btnSpectate");
+  b.classList.toggle("hidden", !can);
+  if (!can && G.spectating) {
+    toggleSpectatorMode(false);
+  }
+  b.classList.toggle("on", G.spectating);
+  b.textContent = G.spectating ? "↩ 숨은 지우개로 돌아가기" : "👀 숨기 완료 · 구경하기";
 }
 function toggleSpectatorMode(force){
-  const next=typeof force==="boolean"?force:!G.spectating;
-  if(next&&!(G.role==="hider"&&!G.found&&(G.phase==="PAINT"||G.phase==="SEEK")))return;
+  const isZom = typeof isZombieMode === "function" && isZombieMode() && G.zombieState > 0;
+  const next = typeof force === "boolean" ? force : !G.spectating;
+  if (next && !(G.role === "hider" && !G.found && !isZom && (G.phase === "PAINT" || G.phase === "SEEK"))) return;
   if(next){
     setMirror(false);
     Net.uploadTex&&Net.uploadTex();
@@ -4235,7 +4345,7 @@ function toggleSpectatorMode(force){
     G.yaw=G.specAnchorYaw;
     G.pose=G.specAnchorPose;
     G.lastPosSent="";
-    if((G.phase==="PAINT"||G.phase==="SEEK")&&G.role==="hider")$("paintPanel").classList.remove("hidden");
+    if((G.phase==="PAINT"||G.phase==="SEEK")&&G.role==="hider"&&!isZom)$("paintPanel").classList.remove("hidden");
     toast("숨은 지우개 시점으로 돌아왔어요.");
   }
   syncLocalFairy();
@@ -4244,6 +4354,7 @@ function toggleSpectatorMode(force){
   updateMobileButtons();
 }
 $("btnSpectate").onclick=()=>{Audio2.resume();toggleSpectatorMode();};
+if($("btnWallStick")) $("btnWallStick").onclick=()=>{Audio2.resume();toggleWallStick();};
 $("btnShowQR").onclick=()=>{Audio2.resume();openQRZoom();};
 
 /* ================= 이동/충돌 ================= */
@@ -4274,8 +4385,8 @@ function poseFitsHere(pose,x=G.pos.x,y=G.pos.y,z=G.pos.z){
   // '누우면서 벽/에셋을 뚫는' 문제를 막습니다. (회전 방향과 무관하게 보수적으로 검사)
   let hx=POSE_HALF[pose][0], hz=POSE_HALF[pose][1];
   const H=POSE_H[pose];
-  if(pose==="lie"||pose==="roll_lie"){
-    const r=Math.max(hx,hz)+0.05;   // 누운 몸 길이를 사방으로 적용 + 소량 여유
+  if(pose==="lie"||pose==="roll_lie"||pose==="star"||pose==="bridge"||pose==="handstand"){
+    const r=Math.max(hx,hz)+0.08;   // 누운/펼친 몸 길이를 사방으로 적용 + 소량 여유
     hx=r; hz=r;
   }
   _min.set(x-hx,y,z-hz); _max.set(x+hx,y+H,z+hz);
@@ -4289,18 +4400,23 @@ function poseFitsHere(pose,x=G.pos.x,y=G.pos.y,z=G.pos.z){
 function resolveClipping(){
   if(G.role==="ghost"||G.spectating)return;
   const {hx,hz,H}=playerDims();
-  for(let iter=0;iter<3;iter++){
+  for(let iter=0;iter<5;iter++){
     let pushed=false;
     _min.set(G.pos.x-hx,G.pos.y,G.pos.z-hz);
     _max.set(G.pos.x+hx,G.pos.y+H,G.pos.z+hz);
     const box=_b.set(_min,_max);
     for(const c of colliders){
       if(!solidOverlap(box,c))continue;
-      // x/z 겹침량을 계산해 더 얕게 겹친 축으로 빼냅니다(수직은 건드리지 않음).
+      // x/z/y 겹침량을 계산해 가장 얕게 겹친 축으로 빼냅니다 (매립 방지).
       const penL=box.max.x-c.min.x, penR=c.max.x-box.min.x;
       const penF=box.max.z-c.min.z, penB=c.max.z-box.min.z;
+      const penTop=c.max.y-box.min.y;
       const mx=Math.min(penL,penR), mz=Math.min(penF,penB);
-      if(mx<=mz){ G.pos.x+= (penL<penR? -mx : mx)-Math.sign(penL<penR?1:-1)*0.001; }
+      if(penTop > 0 && penTop <= 1.2 && penTop < mx && penTop < mz){
+        G.pos.y = c.max.y + 0.01;
+        G.vy = 0;
+        G.grounded = true;
+      } else if(mx<=mz){ G.pos.x+= (penL<penR? -mx : mx)-Math.sign(penL<penR?1:-1)*0.001; }
       else{ G.pos.z+= (penF<penB? -mz : mz)-Math.sign(penF<penB?1:-1)*0.001; }
       pushed=true;
       break;
@@ -4611,6 +4727,38 @@ function updateMovement(dt){
     const vertical=((keys["Space"]||G.flyUp)?1:0)-((keys["ShiftLeft"]||keys["ShiftRight"]||G.flyDown)?1:0);
     G.pos.y+=vertical*speed*0.8*dt;
     enforceRoomBounds();
+  }else if(G.wallStuck){
+    if((G.zombieState||0)>0 || G.role==="seeker" || G.spectating){
+      G.wallStuck = false;
+      updateWallStickButton();
+    } else {
+      const climbSpeed = 6.2;
+      const norm = G.wallNormal || new THREE.Vector3(0, 0, 1);
+      const tangent = new THREE.Vector3(-norm.z, 0, norm.x).normalize(); // 벽 수평 축
+      
+      const horizInput = G.moveIn.x;
+      const vertInput = -G.moveIn.z; // W: 위로, S: 아래로
+      const flyUpDown = ((keys["Space"] || G.flyUp) ? 1 : 0) - ((keys["ShiftLeft"] || keys["ShiftRight"] || G.flyDown) ? 1 : 0);
+      
+      const upVel = (vertInput + flyUpDown) * climbSpeed;
+      const sideVel = horizInput * climbSpeed;
+      
+      moveVertical(upVel * dt);
+      if (tangent.lengthSq() > 0.01) {
+        moveHorizontalAxis("x", tangent.x * sideVel * dt);
+        moveHorizontalAxis("z", tangent.z * sideVel * dt);
+      }
+      
+      G.vy = 0; G.grounded = true;
+      G.pos.y = clamp(G.pos.y, 0.2, WALL_H - 0.5);
+      
+      // 주기적 거미줄 마법 가루 이펙트
+      if (Math.random() < 0.2) {
+        burst(G.pos.clone().add(new THREE.Vector3((Math.random()-0.5)*0.5, Math.random()*0.6, (Math.random()-0.5)*0.5)), "#4aa8ff", 2, 0.5, 0.2);
+      }
+      
+      resolveClipping();
+    }
   }else if(G.flying){
     moveHorizontalAxis("x",dir.x*speed*dt);
     moveHorizontalAxis("z",dir.z*speed*dt);
@@ -4998,8 +5146,13 @@ addEventListener("keydown",e=>{
   if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space","Tab"].includes(e.code))e.preventDefault();
   if(G.screen!=="GAME")return;
   if(e.code==="KeyE")setMirror(!G.mirror);
+  if((e.code==="KeyR" || key==="r" || key==="ㄱ") && !e.repeat) {
+    toggleWallStick();
+  }
   if(e.code==="Space"&&!e.repeat){
-    if(G.spectating)G.flyUp=true;
+    if(G.wallStuck) {
+      detachFromWall(true);
+    } else if(G.spectating) G.flyUp=true;
     else handleJumpPress();
     e.preventDefault();
   }
@@ -5010,6 +5163,9 @@ addEventListener("keydown",e=>{
     if(isCopsMode()) {
       if(G.role === "seeker") doArrestAction();
       else if(G.role === "hider") doRescueAction();
+    }
+    if(isIceMode()) {
+      doIceTagAction();
     }
   }
   if(e.code==="Tab" && !e.repeat) {
@@ -5194,6 +5350,7 @@ function updateMobileButtons(){
 
   document.querySelectorAll(".poseCol .mbtn").forEach(b=>b.classList.toggle("hidden",G.role==="seeker"||G.role==="ghost"||G.mirror||G.spectating));
   updateSpectatorButton();
+  updateWallStickButton();
 }
 renderer.domElement.addEventListener("pointerdown",e=>{
   if(!IS_TOUCH||G.screen!=="GAME")return;
@@ -5528,6 +5685,8 @@ const Net={
         G.zombieState = s.val().zombieState || 0;
         G.teamId = s.val().teamId || "team1";
         G.teamColor = TEAM_COLORS[G.teamId]?.color || "#FF3B30";
+        G.escortedBy = s.val().escortedBy !== undefined ? s.val().escortedBy : null;
+        G.imprisoned = !!s.val().imprisoned;
       }
       onPlayersChange(s.key,"add");
       if(s.key===this.meta.host) onHostBack();          // 선생님이 유예 시간 안에 돌아옴
@@ -5541,8 +5700,12 @@ const Net={
         G.zombieState = after.zombieState || 0;
         G.teamId = after.teamId || "team1";
         G.teamColor = TEAM_COLORS[G.teamId]?.color || "#FF3B30";
+        G.escortedBy = after.escortedBy !== undefined ? after.escortedBy : null;
+        G.imprisoned = !!after.imprisoned;
         if (G.zombieState !== prevZ) {
           rebuildMyFairy();
+          if (G.zombieState > 0 && G.spectating) toggleSpectatorMode(false);
+          updateSpectatorButton();
           if (G.zombieState === 2) {
             toast("🧟 숙주 좀비로 변신했습니다! 다른 인간들을 덮치세요!");
             Audio2.sfxFound();
@@ -7816,6 +7979,161 @@ function initZombieGame() {
   const alertDiv = $("centerAlert");
   if (alertDiv && !alertDiv.textContent.includes("스프링클러")) {
     alertDiv.classList.add("hidden");
+  }
+}
+
+function doArrestAction() {
+  if (!isCopsMode() || G.screen !== "GAME") return;
+  if (G.role !== "seeker" && G.zombieState !== 2) return;
+
+  const copPos = G.pos;
+  let target = null;
+  let targetDist = 4.5;
+
+  if (Net.mode === "practice") {
+    practiceAIList.forEach(bot => {
+      if (bot.role === "hider" && !bot.imprisoned && !bot.escortedBy) {
+        const d = copPos.distanceTo(bot.pos);
+        if (d < targetDist) {
+          targetDist = d;
+          target = { isBot: true, data: bot };
+        }
+      }
+    });
+  } else {
+    Object.keys(Net.players || {}).forEach(uid => {
+      if (uid === Net.uid) return;
+      const pData = Net.players[uid] || {};
+      const r = remotes.get(uid);
+      const pRole = pData.role || (r && r.info && r.info.role) || "hider";
+      const isImp = !!(pData.imprisoned || (r && r.target?.imprisoned));
+      const isEsc = !!(pData.escortedBy || (r && r.target?.escortedBy));
+
+      if ((pRole === "hider" || pRole === "fairy") && !isImp && !isEsc) {
+        let rPos;
+        if (r && r.fairy && r.fairy.group) {
+          rPos = r.fairy.group.position.clone();
+        } else if (r && r.cur && (r.cur.x !== 0 || r.cur.y !== 0 || r.cur.z !== 0)) {
+          rPos = new THREE.Vector3(r.cur.x, r.cur.y || 0, r.cur.z);
+        } else if (r && r.target) {
+          rPos = new THREE.Vector3(r.target.x, r.target.y || 0, r.target.z);
+        } else if (Net.positions && Net.positions[uid]) {
+          const parts = Net.positions[uid].split(",");
+          rPos = new THREE.Vector3(+parts[0] || 0, +parts[1] || 0, +parts[2] || 0);
+        } else {
+          return;
+        }
+
+        const d = copPos.distanceTo(rPos);
+        if (d < targetDist) {
+          targetDist = d;
+          target = { isBot: false, uid, nick: pData.nick || (r && r.info && r.info.nick) || "도둑" };
+        }
+      }
+    });
+  }
+
+  if (target) {
+    Audio2.sfxFound();
+    burst(copPos.clone().add(new THREE.Vector3(0, 0.5, 0)), "#ff3b30", 14, 2.5, 0.4);
+    if (target.isBot) {
+      target.data.escortedBy = Net.uid || "local_host";
+      toast(`👮 봇_${target.data.id.slice(4, 8)}을 체포하여 연행합니다!`);
+    } else {
+      Net.fb.update(Net.fb.ref(Net.db, `rooms/${Net.code}/players/${target.uid}`), { escortedBy: Net.uid }).catch(()=>{});
+      toast(`👮 ${target.nick}님을 체포하여 연행합니다!`);
+    }
+  } else {
+    toast("🔍 근처 4.5m 이내에 체포할 수 있는 자유 도둑이 없습니다.");
+  }
+}
+
+function doRescueAction() {
+  if (!isCopsMode() || G.screen !== "GAME") return;
+  if (G.role !== "hider" || G.imprisoned || G.escortedBy) return;
+
+  const mapId = practiceMapId || activeMapId || "classroom";
+  const pZone = getPrisonZone(mapId);
+  const distToPrison = G.pos.distanceTo(pZone.center);
+
+  if (distToPrison < pZone.radius + 1.0) {
+    let rescuedCount = 0;
+    if (Net.mode === "practice") {
+      practiceAIList.forEach(bot => {
+        if (bot.imprisoned) {
+          bot.imprisoned = false;
+          bot.invincibleTimer = 2.5;
+          rescuedCount++;
+        }
+      });
+    } else {
+      Object.keys(Net.players || {}).forEach(uid => {
+        if (uid === Net.uid) return;
+        const pData = Net.players[uid] || {};
+        const r = remotes.get(uid);
+        if (pData.imprisoned || (r && r.target?.imprisoned)) {
+          Net.fb.update(Net.fb.ref(Net.db, `rooms/${Net.code}/players/${uid}`), { imprisoned: false, escortedBy: null, invincibleTimer: 2.5 }).catch(()=>{});
+          rescuedCount++;
+        }
+      });
+    }
+    if (rescuedCount > 0) {
+      Audio2.sfxRefill();
+      burst(G.pos.clone().add(new THREE.Vector3(0, 0.5, 0)), "#34c759", 16, 3.0, 0.5);
+      toast(`🔓 감옥 구출 성공! ${rescuedCount}명의 도둑을 풀어주었습니다!`);
+      return;
+    }
+  }
+
+  const settings = Net.meta?.settings || {};
+  const allowRescueEscort = (settings.copsRescueEscort !== false);
+  if (allowRescueEscort) {
+    let target = null;
+    let minD = 4.5;
+    if (Net.mode === "practice") {
+      practiceAIList.forEach(bot => {
+        if (bot.escortedBy) {
+          const d = G.pos.distanceTo(bot.pos);
+          if (d < minD) { minD = d; target = { isBot: true, data: bot }; }
+        }
+      });
+    } else {
+      Object.keys(Net.players || {}).forEach(uid => {
+        if (uid === Net.uid) return;
+        const pData = Net.players[uid] || {};
+        const r = remotes.get(uid);
+        const isEsc = !!(pData.escortedBy || (r && r.target?.escortedBy));
+        if (isEsc) {
+          let rPos;
+          if (r && r.fairy && r.fairy.group) {
+            rPos = r.fairy.group.position.clone();
+          } else if (r && r.cur && (r.cur.x !== 0 || r.cur.y !== 0 || r.cur.z !== 0)) {
+            rPos = new THREE.Vector3(r.cur.x, r.cur.y || 0, r.cur.z);
+          } else if (r && r.target) {
+            rPos = new THREE.Vector3(r.target.x, r.target.y || 0, r.target.z);
+          } else if (Net.positions && Net.positions[uid]) {
+            const parts = Net.positions[uid].split(",");
+            rPos = new THREE.Vector3(+parts[0] || 0, +parts[1] || 0, +parts[2] || 0);
+          } else {
+            return;
+          }
+
+          const d = G.pos.distanceTo(rPos);
+          if (d < minD) { minD = d; target = { isBot: false, uid, nick: pData.nick || (r && r.info && r.info.nick) || "동료" }; }
+        }
+      });
+    }
+    if (target) {
+      Audio2.sfxRefill();
+      burst(G.pos.clone().add(new THREE.Vector3(0, 0.5, 0)), "#34c759", 14, 2.5, 0.4);
+      if (target.isBot) {
+        target.data.escortedBy = null;
+        toast(`🔓 연행 중인 봇_${target.data.id.slice(4, 8)}을 구출했습니다!`);
+      } else {
+        Net.fb.update(Net.fb.ref(Net.db, `rooms/${Net.code}/players/${target.uid}`), { escortedBy: null }).catch(()=>{});
+        toast(`🔓 연행 중인 ${target.nick}님을 구출했습니다!`);
+      }
+    }
   }
 }
 
@@ -10138,13 +10456,13 @@ function doIceTagAction() {
     if (!isIceMode() || G.screen !== "GAME") return;
     const myPos = G.pos;
     let target = null;
-    let minDist = 3.5;
+    let minDist = 4.5;
 
     const isSeeker = (G.role === "seeker");
     const isHider = (G.role === "hider" || G.role === "fairy");
 
     if (isSeeker) {
-        // 술래 → 얼음이 아닌(zombieState===0) 도망자를 터치(아웃)
+        // 술래 → 얼음이 아닌(zombieState === 0) 도망자를 터치(아웃)
         if (Net.mode === "practice") {
             practiceAIList.forEach(bot => {
                 if ((bot.role === "hider" || bot.role === "fairy") && (bot.zombieState || 0) === 0) {
@@ -10153,11 +10471,30 @@ function doIceTagAction() {
                 }
             });
         } else {
-            remotes.forEach((r, uid) => {
-                if (r && r.info && (r.info.role === "hider" || r.info.role === "fairy") && (r.info.zombieState || 0) === 0) {
-                    const rPos = new THREE.Vector3(r.cur.x, r.cur.y || 0, r.cur.z);
+            Object.keys(Net.players || {}).forEach(uid => {
+                if (uid === Net.uid) return;
+                const pData = Net.players[uid] || {};
+                const r = remotes.get(uid);
+                const pRole = pData.role || (r && r.info && r.info.role) || "hider";
+                const zState = (r && r.target && r.target.zombieState !== undefined) ? r.target.zombieState : (pData.zombieState || 0);
+
+                if ((pRole === "hider" || pRole === "fairy") && zState === 0) {
+                    let rPos;
+                    if (r && r.fairy && r.fairy.group) {
+                        rPos = r.fairy.group.position.clone();
+                    } else if (r && r.cur && (r.cur.x !== 0 || r.cur.y !== 0 || r.cur.z !== 0)) {
+                        rPos = new THREE.Vector3(r.cur.x, r.cur.y || 0, r.cur.z);
+                    } else if (r && r.target) {
+                        rPos = new THREE.Vector3(r.target.x, r.target.y || 0, r.target.z);
+                    } else if (Net.positions && Net.positions[uid]) {
+                        const parts = Net.positions[uid].split(",");
+                        rPos = new THREE.Vector3(+parts[0] || 0, +parts[1] || 0, +parts[2] || 0);
+                    } else {
+                        return;
+                    }
+
                     const d = myPos.distanceTo(rPos);
-                    if (d < minDist) { minDist = d; target = { uid, nick: r.info.nick }; }
+                    if (d < minDist) { minDist = d; target = { uid, nick: pData.nick || (r && r.info && r.info.nick) || "도망자" }; }
                 }
             });
         }
@@ -10173,7 +10510,7 @@ function doIceTagAction() {
                 if (target.fairy) applyZombieSkinToFairy(target.fairy, 2);
             }
         } else {
-            toast("🔍 근처에 잡을 수 있는 도망자가 없습니다. (얼음 상태는 터치 불가)");
+            toast("🔍 근처 4.5m 이내에 잡을 수 있는 도망자가 없습니다. (얼음 상태는 터치 불가)");
         }
     } else if (isHider && G.zombieState === 0) {
         // 도망자 → 얼음 상태(zombieState > 0)인 동료를 구출
@@ -10185,11 +10522,30 @@ function doIceTagAction() {
                 }
             });
         } else {
-            remotes.forEach((r, uid) => {
-                if (r && r.info && (r.info.role === "hider" || r.info.role === "fairy") && (r.info.zombieState || 0) > 0) {
-                    const rPos = new THREE.Vector3(r.cur.x, r.cur.y || 0, r.cur.z);
+            Object.keys(Net.players || {}).forEach(uid => {
+                if (uid === Net.uid) return;
+                const pData = Net.players[uid] || {};
+                const r = remotes.get(uid);
+                const pRole = pData.role || (r && r.info && r.info.role) || "hider";
+                const zState = (r && r.target && r.target.zombieState !== undefined) ? r.target.zombieState : (pData.zombieState || 0);
+
+                if ((pRole === "hider" || pRole === "fairy") && zState > 0) {
+                    let rPos;
+                    if (r && r.fairy && r.fairy.group) {
+                        rPos = r.fairy.group.position.clone();
+                    } else if (r && r.cur && (r.cur.x !== 0 || r.cur.y !== 0 || r.cur.z !== 0)) {
+                        rPos = new THREE.Vector3(r.cur.x, r.cur.y || 0, r.cur.z);
+                    } else if (r && r.target) {
+                        rPos = new THREE.Vector3(r.target.x, r.target.y || 0, r.target.z);
+                    } else if (Net.positions && Net.positions[uid]) {
+                        const parts = Net.positions[uid].split(",");
+                        rPos = new THREE.Vector3(+parts[0] || 0, +parts[1] || 0, +parts[2] || 0);
+                    } else {
+                        return;
+                    }
+
                     const d = myPos.distanceTo(rPos);
-                    if (d < minDist) { minDist = d; target = { uid, nick: r.info.nick }; }
+                    if (d < minDist) { minDist = d; target = { uid, nick: pData.nick || (r && r.info && r.info.nick) || "동료" }; }
                 }
             });
         }
@@ -10205,7 +10561,7 @@ function doIceTagAction() {
                 if (target.fairy) applyZombieSkinToFairy(target.fairy, 0);
             }
         } else {
-            toast("💡 구해줄 수 있는 동료가 근처에 없습니다.");
+            toast("💡 근처 4.5m 이내에 구해줄 수 있는 얼음 동료가 없습니다.");
         }
     }
 }
@@ -10725,7 +11081,7 @@ function buildMazeMap() {
   // 4) 중앙 광장 (화려한 고대 세계수)
   addCyl(4, 30, lambert({color: 0x4a321a}), 0, 15, 0, {collide: true}); // 나무 기둥
   addCyl(14, 9, lambert({color: 0x2d5937}), 0, 24, 0, {collide: true}); // 메인 잎
-  addCyl(20, 9, lambert({color: 0x3d734b}), 0, 16, 0, {collide: false}); // 하단 잎
+  addCyl(20, 9, lambert({color: 0x3d734b}), 0, 16, 0, {collide: true}); // 하단 잎(실제 충돌체 적용하여 매립 방지)
   // 세계수 빛나는 열매/영혼 구체
   const treeCoreLight = new THREE.PointLight(0xffea00, 1.2, 25);
   treeCoreLight.position.set(0, 12, 0);
