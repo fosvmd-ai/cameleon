@@ -638,6 +638,13 @@ if (typeof window.TEACHER_CODE === "undefined" || !window.TEACHER_CODE) window.T
     <div id="timer">3:00</div>
     <div id="phaseLabel"></div>
     <div id="iconRow"></div>
+    <div id="iceScoreBoard" class="hidden" style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 5px; padding: 5px 14px; background: rgba(10, 30, 60, 0.75); border: 1.5px solid #4aa8ff; border-radius: 14px; pointer-events: none; backdrop-filter: blur(4px);">
+      <div style="font-size: 13px; font-weight: bold; color: #77ddff; text-shadow: 0 1px 3px #000; display: flex; align-items: center; gap: 6px;">
+        <span>🧊 활동 중 요정:</span>
+        <span id="iceActiveCount" style="color: #ffffff; font-size: 15px; font-weight: 800;">0명</span>
+        <span style="color: rgba(255,255,255,0.7); font-size: 12px;">(전체 <span id="iceTotalCount">0</span>명 / 🥶 얼음 <span id="iceFrozenCount">0</span>명)</span>
+      </div>
+    </div>
     <div id="zombieScoreBoard" class="hidden" style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 5px; padding: 4px 10px; background: rgba(0,0,0,0.6); border-radius: 12px; pointer-events: none;">
       <div style="font-size: 11px; font-weight: bold; color: #fff; text-shadow: 0 1px 2px #000; margin-right: 2px;">🧟 좀비 현황:</div>
       <div style="display: flex; gap: 8px; align-items: center;">
@@ -4531,9 +4538,10 @@ function toggleFlight(force){
       return;
     }
   }
-  if(isCopsMode() && (!G.infiniteFlightTimer || G.infiniteFlightTimer <= 0)) {
+  // 경찰과 도둑 모드에서는 도둑(hider)만 비행 아이템 필요. 경찰 술래(seeker)는 무제한 자유 비행 가능!
+  if(isCopsMode() && G.role !== "seeker" && (!G.infiniteFlightTimer || G.infiniteFlightTimer <= 0)) {
     if (force !== false) {
-      toast("🚫 경찰과 도둑 모드에서는 깃털/비행 아이템을 획득해야 날 수 있습니다!");
+      toast("🚫 경찰과 도둑 모드에서 도둑은 깃털/비행 아이템을 획득해야 날 수 있습니다!");
       return;
     }
   }
@@ -4549,7 +4557,8 @@ function toggleFlight(force){
   if(G.flying){
     G.vy=0;
     G.pos.y=Math.min(G.pos.y+0.35,WALL_H-playerDims().H-0.3);
-    toast("✈️ 비행 모드! ↑ 상승 · ↓ 하강 · 위/아래 두 번 = 낙하");
+    const modeName = (typeof isIceMode === "function" && isIceMode() && isSeeker) ? "🧊 얼음땡 술래 자유 비행!" : (isCopsMode() && isSeeker) ? "👮 경찰 술래 자유 비행!" : "✈️ 비행 모드!";
+    toast(`${modeName} ↑ 상승 · ↓ 하강 · [Space/점프] 2번 = 낙하`);
   }else{
     G.vy=-4.5;
     toast("⬇️ 비행을 멈추고 떨어집니다");
@@ -4763,7 +4772,8 @@ function updateMovement(dt){
     moveHorizontalAxis("x",dir.x*speed*dt);
     moveHorizontalAxis("z",dir.z*speed*dt);
     const vertical=((keys["Space"]||G.flyUp)?1:0)-((keys["ShiftLeft"]||G.flyDown)?1:0);
-    moveVertical(vertical*5.2*dt);
+    const vertSpeed = (G.role === "seeker") ? 7.5 : 5.2;
+    moveVertical(vertical*vertSpeed*dt);
     G.vy=0; G.grounded=false;
   }else{
     moveHorizontalAxis("x",dir.x*speed*dt);
@@ -5706,9 +5716,17 @@ const Net={
           rebuildMyFairy();
           if (G.zombieState > 0 && G.spectating) toggleSpectatorMode(false);
           updateSpectatorButton();
-          if (G.zombieState === 2) {
+          if (typeof isZombieMode === "function" && isZombieMode() && G.zombieState === 2) {
             toast("🧟 숙주 좀비로 변신했습니다! 다른 인간들을 덮치세요!");
             Audio2.sfxFound();
+          } else if (typeof isIceMode === "function" && isIceMode()) {
+            if (G.zombieState > 0) {
+              toast("🧊 얼음! 술래가 터치할 수 없습니다. 동료의 구출[F/땡]을 기다리세요!");
+              Audio2.sfxBreak();
+            } else {
+              toast("🔔 땡! 동료가 얼음을 풀어주어 다시 움직일 수 있습니다!");
+              Audio2.sfxRefill();
+            }
           }
         }
       }
@@ -7065,6 +7083,38 @@ function updateHUD(){
   updateFrozenBanner();
   // TV 중계 중엔 일반 HUD의 시간·페이즈 문구·아이콘줄이 TV 전용 타이머와 겹치므로 숨깁니다.
   $("timerBox").classList.toggle("hidden",G.tvMode);
+
+  // 🧊 얼음땡 모드: 안 얼은 요정 / 전체 요정 수 HUD 업데이트
+  const isIce = typeof isIceMode === "function" && isIceMode();
+  const iceBoard = $("iceScoreBoard");
+  if (iceBoard) {
+    const showIceHUD = isIce && G.screen === "GAME" && (G.phase === "SEEK" || G.phase === "PAINT" || Net.mode === "practice");
+    iceBoard.classList.toggle("hidden", !showIceHUD);
+    if (showIceHUD) {
+      let totalHiders = 0;
+      let activeHiders = 0;
+      let frozenHiders = 0;
+
+      if (Net.mode === "practice") {
+        const bots = practiceAIList.filter(b => b.role === "hider" || b.role === "fairy");
+        totalHiders = bots.length + ((G.role === "hider" || G.role === "fairy") ? 1 : 0);
+        const activeBots = bots.filter(b => (b.zombieState || 0) === 0).length;
+        const localActive = ((G.role === "hider" || G.role === "fairy") && (G.zombieState || 0) === 0) ? 1 : 0;
+        activeHiders = activeBots + localActive;
+        frozenHiders = totalHiders - activeHiders;
+      } else {
+        const playersArr = Object.values(Net.players || {}).filter(p => p.role === "hider" || p.role === "fairy");
+        totalHiders = playersArr.length;
+        activeHiders = playersArr.filter(p => (p.zombieState || 0) === 0).length;
+        frozenHiders = totalHiders - activeHiders;
+      }
+
+      if ($("iceActiveCount")) $("iceActiveCount").textContent = `${activeHiders}명`;
+      if ($("iceTotalCount")) $("iceTotalCount").textContent = `${totalHiders}`;
+      if ($("iceFrozenCount")) $("iceFrozenCount").textContent = `${frozenHiders}`;
+    }
+  }
+
   if(G.tvMode){
     $("tvTimer").textContent=(G.phase==="PAINT"||G.phase==="SEEK")?fmtTime(G.remainMs):"--:--";
     const hidersArr=Object.values(Net.players||{}).filter(p=>p.role==="hider");
@@ -10194,7 +10244,23 @@ function updatePracticeAI(dt) {
     bot.fairy.group.rotation.y = bot.yaw + Math.PI;
     
     const speedVal = collided ? 0 : speed;
-    animateFairyMovement(bot.fairy, dt, speedVal, "stand", true, false, bot.zombieState);
+    if ((gm === "cops" || gm === "ice") && bot.role === "seeker") {
+      let targetHiderPos = null;
+      if (G.role === "hider" && !G.imprisoned && !G.escortedBy) targetHiderPos = G.pos;
+      practiceAIList.forEach(b => {
+        if (b.role === "hider" && !b.imprisoned && !b.escortedBy) {
+          if (!targetHiderPos || bot.pos.distanceTo(b.pos) < bot.pos.distanceTo(targetHiderPos)) targetHiderPos = b.pos;
+        }
+      });
+      if (targetHiderPos && targetHiderPos.y > bot.pos.y + 1.0) {
+        bot.pos.y = Math.min(targetHiderPos.y, bot.pos.y + dt * 6.5);
+        bot.flying = true;
+      } else if (bot.pos.y > 0) {
+        bot.pos.y = Math.max(0, bot.pos.y - dt * 5.0);
+        if (bot.pos.y <= 0) bot.flying = false;
+      }
+    }
+    animateFairyMovement(bot.fairy, dt, speedVal, "stand", !bot.flying, bot.flying, bot.zombieState);
     
     if (gm === "cops") {
       const pZone = getPrisonZone(practiceMapId || activeMapId || "classroom");
@@ -10256,6 +10322,52 @@ function updatePracticeAI(dt) {
           Audio2.sfxFound();
           burst(bot.pos.clone().add(new THREE.Vector3(0, 0.5, 0)), "#3f8a4f", 12, 3.5, 0.5);
           toast(`🧟 성공! 인간 봇을 좀비로 감염시켰습니다!`);
+        }
+      }
+    }
+
+    if (gm === "ice") {
+      if (bot.role === "seeker") {
+        practiceAIList.forEach(b => {
+          if ((b.role === "hider" || b.role === "fairy") && (b.zombieState || 0) === 0) {
+            if (bot.pos.distanceTo(b.pos) < 1.8) {
+              b.zombieState = 2;
+              applyZombieSkinToFairy(b.fairy, 2);
+              Audio2.sfxBreak();
+              burst(b.pos.clone().add(new THREE.Vector3(0, 0.5, 0)), "#4aa8ff", 12, 3.5, 0.5);
+              toast(`🥶 술래 봇이 봇_${b.id.slice(4, 8)}을 얼렸습니다!`);
+            }
+          }
+        });
+        if ((G.role === "hider" || G.role === "fairy") && (G.zombieState || 0) === 0) {
+          if (bot.pos.distanceTo(G.pos) < 1.8) {
+            G.zombieState = 2;
+            applyZombieSkinToFairy(myFairy, 2);
+            Audio2.sfxBreak();
+            burst(G.pos.clone().add(new THREE.Vector3(0, 0.5, 0)), "#4aa8ff", 15, 4.0, 0.6);
+            toast(`🥶 으악! 술래 봇에게 붙잡혀 얼어붙었습니다! [Q]나 동료의 구출을 기다리세요!`);
+          }
+        }
+      } else if ((bot.role === "hider" || bot.role === "fairy") && (bot.zombieState || 0) === 0) {
+        practiceAIList.forEach(b => {
+          if ((b.role === "hider" || b.role === "fairy") && (b.zombieState || 0) > 0) {
+            if (bot.pos.distanceTo(b.pos) < 1.8) {
+              b.zombieState = 0;
+              applyZombieSkinToFairy(b.fairy, 0);
+              Audio2.sfxRefill();
+              burst(b.pos.clone().add(new THREE.Vector3(0, 0.5, 0)), "#ffd700", 12, 3.0, 0.5);
+              toast(`🔔 봇_${bot.id.slice(4, 8)}이 봇_${b.id.slice(4, 8)}을 구했습니다 (땡)!`);
+            }
+          }
+        });
+        if ((G.role === "hider" || G.role === "fairy") && (G.zombieState || 0) > 0) {
+          if (bot.pos.distanceTo(G.pos) < 1.8) {
+            G.zombieState = 0;
+            applyZombieSkinToFairy(myFairy, 0);
+            Audio2.sfxRefill();
+            burst(G.pos.clone().add(new THREE.Vector3(0, 0.5, 0)), "#ffd700", 15, 3.5, 0.6);
+            toast(`🔔 땡! 봇_${bot.id.slice(4, 8)}이 당신의 얼음을 풀어주었습니다!`);
+          }
         }
       }
     }
