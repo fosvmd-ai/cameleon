@@ -430,12 +430,13 @@ const firebaseConfig = {
   appId: "1:52719602874:web:cbe6b5e39476dc7787c683"
 };
 
-/* 학생이 함부로 방을 만들지 못하게 막는 "선생님 코드"입니다.
-   원하는 말로 자유롭게 바꿔서 쓰세요. */
+/* 학생이 함부로 방을 만들지 못하게 막는 "선생님 코드" 목록입니다. */
+const TEACHER_CODES = ["중앙초", "수송초"];
 const TEACHER_CODE = "중앙초";
 /* ▲▲▲ 여기까지 ▲▲▲  (이 아래로는 수정하지 마세요) */
 
 window.FIREBASE_CONFIG = firebaseConfig;
+window.TEACHER_CODES = TEACHER_CODES;
 window.TEACHER_CODE = TEACHER_CODE;
 window.onerror = function(msg, url, line, col, error) {
   alert("🚨 런타임 오류 발생: " + msg + "\n위치: " + url + ":" + line + ":" + col + "\n에러 상세: " + error);
@@ -446,6 +447,7 @@ window.onerror = function(msg, url, line, col, error) {
 /* 위 설정 구역에 문법 오류(붙여넣기 실수 등)가 있어도
    게임이 완전히 멈추지 않고 안내 메시지를 띄울 수 있게 하는 안전장치입니다. */
 if (typeof window.FIREBASE_CONFIG === "undefined") window.FIREBASE_CONFIG = null;
+if (typeof window.TEACHER_CODES === "undefined" || !Array.isArray(window.TEACHER_CODES)) window.TEACHER_CODES = ["중앙초", "수송초"];
 if (typeof window.TEACHER_CODE === "undefined" || !window.TEACHER_CODE) window.TEACHER_CODE = "중앙초";
 </script>
 </head>
@@ -828,6 +830,44 @@ if (typeof window.TEACHER_CODE === "undefined" || !window.TEACHER_CODE) window.T
   </div>
 </div>
 
+<!-- Firebase 보안 규칙 만료 안내 모달 -->
+<div id="permErrModal" class="hidden" style="position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); width:92%; max-width:520px; max-height:90vh; background:rgba(18, 22, 32, 0.98); border:3px solid #ff3b30; border-radius:20px; box-shadow:0 16px 48px rgba(0,0,0,0.8); z-index:10000; padding:22px; color:#fff; font-family:inherit; overflow-y:auto; backdrop-filter:blur(10px);">
+  <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.15); padding-bottom:12px; margin-bottom:16px;">
+    <div style="font-size:18px; font-weight:bold; color:#ff6b6b; display:flex; align-items:center; gap:8px;">
+      <span>🔒</span> Firebase 데이터베이스 규칙 만료 안내
+    </div>
+    <button onclick="$('permErrModal').classList.add('hidden')" style="background:none; border:none; color:#aaa; font-size:22px; cursor:pointer; padding:0 6px;">✕</button>
+  </div>
+
+  <div style="font-size:14px; line-height:1.6; color:#e0e0e0; margin-bottom:16px;">
+    Firebase의 30일 테스트 모드 기간이 지나 <b>데이터 읽기/쓰기 보안 권한(Permission Denied)</b>이 만료되어 방 만들기가 실패했습니다.
+  </div>
+
+  <div style="background:rgba(255,255,255,0.06); border-radius:12px; padding:14px; margin-bottom:16px;">
+    <div style="font-size:14px; font-weight:bold; color:#77ddff; margin-bottom:8px;">🛠️ 해결 방법 (1분 소요)</div>
+    <ol style="margin:0; padding-left:20px; font-size:13px; line-height:1.7; color:#ddd;">
+      <li>아래 버튼을 눌러 <b>Firebase 콘솔</b>에 접속합니다.</li>
+      <li>내 프로젝트 선택 ➔ <b>[Realtime Database]</b> ➔ 상단 <b>[규칙]</b> 탭 클릭</li>
+      <li>규칙 내용을 아래와 같이 수정 후 <b>[게시]</b> 버튼을 누르세요:</li>
+    </ol>
+    <pre style="background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:10px; font-family:monospace; font-size:12px; color:#58a6ff; margin:10px 0 0 0; white-space:pre-wrap;">{
+  "rules": {
+    ".read": true,
+    ".write": true
+  }
+}</pre>
+  </div>
+
+  <div style="display:flex; gap:10px; justify-content:flex-end;">
+    <a href="https://console.firebase.google.com" target="_blank" rel="noopener" style="background:#007aff; color:#fff; text-decoration:none; padding:10px 16px; border-radius:10px; font-weight:bold; font-size:13px; display:inline-flex; align-items:center; gap:6px;">
+      🔗 Firebase 콘솔 바로가기 ↗
+    </a>
+    <button onclick="$('permErrModal').classList.add('hidden')" style="background:rgba(255,255,255,0.15); border:none; color:#fff; padding:10px 16px; border-radius:10px; font-weight:bold; font-size:13px; cursor:pointer;">
+      닫기
+    </button>
+  </div>
+</div>
+
 <div id="rotateOverlay" class="screen hidden">📱 화면을 <b>가로</b>로 돌려주세요!</div>
 
 
@@ -855,6 +895,10 @@ function fbConfigProblem(){
   if(!/^https:\/\//.test(c.databaseURL))
     return "⚠️ databaseURL 값이 올바른 주소(https://...) 형태가 아니에요. 따옴표 안 내용을 다시 확인해 주세요.";
   return null;
+}
+function showFirebasePermModal(){
+  const modal=$("permErrModal");
+  if(modal) modal.classList.remove("hidden");
 }
 /* 게임 로직은 서버 목록 구조를 그대로 사용합니다(선생님 서버 1개). */
 const FIREBASE_SERVERS=[
@@ -5534,10 +5578,20 @@ const Net={
       if(!connected){
         // 실시간 연결은 막혔지만 REST(일반 https)는 되는지 확인해 원인을 좁힙니다
         let restOk=false;
+        let isPermDenied=false;
         try{
           const r=await fetch(srv.config.databaseURL.replace(/\/$/,"")+"/.json?shallow=true",{signal:AbortSignal.timeout(5000)});
           restOk=r.ok;
+          if(r.status===401 || r.status===403) isPermDenied=true;
         }catch(e){}
+
+        if(isPermDenied){
+          if(typeof showFirebasePermModal === "function") showFirebasePermModal();
+          setNotice("🔒 Firebase 데이터베이스 보안 규칙이 만료되었습니다 (Permission Denied). 화면의 안내 창을 확인해 주세요.");
+          this.db=null;
+          return false;
+        }
+
         const msg=restOk
           ?"⚠️ Firebase 실시간 연결이 계속 불안정해요. 통신사 유해정보차단 앱(자녀안심/스마트필터링 등)이나 광고차단 확장, 인앱 브라우저가 원인일 수 있습니다. 와이파이/데이터를 바꿔보거나 크롬 브라우저로 다시 시도해 보세요."
           :"⚠️ firebasedatabase.app 도메인 접속이 완전히 차단되어 있어요. 현재 네트워크에서는 멀티플레이가 불가능합니다. 다른 네트워크로 시도해 보세요.";
@@ -5549,7 +5603,13 @@ const Net={
       return true;
     }catch(err){
       console.error(err);
-      $("setupNotice").textContent="⚠️ Firebase 연결 실패: "+err.message;
+      const msg = String(err?.message || err || "");
+      if(msg.includes("PERMISSION_DENIED") || msg.includes("Permission denied")){
+        if(typeof showFirebasePermModal === "function") showFirebasePermModal();
+        $("setupNotice").textContent="🔒 Firebase 보안 규칙이 만료되었습니다. 안내 창을 확인해 주세요.";
+      } else {
+        $("setupNotice").textContent="⚠️ Firebase 연결 실패: "+msg;
+      }
       $("setupNotice").classList.remove("hidden");
       return false;
     }
@@ -7205,9 +7265,11 @@ $("btnCreate").onclick=()=>{
     $("titleNote").textContent="Firebase 설정이 필요해요. 화면의 안내를 확인해 주세요.";
     return;
   }
-  const teacherCode=prompt("선생님 방 만들기 코드를 입력해 주세요.");
+  const allowedCodes = Array.isArray(window.TEACHER_CODES) ? window.TEACHER_CODES : [String(window.TEACHER_CODE || "중앙초")];
+  const teacherCode = prompt(`선생님 방 만들기 코드를 입력해 주세요.\n(허용 코드: ${allowedCodes.join(", ")})`, allowedCodes[0]);
   if(teacherCode===null)return;
-  if(teacherCode.trim()!==String(window.TEACHER_CODE)){$("titleNote").textContent="선생님 코드가 올바르지 않아요.";return;}
+  const inputCode = teacherCode.trim();
+  if(!allowedCodes.includes(inputCode)){$("titleNote").textContent="선생님 코드가 올바르지 않아요.";return;}
   const n=getNick()||"선생님"; $("nickInput").value=n;
   createRoomOnServer(n,1);   // 코드 통과 → 바로 방 개설
 };
@@ -7224,7 +7286,13 @@ async function createRoomOnServer(nick,serverIdx){
     enterLobby();
   }catch(err){
     console.error("방 만들기 실패:",err);
-    $("titleNote").textContent="방 만들기 실패: "+(err?.message||"알 수 없는 오류");
+    const msg = String(err?.message || err || "");
+    if (msg.includes("PERMISSION_DENIED") || msg.includes("Permission denied")) {
+      if (typeof showFirebasePermModal === "function") showFirebasePermModal();
+      $("titleNote").textContent="⚠️ Firebase 보안 규칙이 만료되었습니다. 안내 창을 확인해 주세요.";
+    } else {
+      $("titleNote").textContent="방 만들기 실패: "+(msg||"알 수 없는 오류");
+    }
   }finally{
     btn.disabled=false;
   }
