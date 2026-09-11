@@ -326,6 +326,31 @@ label.chk input{width:20px;height:20px;}
 #mobileUI.seekerControls #btnFlyDown{right:140px;bottom:32px;}
 #mobileUI.seekerControls.flyingControls #btnJump{right:136px;bottom:116px;}
 #mobileUI.seekerControls.flyingControls #btnFlyDown{right:140px;bottom:34px;}
+
+/* 조작 모드 토글 버튼 */
+#btnControlMode{position:fixed;top:82px;left:12px;z-index:95;font-size:12px;font-weight:800;
+  padding:6px 12px;border-radius:12px;background:rgba(255,248,231,.95);border:2.5px solid var(--ink);
+  cursor:pointer;box-shadow:2px 2px 0 rgba(0,0,0,.3);display:flex;align-items:center;gap:6px;pointer-events:auto;}
+#btnControlMode:active{transform:translate(1px,1px);box-shadow:1px 1px 0 rgba(0,0,0,.3);}
+@media(max-width:600px){
+  #btnControlMode{top:74px;left:8px;font-size:11px;padding:5px 9px;}
+}
+
+/* 경찰과 도둑 & 얼음땡 전용 모바일 버튼 스타일 및 위치 */
+#btnArrest{width:80px;height:80px;right:18px;bottom:20px;background:#FF3B30;color:#fff;font-size:15px;z-index:46;}
+#btnRescue{width:80px;height:80px;right:18px;bottom:20px;background:#34C759;color:#fff;font-size:14px;z-index:46;}
+#btnCopsStatus{width:60px;height:60px;right:26px;bottom:184px;background:#007AFF;color:#fff;font-size:12px;z-index:45;}
+#btnItem{width:60px;height:60px;right:104px;bottom:116px;background:#FFCC00;color:#000;font-size:12px;z-index:45;}
+#btnIceTag{width:82px;height:82px;right:18px;bottom:20px;background:#FFCC00;color:#000;font-size:15px;z-index:46;}
+#btnIceSelf{width:72px;height:72px;right:104px;bottom:36px;background:#a9d9ee;color:#000;font-size:13px;z-index:46;}
+
+/* 비행 중 컨트롤 레이아웃 정돈 */
+#mobileUI.flyingControls #btnArrest,
+#mobileUI.flyingControls #btnRescue,
+#mobileUI.flyingControls #btnIceTag{right:104px;bottom:34px;}
+#mobileUI.flyingControls #btnIceSelf{right:176px;bottom:34px;}
+#mobileUI.flyingControls #btnItem{right:104px;bottom:184px;}
+#mobileUI.flyingControls #btnCopsStatus{right:176px;bottom:116px;}
 .poseCol{position:absolute;left:14px;bottom:14px;display:flex;flex-direction:row;flex-wrap:wrap;gap:5px;max-width:280px;z-index:42;}
 .poseCol .mbtn{position:relative;width:48px;height:48px;font-size:10px;padding:2px;}
 .pchip{position:relative;}
@@ -453,6 +478,7 @@ if (typeof window.TEACHER_CODE === "undefined" || !window.TEACHER_CODE) window.T
 </head>
 <body>
 <div id="zombieVignette"></div>
+<button id="btnControlMode" title="조작 모드 전환 (마우스 ↔ 화면 터치)">🎮 조작: 🖱️ 마우스</button>
 
 <!-- 타이틀 -->
 <div id="screenTitle" class="screen">
@@ -776,10 +802,12 @@ if (typeof window.TEACHER_CODE === "undefined" || !window.TEACHER_CODE) window.T
   <div class="mbtn" id="btnSpoit">💧<br>스포이트</div>
   <div class="mbtn" id="btnMirror">🎨<br>색칠 모드</div>
   <div class="mbtn hidden" id="btnJudge">콕<br>찍기!</div>
-  <div class="mbtn hidden" id="btnArrest" style="background:#FF3B30; color:#fff;">👮<br>체포[F]</div>
-  <div class="mbtn hidden" id="btnRescue" style="background:#34C759; color:#fff;">🔓<br>구출[F]</div>
-  <div class="mbtn hidden" id="btnCopsStatus" style="background:#007AFF; color:#fff;">🗺️<br>현황[Tab]</div>
-  <div class="mbtn hidden" id="btnItem" style="background:#FFCC00; color:#000;">⚡<br>버프[Shift]</div>
+  <div class="mbtn hidden" id="btnArrest">👮<br>체포[F]</div>
+  <div class="mbtn hidden" id="btnRescue">🔓<br>구출[F]</div>
+  <div class="mbtn hidden" id="btnCopsStatus">🗺️<br>현황[Tab]</div>
+  <div class="mbtn hidden" id="btnItem">⚡<br>버프[Shift]</div>
+  <div class="mbtn hidden" id="btnIceTag">🔔<br>땡/터치[F]</div>
+  <div class="mbtn hidden" id="btnIceSelf">🧊<br>얼음[Q]</div>
   <div class="mbtn hidden" id="btnFlyDown" aria-label="하강" title="하강">↓</div>
   <div class="poseCol">
     <div class="mbtn" data-pose="stand">서기</div>
@@ -910,9 +938,25 @@ const $=id=>document.getElementById(id);
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const lerp=(a,b,t)=>a+(b-a)*t;
 const rand=(a,b)=>a+Math.random()*(b-a);
-function mulberry32(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
-const IS_TOUCH=(('ontouchstart' in window)||navigator.maxTouchPoints>0) && (/Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
-function fmtTime(ms){const s=Math.max(0,Math.ceil(ms/1000));return Math.floor(s/60)+":"+String(s%60).padStart(2,"0");}
+// 하드웨어 터치 지원 여부 (모바일/태블릿 및 서피스, 2-in-1 터치 노트북 포함)
+const HAS_TOUCH_HARDWARE = (('ontouchstart' in window) || (navigator.maxTouchPoints > 0));
+const IS_MOBILE_DEVICE = HAS_TOUCH_HARDWARE && (/Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+
+let userControlPreference = localStorage.getItem("cameleon_control_mode") || "auto"; // "auto" | "mouse" | "touch"
+let dynamicTouchDetected = IS_MOBILE_DEVICE;
+
+function isTouchMode() {
+  if (userControlPreference === "touch") return true;
+  if (userControlPreference === "mouse") return false;
+  return dynamicTouchDetected;
+}
+
+// 하위 호환성을 위해 window.IS_TOUCH를 동적 getter로 정의
+Object.defineProperty(window, "IS_TOUCH", {
+  get() { return isTouchMode(); },
+  configurable: true,
+  enumerable: true
+});
 function hsvToRgb(h,s,v){const f=(n,k=(n+h/60)%6)=>v-v*s*Math.max(Math.min(k,4-k,1),0);return[f(5)*255|0,f(3)*255|0,f(1)*255|0];}
 function rgbHex(r,g,b){return "#"+[r,g,b].map(x=>Math.round(x).toString(16).padStart(2,"0")).join("");}
 
@@ -4030,7 +4074,7 @@ const G={
   joinedMidgame:false,                            // v2: 게임 도중 합류(재입장) 시 스폰 재배치 표시
   onSprinkler:false,                              // 운동장 스프링클러 적용 여부
   zombieState:0,                                  // 좀비 상태 (0: 인간, 1: 감염중, 2: 좀비)
-  wallStuck:false, wallNormal:new THREE.Vector3(0,0,1), wallPoint:new THREE.Vector3(0,0,0),
+  wallStuck:false, wallNormal:new THREE.Vector3(0,0,1), wallPoint:new THREE.Vector3(0,0,0), wallCollider:null, wallCrawlAngle:0,
 };
 
 function findNearestWallFace(pos, maxDist = 2.8) {
@@ -4038,36 +4082,83 @@ function findNearestWallFace(pos, maxDist = 2.8) {
   let minDist = maxDist;
 
   // 1) 4개 맵 외곽 벽면 (Outer boundary walls)
+  const halfW = ROOM_W / 2;
+  const halfD = ROOM_D / 2;
   const roomWalls = [
-    { normal: new THREE.Vector3(0, 0, 1), point: new THREE.Vector3(pos.x, pos.y, -ROOM_D/2 + 0.35), dist: Math.abs(pos.z - (-ROOM_D/2 + 0.35)) },
-    { normal: new THREE.Vector3(0, 0, -1), point: new THREE.Vector3(pos.x, pos.y, ROOM_D/2 - 0.35), dist: Math.abs(pos.z - (ROOM_D/2 - 0.35)) },
-    { normal: new THREE.Vector3(1, 0, 0), point: new THREE.Vector3(-ROOM_W/2 + 0.35, pos.y, pos.z), dist: Math.abs(pos.x - (-ROOM_W/2 + 0.35)) },
-    { normal: new THREE.Vector3(-1, 0, 0), point: new THREE.Vector3(ROOM_W/2 - 0.35, pos.y, pos.z), dist: Math.abs(pos.x - (ROOM_W/2 - 0.35)) }
+    {
+      normal: new THREE.Vector3(0, 0, 1),
+      point: new THREE.Vector3(clamp(pos.x, -halfW + 0.5, halfW - 0.5), clamp(pos.y, 0.2, WALL_H - 0.5), -halfD + 0.35)
+    },
+    {
+      normal: new THREE.Vector3(0, 0, -1),
+      point: new THREE.Vector3(clamp(pos.x, -halfW + 0.5, halfW - 0.5), clamp(pos.y, 0.2, WALL_H - 0.5), halfD - 0.35)
+    },
+    {
+      normal: new THREE.Vector3(1, 0, 0),
+      point: new THREE.Vector3(-halfW + 0.35, clamp(pos.y, 0.2, WALL_H - 0.5), clamp(pos.z, -halfD + 0.5, halfD - 0.5))
+    },
+    {
+      normal: new THREE.Vector3(-1, 0, 0),
+      point: new THREE.Vector3(halfW - 0.35, clamp(pos.y, 0.2, WALL_H - 0.5), clamp(pos.z, -halfD + 0.5, halfD - 0.5))
+    }
   ];
+
   roomWalls.forEach(w => {
-    if (w.dist < minDist) {
-      minDist = w.dist;
-      closest = { normal: w.normal, point: w.point };
+    const d = pos.distanceTo(w.point);
+    if (d < minDist) {
+      minDist = d;
+      closest = { normal: w.normal, point: w.point, collider: null };
     }
   });
 
-  // 2) 맵 내부 덤불/건물/구조체 충돌체 (Scene colliders)
-  const pBox = new THREE.Box3().setFromCenterAndSize(pos, new THREE.Vector3(maxDist * 2, 4, maxDist * 2));
+  // 2) 맵 내부 구조체 및 장애물 충돌체 (Scene colliders)
   for (const c of colliders) {
-    if (!c.intersectsBox(pBox)) continue;
+    // 최소 높이 0.8m 이상인 입체 구조체만 벽으로 인식 (얇은 바닥/카펫/작은 잡동사니 제외)
+    const h = c.max.y - c.min.y;
+    if (h < 0.8) continue;
+    // 플레이어의 Y가 장애물 Y 범위 근처에 있어야 함
+    if (pos.y < c.min.y - 0.5 || pos.y > c.max.y + 0.5) continue;
+
+    const clampedY = clamp(pos.y, c.min.y + 0.2, c.max.y - 0.2);
+
     const faces = [
-      { normal: new THREE.Vector3(-1, 0, 0), point: new THREE.Vector3(c.min.x - 0.35, pos.y, pos.z), dist: Math.abs(pos.x - (c.min.x - 0.35)) },
-      { normal: new THREE.Vector3(1, 0, 0), point: new THREE.Vector3(c.max.x + 0.35, pos.y, pos.z), dist: Math.abs(pos.x - (c.max.x + 0.35)) },
-      { normal: new THREE.Vector3(0, 0, -1), point: new THREE.Vector3(pos.x, pos.y, c.min.z - 0.35), dist: Math.abs(pos.z - (c.min.z - 0.35)) },
-      { normal: new THREE.Vector3(0, 0, 1), point: new THREE.Vector3(pos.x, pos.y, c.max.z + 0.35), dist: Math.abs(pos.z - (c.max.z + 0.35)) }
+      // Left (-X): normal (-1, 0, 0)
+      {
+        normal: new THREE.Vector3(-1, 0, 0),
+        point: new THREE.Vector3(c.min.x - 0.35, clampedY, clamp(pos.z, c.min.z + 0.1, c.max.z - 0.1)),
+        valid: pos.x <= c.min.x + 0.4
+      },
+      // Right (+X): normal (1, 0, 0)
+      {
+        normal: new THREE.Vector3(1, 0, 0),
+        point: new THREE.Vector3(c.max.x + 0.35, clampedY, clamp(pos.z, c.min.z + 0.1, c.max.z - 0.1)),
+        valid: pos.x >= c.max.x - 0.4
+      },
+      // Front (-Z): normal (0, 0, -1)
+      {
+        normal: new THREE.Vector3(0, 0, -1),
+        point: new THREE.Vector3(clamp(pos.x, c.min.x + 0.1, c.max.x - 0.1), clampedY, c.min.z - 0.35),
+        valid: pos.z <= c.min.z + 0.4
+      },
+      // Back (+Z): normal (0, 0, 1)
+      {
+        normal: new THREE.Vector3(0, 0, 1),
+        point: new THREE.Vector3(clamp(pos.x, c.min.x + 0.1, c.max.x - 0.1), clampedY, c.max.z + 0.35),
+        valid: pos.z >= c.max.z - 0.4
+      }
     ];
+
     faces.forEach(f => {
-      if (pos.y >= c.min.y - 0.5 && pos.y <= c.max.y + 0.5 && f.dist < minDist) {
-        minDist = f.dist;
-        closest = { normal: f.normal, point: f.point };
+      if (f.valid) {
+        const d = pos.distanceTo(f.point);
+        if (d < minDist) {
+          minDist = d;
+          closest = { normal: f.normal, point: f.point, collider: c };
+        }
       }
     });
   }
+
   return closest;
 }
 
@@ -4094,13 +4185,15 @@ function toggleWallStick(force) {
 
   const wallInfo = findNearestWallFace(G.pos, 2.8);
   if (!wallInfo) {
-    toast("🧗 근처에 달라붙을 수 있는 벽이나 구조체가 없습니다! 벽 가까이 이동하세요.");
+    toast("🧗 근처 2.8m 이내에 달라붙을 수 있는 벽이나 구조체가 없습니다! 벽 가까이 이동하세요.");
     return;
   }
 
   G.wallStuck = true;
   G.wallNormal.copy(wallInfo.normal);
   G.wallPoint.copy(wallInfo.point);
+  G.wallCollider = wallInfo.collider || null;
+  G.wallCrawlAngle = 0;
   G.pos.copy(wallInfo.point);
   G.vy = 0;
   G.grounded = true;
@@ -4108,18 +4201,22 @@ function toggleWallStick(force) {
 
   Audio2.sfxRefill();
   burst(G.pos.clone().add(new THREE.Vector3(0, 0.6, 0)), "#33aaff", 16, 2.2, 0.4);
-  toast("🕷️ 스파이더맨 벽 붙기 성공! [상/하/좌/우] 기어다니기, [점프/Space] 탈출!");
+  toast("🕷️ 스파이더맨 벽 붙기 성공! [W/S/A/D] 기어다니기, [점프/Space] 탈출!");
   updateWallStickButton();
 }
 
 function detachFromWall(jumpLaunch = false) {
   if (!G.wallStuck) return;
   G.wallStuck = false;
+  G.wallCollider = null;
+  G.wallCrawlAngle = 0;
   if (jumpLaunch) {
-    G.vy = 14.0;
-    G.pos.add(G.wallNormal.clone().multiplyScalar(0.6));
-    burst(G.pos.clone(), "#ffffff", 12, 1.8, 0.4);
-    toast("🕸️ 벽에서 점프하여 착지했습니다!");
+    G.vy = 9.5;
+    G.grounded = false;
+    G.pos.add(G.wallNormal.clone().multiplyScalar(0.7));
+    Audio2.sfxJump();
+    burst(G.pos.clone(), "#ffffff", 14, 2.2, 0.4);
+    toast("🕸️ 벽을 차고 점프하여 탈출했습니다!");
   }
   updateWallStickButton();
 }
@@ -4251,8 +4348,13 @@ function updateRemotes(dt){
     r.cur.z=lerp(r.cur.z,r.target.z,k); r.cur.ry=lerp(r.cur.ry,r.target.ry,k);
     r.fairy.group.position.set(r.cur.x,r.cur.y,r.cur.z);
     r.fairy.group.userData.baseY=r.cur.y;
-    applyPoseToFairy(r.fairy,r.target.pose);
+    applyPoseToFairy(r.fairy,r.target.wallStuck ? "star" : r.target.pose);
     r.fairy.group.rotation.y=r.cur.ry+Math.PI;
+    if(r.target.wallStuck){
+      r.fairy.group.rotation.x = Math.PI / 2;
+    } else {
+      r.fairy.group.rotation.x = 0;
+    }
     applyZombieSkinToFairy(r.fairy,r.target.zombieState||0); // 좀비 스킨 적용
     const remoteSpeed=dt>0?Math.hypot(r.cur.x-oldX,r.cur.z-oldZ)/dt:0;
     animateFairyMovement(r.fairy,dt,remoteSpeed,r.target.pose,true,r.target.flying,r.target.zombieState||0);
@@ -4296,12 +4398,18 @@ function syncLocalFairy(){
   const pose=G.spectating?G.specAnchorPose:G.pose;
   myFairy.group.position.set(p.x,p.y,p.z);
   myFairy.group.userData.baseY=p.y;
-  applyPoseToFairy(myFairy,pose);
-  myFairy.group.rotation.y=yaw+Math.PI;
+  applyPoseToFairy(myFairy,G.wallStuck?"star":pose);
   if (G.wallStuck && G.wallNormal) {
-    myFairy.group.rotation.x = Math.PI / 3;
+    const normAngle = Math.atan2(G.wallNormal.x, G.wallNormal.z);
+    myFairy.group.rotation.set(0, 0, 0);
+    myFairy.group.rotation.y = normAngle;
+    myFairy.group.rotation.x = -Math.PI * 0.42;
+    if (G.wallCrawlAngle !== undefined) {
+      myFairy.group.rotation.z = -G.wallCrawlAngle;
+    }
   } else {
-    myFairy.group.rotation.x = 0;
+    myFairy.group.rotation.set(0, 0, 0);
+    myFairy.group.rotation.y = yaw + Math.PI;
   }
   applyZombieSkinToFairy(myFairy, G.zombieState || 0); // 로컬 좀비 도색
   const isSeeker = G.role === "seeker";
@@ -4314,6 +4422,9 @@ function updateThirdPersonCamera(){
 
   const targetY = (G.pose === "lie" || G.pose === "star" || G.pose === "roll_lie") ? 0.32 : (G.pose === "squat" || G.pose === "bridge" || G.pose === "roll") ? 0.52 : (G.pose === "handstand") ? 1.25 : 0.82;
   _camTarget.set(G.pos.x,G.pos.y+targetY,G.pos.z);
+  if (G.wallStuck && G.wallNormal) {
+    _camTarget.addScaledVector(G.wallNormal, 0.45);
+  }
   _camForward.set(-Math.sin(G.yaw),0,-Math.cos(G.yaw)).normalize();
   _camBack.copy(_camForward).multiplyScalar(-1);
 
@@ -4576,6 +4687,9 @@ function moveVertical(delta,ignoreAssets=false){
 }
 function toggleFlight(force){
   if(G.role==="ghost")return;
+  if(G.wallStuck && force !== false){
+    detachFromWall(false);
+  }
   if(typeof isIceMode === "function" && isIceMode() && (G.role === "hider" || G.role === "fairy") && G.zombieState > 0) {
     if (force !== false) {
       toast("🧊 얼음 상태에서는 비행할 수 없습니다!");
@@ -4613,6 +4727,10 @@ function handleJumpPress(){
   const now=performance.now();
   if(G.role==="ghost")return;
   if(typeof isIceMode === "function" && isIceMode() && (G.role === "hider" || G.role === "fairy") && G.zombieState > 0) {
+    return;
+  }
+  if(G.wallStuck){
+    detachFromWall(true);
     return;
   }
 
@@ -4783,34 +4901,81 @@ function updateMovement(dt){
   }else if(G.wallStuck){
     if((G.zombieState||0)>0 || G.role==="seeker" || G.spectating){
       G.wallStuck = false;
+      G.wallCollider = null;
       updateWallStickButton();
     } else {
-      const climbSpeed = 6.2;
-      const norm = G.wallNormal || new THREE.Vector3(0, 0, 1);
-      const tangent = new THREE.Vector3(-norm.z, 0, norm.x).normalize(); // 벽 수평 축
-      
-      const horizInput = G.moveIn.x;
-      const vertInput = -G.moveIn.z; // W: 위로, S: 아래로
+      const climbSpeed = 6.0;
+      const upInput = G.moveIn.z; // W / 위: +1 (상승), S / 아래: -1 (하강)
+      const sideInput = G.moveIn.x; // D / 우: +1 (우측), A / 좌: -1 (좌측)
       const flyUpDown = ((keys["Space"] || G.flyUp) ? 1 : 0) - ((keys["ShiftLeft"] || keys["ShiftRight"] || G.flyDown) ? 1 : 0);
-      
-      const upVel = (vertInput + flyUpDown) * climbSpeed;
-      const sideVel = horizInput * climbSpeed;
-      
-      moveVertical(upVel * dt);
-      if (tangent.lengthSq() > 0.01) {
-        moveHorizontalAxis("x", tangent.x * sideVel * dt);
-        moveHorizontalAxis("z", tangent.z * sideVel * dt);
+      const totalUp = upInput + flyUpDown;
+      const vertVel = totalUp * climbSpeed;
+      const sideVel = sideInput * climbSpeed;
+      const norm = G.wallNormal || new THREE.Vector3(0, 0, 1);
+      const wallRight = new THREE.Vector3(0, 1, 0).cross(norm).normalize();
+
+      G.pos.y += vertVel * dt;
+      G.pos.addScaledVector(wallRight, sideVel * dt);
+
+      // 벽면 표면 밀착: 벽 법선 방향 좌표를 G.wallPoint에 정확히 고정하여 파고들거나 밀려남 방지
+      if (Math.abs(norm.x) > 0.5 && G.wallPoint) G.pos.x = G.wallPoint.x;
+      if (Math.abs(norm.z) > 0.5 && G.wallPoint) G.pos.z = G.wallPoint.z;
+
+      // 장애물 벽면 범위 제한 (허공 이동 방지) 및 꼭대기/바닥 탈출
+      if (G.wallCollider && G.wallCollider.min && G.wallCollider.max) {
+        const c = G.wallCollider;
+        if (Math.abs(norm.x) > 0.5) {
+          G.pos.z = clamp(G.pos.z, c.min.z + 0.15, c.max.z - 0.15);
+        } else if (Math.abs(norm.z) > 0.5) {
+          G.pos.x = clamp(G.pos.x, c.min.x + 0.15, c.max.x - 0.15);
+        }
+
+        // 장애물 꼭대기에 도달했을 때: 장애물 위로 자연스럽게 올라서기
+        if (G.pos.y >= c.max.y + 0.1) {
+          G.pos.y = c.max.y + 0.05;
+          // 벽 안쪽(반대 법선 방향)으로 발을 디딤
+          G.pos.sub(norm.clone().multiplyScalar(0.4));
+          G.wallStuck = false;
+          G.wallCollider = null;
+          G.grounded = true;
+          G.vy = 0;
+          toast("🧗 장애물 꼭대기에 올라섰습니다!");
+          updateWallStickButton();
+          return;
+        }
+      } else {
+        // 룸 외벽인 경우
+        if (Math.abs(norm.x) > 0.5) {
+          G.pos.z = clamp(G.pos.z, -ROOM_D/2 + 0.45, ROOM_D/2 - 0.45);
+        } else if (Math.abs(norm.z) > 0.5) {
+          G.pos.x = clamp(G.pos.x, -ROOM_W/2 + 0.45, ROOM_W/2 - 0.45);
+        }
+        if (G.pos.y >= WALL_H - 0.7) G.pos.y = WALL_H - 0.7;
       }
-      
-      G.vy = 0; G.grounded = true;
-      G.pos.y = clamp(G.pos.y, 0.2, WALL_H - 0.5);
-      
-      // 주기적 거미줄 마법 가루 이펙트
-      if (Math.random() < 0.2) {
+
+      // 바닥에 도달했을 때: 걷기 모드로 부드럽게 복귀
+      if (G.pos.y <= 0.3) {
+        G.pos.y = 0;
+        G.wallStuck = false;
+        G.wallCollider = null;
+        G.grounded = true;
+        G.vy = 0;
+        toast("👟 바닥에 도착하여 벽에서 내려왔습니다.");
+        updateWallStickButton();
+        return;
+      }
+
+      // 기어가는 방향 각도 계산 (요정 기어가기 애니메이션용)
+      if (Math.hypot(sideInput, totalUp) > 0.15) {
+        G.wallCrawlAngle = Math.atan2(sideInput, totalUp);
+      }
+      G.vy = 0;
+      G.grounded = true;
+
+      // 이동 시 마법 가루 이펙트
+      if (Math.random() < 0.2 && Math.hypot(vertVel, sideVel) > 0.1) {
         burst(G.pos.clone().add(new THREE.Vector3((Math.random()-0.5)*0.5, Math.random()*0.6, (Math.random()-0.5)*0.5)), "#4aa8ff", 2, 0.5, 0.2);
       }
-      
-      resolveClipping();
     }
   }else if(G.flying){
     moveHorizontalAxis("x",dir.x*speed*dt);
@@ -5189,10 +5354,10 @@ function updatePencil(dt){
 /* ================= 입력 ================= */
 const keys={};
 let joyId=null,lookId=null,joyOrigin=null,lastLook=null,paintTouch=null,spoitMode=false;
+let lookStartTime=0, lookStartPos=null;
 let flightUpId=null,flightDownId=null;
 let pointerLocked=false;
-// PC 술래 전용: 마우스 커서가 곧 조준점. 클릭 후 드래그하면 시점 회전, 그대로 떼면 그 위치로 콕 찍기.
-let seekerLookDrag=null, seekerDragMoved=false;
+let mouseLookDrag=null, mouseDragMoved=false, mouseDragOrigin=null;
 let mouseX=innerWidth/2, mouseY=innerHeight/2;
 addEventListener("keydown",e=>{
   const key=String(e.key||"").toLowerCase();
@@ -5210,20 +5375,26 @@ addEventListener("keydown",e=>{
     else handleJumpPress();
     e.preventDefault();
   }
-  if(e.code==="KeyF" && !e.repeat) {
+  if((e.code==="KeyQ" || key==="q" || key==="ㅂ") && !e.repeat) {
+    if(typeof isIceMode === "function" && isIceMode()) {
+      e.preventDefault();
+      doIceSelfAction();
+    }
+  }
+  if((e.code==="KeyF" || key==="f" || key==="ㄹ") && !e.repeat) {
     if(currentMapId === "gym") {
       tryGymDunkAction();
     }
-    if(isCopsMode()) {
+    if(typeof isCopsMode === "function" && isCopsMode()) {
       if(G.role === "seeker") doArrestAction();
-      else if(G.role === "hider") doRescueAction();
+      else if(G.role === "hider" || G.role === "fairy") doRescueAction();
     }
-    if(isIceMode()) {
+    if(typeof isIceMode === "function" && isIceMode()) {
       doIceTagAction();
     }
   }
   if(e.code==="Tab" && !e.repeat) {
-    if(isCopsMode()) {
+    if(typeof isCopsMode === "function" && isCopsMode()) {
       e.preventDefault();
       toggleCopsStatusModal();
     }
@@ -5258,18 +5429,96 @@ addEventListener("keyup",e=>{
   if(e.code==="Space")G.flyUp=false;
   if(e.code==="ShiftLeft"||e.code==="ShiftRight")G.flyDown=false;
 });
+function updateControlModeUI(){
+  const btn=$("btnControlMode");
+  const touch=isTouchMode();
+  if(btn){
+    if(userControlPreference==="auto"){
+      btn.innerHTML=touch?"🎮 조작: 📱 터치 (자동)":"🎮 조작: 🖱️ 마우스 (자동)";
+      btn.title="현재 조작 방식: 자동 감지 (클릭 시 마우스 또는 화면 터치로 고정 전환)";
+    }else if(userControlPreference==="mouse"){
+      btn.innerHTML="🎮 조작: 🖱️ 마우스 모드";
+      btn.title="현재 조작 방식: 마우스/키보드 고정 (클릭 시 화면 터치로 전환)";
+    }else{
+      btn.innerHTML="🎮 조작: 📱 화면 터치";
+      btn.title="현재 조작 방식: 화면 터치 고정 (클릭 시 마우스로 전환)";
+    }
+  }
+  updateMobileButtons();
+  if($("deskHint")){
+    $("deskHint").textContent=touch
+      ?"📱 화면 터치: 왼쪽 조이스틱 이동 · 오른쪽 드래그 시점 · 화면 탭 콕찍기/스포이트"
+      :"🖱️ 마우스: WASD 이동 · 마우스 시점 · 좌클릭 조작 · 우클릭 색추출 · Space 점프";
+  }
+}
+
+function cycleControlMode(){
+  Audio2.resume();
+  if(userControlPreference==="auto"){
+    userControlPreference=isTouchMode()?"mouse":"touch";
+  }else if(userControlPreference==="mouse"){
+    userControlPreference="touch";
+  }else if(userControlPreference==="touch"){
+    userControlPreference="auto";
+  }
+  localStorage.setItem("cameleon_control_mode",userControlPreference);
+  
+  if(userControlPreference==="mouse"){
+    toast("🖱️ 마우스·키보드 조작 모드로 설정되었습니다.");
+    resetMovementInputs();
+  }else if(userControlPreference==="touch"){
+    toast("📱 화면 터치 조작 모드로 설정되었습니다.");
+    try{document.exitPointerLock?.();}catch(_e){}
+  }else{
+    toast("✨ 조작 모드: 기기 입력에 따라 자동 감지됩니다.");
+  }
+  updateControlModeUI();
+}
+if($("btnControlMode")) $("btnControlMode").onclick=cycleControlMode;
+
+function triggerPrimaryGameAction(cx,cy){
+  if(G.screen!=="GAME")return;
+  const isCops=typeof isCopsMode==="function"&&isCopsMode();
+  const isIce=typeof isIceMode==="function"&&isIceMode();
+
+  if(isCops){
+    if(G.role==="seeker"&&G.phase==="SEEK"){
+      doArrestAction();
+    }else if(G.role==="hider"||G.role==="fairy"){
+      if(currentMapId==="gym"&&GymHoops&&GymHoops.some(h=>Math.hypot(G.pos.x-h.x,G.pos.z-h.z)<7.5)){
+        tryGymDunkAction();
+        return;
+      }
+      doRescueAction();
+    }
+    return;
+  }
+
+  if(isIce){
+    if(G.phase==="SEEK"){
+      doIceTagAction();
+    }
+    return;
+  }
+
+  if(G.role==="seeker"&&G.phase==="SEEK"){
+    tryJudge(cx,cy);
+  }
+}
+
 function resetMovementInputs(){
   Object.keys(keys).forEach(k=>keys[k]=false);
   G.flyUp=false;G.flyDown=false;
   G.moveIn.x=0;G.moveIn.z=0;
   joyId=null;lookId=null;paintTouch=null;flightUpId=null;flightDownId=null;
-  joyOrigin=null;lastLook=null;lastPaintPx=null;
-  seekerLookDrag=null;seekerDragMoved=false;
+  joyOrigin=null;lastLook=null;lastPaintPx=null;lookStartPos=null;
+  mouseLookDrag=null;mouseDragMoved=false;mouseDragOrigin=null;
   const jb=$("joyBase");if(jb)jb.style.display="none";
   const jk=$("joyKnob");if(jk){jk.style.left="34px";jk.style.top="34px";}
 }
 addEventListener("blur",resetMovementInputs);
 addEventListener("pagehide",resetMovementInputs);
+
 function readKeys(){
   const kx=((keys["KeyD"]||keys["d"]||keys["ArrowRight"])?1:0)-((keys["KeyA"]||keys["a"]||keys["ArrowLeft"])?1:0);
   const kz=((keys["KeyW"]||keys["w"]||keys["ArrowUp"])?1:0)-((keys["KeyS"]||keys["s"]||keys["ArrowDown"])?1:0);
@@ -5277,32 +5526,46 @@ function readKeys(){
   if(joyId===null){G.moveIn.x=kx;G.moveIn.z=kz;}
   if(keys["Space"]&&(G.role==="ghost"||G.spectating))G.flyUp=true;
 }
-document.addEventListener("pointerlockchange",()=>{pointerLocked=document.pointerLockElement===renderer.domElement;});
+
+document.addEventListener("pointerlockchange",()=>{
+  pointerLocked=document.pointerLockElement===renderer.domElement;
+});
+
 renderer.domElement.addEventListener("mousemove",e=>{
   mouseX=e.clientX; mouseY=e.clientY;
   if(pointerLocked&&!G.mirror){
-    G.yaw-=e.movementX*0.0024; G.pitch=clamp(G.pitch-e.movementY*0.0024,-1.4,1.4);
+    G.yaw-=e.movementX*0.0024;
+    G.pitch=clamp(G.pitch-e.movementY*0.0024,-1.4,1.4);
     return;
   }
-  if(seekerLookDrag&&G.role==="seeker"&&G.phase==="SEEK"&&!IS_TOUCH){
-    const dx=e.clientX-seekerLookDrag.x, dy=e.clientY-seekerLookDrag.y;
-    if(Math.hypot(dx,dy)>6)seekerDragMoved=true;
-    G.yaw-=dx*0.0026; G.pitch=clamp(G.pitch-dy*0.0026,-1.4,1.4);
-    seekerLookDrag={x:e.clientX,y:e.clientY};
+  // 포인터가 잠겨있지 않을 때 드래그로 시점 회전 (모든 역할 지원)
+  if(mouseLookDrag&&!G.mirror){
+    const dx=e.clientX-mouseLookDrag.x, dy=e.clientY-mouseLookDrag.y;
+    if(mouseDragOrigin&&Math.hypot(e.clientX-mouseDragOrigin.x,e.clientY-mouseDragOrigin.y)>5){
+      mouseDragMoved=true;
+    }
+    G.yaw-=dx*0.0028;
+    G.pitch=clamp(G.pitch-dy*0.0028,-1.4,1.4);
+    mouseLookDrag={x:e.clientX,y:e.clientY};
     return;
   }
 });
+
 let mirrorDrag=null;
 renderer.domElement.addEventListener("mousedown",e=>{
   if(G.screen!=="GAME")return;
-  if(G.tvMode&&G.isHost)return; // v2: TV 조망 모드에서는 드래그 회전만 사용, 시점 잠금/판정 입력을 막습니다.
+  if(G.tvMode&&G.isHost)return; // TV 조망 중에는 전용 드래그 사용
   Audio2.resume();
+
   if(spoitMode){
-    const ok=trySample(e.clientX,e.clientY);
+    const sx=pointerLocked?innerWidth/2:e.clientX;
+    const sy=pointerLocked?innerHeight/2:e.clientY;
+    const ok=trySample(sx,sy);
     if(!ok)toast("이 부분에서는 색을 가져오지 못했어요");
     spoitMode=false;$("btnSpoit").style.background="";
     return;
   }
+
   if(G.mirror){
     if(e.button===2){trySample(e.clientX,e.clientY);return;}
     if(tryPaintAt(e.clientX,e.clientY)){
@@ -5313,33 +5576,36 @@ renderer.domElement.addEventListener("mousedown",e=>{
     }
     return;
   }
+
+  // 우클릭 또는 Alt+클릭: 도망자 색상 추출 (스포이트)
   if(e.button===2||e.altKey){
-    if(G.role==="hider"&&(G.phase==="PAINT"||G.phase==="SEEK"))trySample(e.clientX,e.clientY);
+    if(G.role==="hider"&&(G.phase==="PAINT"||G.phase==="SEEK")){
+      const sx=pointerLocked?innerWidth/2:e.clientX;
+      const sy=pointerLocked?innerHeight/2:e.clientY;
+      trySample(sx,sy);
+    }
     return;
   }
+
+  // 좌클릭:
   if(e.button===0){
-    if(!pointerLocked&&!IS_TOUCH) {
-      renderer.domElement.requestPointerLock();
-    }
-    if(G.role==="seeker"&&G.phase==="SEEK"){
-      const isCops = isCopsMode();
-      const isIce = isIceMode();
-      if (isCops) { doArrestAction(); return; }
-      if (isIce) { doIceTagAction(); return; }
-      if (IS_TOUCH) { tryJudge(); return; }
-      seekerLookDrag={x:e.clientX,y:e.clientY}; seekerDragMoved=false;
-      return;
+    mouseLookDrag={x:e.clientX,y:e.clientY};
+    mouseDragOrigin={x:e.clientX,y:e.clientY};
+    mouseDragMoved=false;
+
+    // 포인터가 잠겨있을 때는 좌클릭 즉시 메인 액션(콕 찍기/체포 등) 실행
+    if(pointerLocked){
+      triggerPrimaryGameAction(null,null);
     }
   }
 });
 
-window.addEventListener("contextmenu",e=>{
-  e.preventDefault();
-});
+window.addEventListener("contextmenu",e=>e.preventDefault());
+renderer.domElement.addEventListener("contextmenu",e=>e.preventDefault());
+
 addEventListener("mousemove",e=>{
   if(!G.mirror)return;
   if(mirrorDrag==="paint"){
-    // 색칠 중 포인터가 지우개 밖으로 나가도 카메라 회전으로 전환하지 않습니다.
     tryPaintAt(e.clientX,e.clientY);
   }else if(mirrorDrag==="orbit"&&mirrorLast){
     mirrorAngle-=(e.clientX-mirrorLast[0])*0.007;
@@ -5347,76 +5613,135 @@ addEventListener("mousemove",e=>{
     mirrorLast=[e.clientX,e.clientY];
   }
 });
+
 addEventListener("mouseup",()=>{
   mirrorDrag=null;mirrorLast=null;lastPaintPx=null;
-  if(seekerLookDrag){
-    if(!seekerDragMoved && !isCopsMode() && !isIceMode()) tryJudge();
-    seekerLookDrag=null;
+  if(mouseLookDrag){
+    if(!mouseDragMoved){
+      // 드래그가 아닌 단순 클릭인 경우
+      if(!pointerLocked&&!isTouchMode()){
+        try{renderer.domElement.requestPointerLock?.();}catch(_e){}
+      }
+      if(!pointerLocked){
+        triggerPrimaryGameAction(mouseLookDrag.x,mouseLookDrag.y);
+      }
+    }
+    mouseLookDrag=null;
+    mouseDragOrigin=null;
   }
 });
-renderer.domElement.addEventListener("contextmenu",e=>e.preventDefault());
 
-/* ── 모바일 ── */
+/* ── 모바일 버튼 관리 ── */
 function updateMobileButtons(){
-  if(!IS_TOUCH)return;
+  const touch=isTouchMode();
+  const mob=$("mobileUI");
+  if(!mob)return;
+
+  if(!touch||G.screen!=="GAME"){
+    mob.classList.add("hidden");
+    return;
+  }
+  mob.classList.remove("hidden");
+
   const seek=G.role==="seeker"&&G.phase==="SEEK";
   const hidePaint=G.role==="hider"&&(G.lobbyPractice||G.phase==="PAINT"||G.phase==="SEEK")&&!G.found;
   
-  const isIce = typeof isIceMode === "function" && isIceMode();
-  const isCops = typeof isCopsMode === "function" && isCopsMode();
+  const isIce=typeof isIceMode==="function"&&isIceMode();
+  const isCops=typeof isCopsMode==="function"&&isCopsMode();
+  const isFly=G.flying||G.spectating||G.role==="ghost";
 
-  $("btnJudge").classList.toggle("hidden",!seek || isIce || isCops);
-  $("mobileUI").classList.toggle("seekerControls",seek);
-  $("mobileUI").classList.toggle("flyingControls",G.flying||G.spectating||G.role==="ghost");
-  $("btnJump").classList.toggle("hidden",G.mirror);
-  const arrowUp=G.spectating||G.flying||G.role==="ghost";
-  $("btnJump").textContent=arrowUp?"↑":"점프";
-  $("btnJump").classList.toggle("arrowMode",arrowUp);
-  $("btnJump").setAttribute("aria-label",arrowUp?"상승":"점프");
-  $("btnFlyDown").classList.toggle("hidden",G.mirror||(!G.flying&&!G.spectating&&G.role!=="ghost"));
-  $("btnPaintHold").classList.add("hidden");
-  $("btnSpoit").classList.toggle("hidden",!(hidePaint));
-  $("btnMirror").classList.toggle("hidden",!hidePaint||G.mirror);
-  
+  // Hide & Seek Seeker: 콕 찍기!
+  if($("btnJudge")) $("btnJudge").classList.toggle("hidden",!seek||isIce||isCops);
 
+  // 우측 하단에 메인 액션 버튼(콕 찍기, 체포, 땡 등)이 있으면 점프 버튼을 좌측으로 이동
+  const hasPrimaryAction=(seek&&!isIce&&!isCops)||isIce||(isCops&&G.phase==="SEEK");
+  mob.classList.toggle("seekerControls",hasPrimaryAction);
+  mob.classList.toggle("flyingControls",isFly);
 
-  const nearGymHoop = currentMapId === "gym" && GymHoops && GymHoops.some(h => Math.hypot(G.pos.x - h.x, G.pos.z - h.z) < 7.5);
-  if($("btnArrest")) $("btnArrest").classList.toggle("hidden", !(isCops && G.role === "seeker" && G.phase === "SEEK"));
-  if($("btnRescue")) {
-    const showRescue = (isCops && G.role === "hider" && !G.imprisoned && (!G.escortedBy)) || nearGymHoop;
-    $("btnRescue").classList.toggle("hidden", !showRescue);
-    if(nearGymHoop) $("btnRescue").innerHTML = "🏀<br>덩크[F]";
-    else $("btnRescue").innerHTML = "🚑<br>구출[F]";
-  }
-  if($("btnCopsStatus")) $("btnCopsStatus").classList.toggle("hidden", !isCops);
-  if($("btnItem")) $("btnItem").classList.toggle("hidden", !(isCops && G.role === "hider" && !G.imprisoned && (!G.escortedBy)));
-
-  // 얼음땡 버튼
-  if (typeof injectIceButtons === "function") injectIceButtons();
-  if ($("btnIceSelf")) {
-      const showIceSelf = isIce && G.role === "hider" && G.phase === "SEEK" && G.zombieState === 0;
-      $("btnIceSelf").classList.toggle("hidden", !showIceSelf);
-  }
-  if ($("btnIceTag")) {
-      const showIceTag = isIce && G.phase === "SEEK" && (G.role === "seeker" || (G.role === "hider" && G.zombieState === 0));
-      $("btnIceTag").classList.toggle("hidden", !showIceTag);
+  // Jump / FlyUp
+  const btnJump=$("btnJump");
+  if(btnJump){
+    btnJump.classList.toggle("hidden",G.mirror);
+    btnJump.textContent=isFly?"↑":"점프";
+    btnJump.classList.toggle("arrowMode",isFly);
+    btnJump.setAttribute("aria-label",isFly?"상승":"점프");
   }
 
-  document.querySelectorAll(".poseCol .mbtn").forEach(b=>b.classList.toggle("hidden",G.role==="seeker"||G.role==="ghost"||G.mirror||G.spectating));
-  updateSpectatorButton();
-  updateWallStickButton();
+  // FlyDown
+  const btnFlyDown=$("btnFlyDown");
+  if(btnFlyDown){
+    btnFlyDown.classList.toggle("hidden",G.mirror||!isFly);
+  }
+
+  // Spoit & Mirror
+  if($("btnSpoit")) $("btnSpoit").classList.toggle("hidden",!(hidePaint&&!isCops&&!isIce));
+  if($("btnMirror")) $("btnMirror").classList.toggle("hidden",!hidePaint||G.mirror);
+
+  // Cops & Robbers buttons
+  const nearGymHoop=currentMapId==="gym"&&GymHoops&&GymHoops.some(h=>Math.hypot(G.pos.x-h.x,G.pos.z-h.z)<7.5);
+  if($("btnArrest")) $("btnArrest").classList.toggle("hidden",!(isCops&&G.role==="seeker"&&G.phase==="SEEK"));
+  if($("btnRescue")){
+    const showRescue=(isCops&&G.role==="hider"&&!G.imprisoned&&(!G.escortedBy))||nearGymHoop;
+    $("btnRescue").classList.toggle("hidden",!showRescue);
+    if(nearGymHoop) $("btnRescue").innerHTML="🏀<br>덩크[F]";
+    else $("btnRescue").innerHTML="🚑<br>구출[F]";
+  }
+  if($("btnCopsStatus")) $("btnCopsStatus").classList.toggle("hidden",!isCops);
+  if($("btnItem")) $("btnItem").classList.toggle("hidden",!(isCops&&G.role==="hider"&&!G.imprisoned&&(!G.escortedBy)));
+
+  // Ice Tag buttons
+  if(typeof injectIceButtons==="function") injectIceButtons();
+  if($("btnIceSelf")){
+    const showIceSelf=isIce&&(G.role==="hider"||G.role==="fairy")&&G.phase==="SEEK"&&(G.zombieState||0)===0;
+    $("btnIceSelf").classList.toggle("hidden",!showIceSelf);
+  }
+  if($("btnIceTag")){
+    const showIceTag=isIce&&G.phase==="SEEK"&&(G.role==="seeker"||((G.role==="hider"||G.role==="fairy")&&(G.zombieState||0)===0));
+    $("btnIceTag").classList.toggle("hidden",!showIceTag);
+    if(G.role==="seeker"){
+      $("btnIceTag").innerHTML="🥶<br>얼리기[F]";
+      $("btnIceTag").style.background="#FF3B30";
+      $("btnIceTag").style.color="#fff";
+    }else{
+      $("btnIceTag").innerHTML="🔔<br>땡/구출[F]";
+      $("btnIceTag").style.background="#ffcc00";
+      $("btnIceTag").style.color="#000";
+    }
+  }
+
+  // Poses
+  document.querySelectorAll(".poseCol .mbtn").forEach(b=>{
+    b.classList.toggle("hidden",G.role==="seeker"||G.role==="ghost"||G.mirror||G.spectating||isCops||isIce);
+  });
+
+  if(typeof updateSpectatorButton==="function") updateSpectatorButton();
+  if(typeof updateWallStickButton==="function") updateWallStickButton();
 }
+
+/* ── 터치 이벤트 (화면 터치 모드) ── */
 renderer.domElement.addEventListener("pointerdown",e=>{
-  if(!IS_TOUCH||G.screen!=="GAME")return;
-  if(G.tvMode&&G.isHost)return; // v2: TV 조망 중에는 이동 조이스틱 대신 드래그 회전만 사용
+  if(e.pointerType==="mouse"&&!isTouchMode())return;
+  if(G.screen!=="GAME")return;
+  if(G.tvMode&&G.isHost)return; // TV 조망 중에는 전용 드래그 사용
+
+  // 터치 입력 발생 시 자동 감지 적응
+  if(e.pointerType==="touch"||e.pointerType==="pen"){
+    if(!dynamicTouchDetected){
+      dynamicTouchDetected=true;
+      updateControlModeUI();
+    }
+  }
+
   Audio2.resume();
+
+  // 스포이트 활성화 중 터치: 해당 위치 색상 추출
   if(spoitMode){
     const ok=trySample(e.clientX,e.clientY);
     if(!ok)toast("이 부분에서는 색을 가져오지 못했어요");
     spoitMode=false;$("btnSpoit").style.background="";
     return;
   }
-  renderer.domElement.setPointerCapture?.(e.pointerId);
+
   if(G.mirror){
     if(tryPaintAt(e.clientX,e.clientY)){
       paintTouch=e.pointerId;
@@ -5426,96 +5751,145 @@ renderer.domElement.addEventListener("pointerdown",e=>{
     }
     return;
   }
-  if(e.clientX<innerWidth*0.45&&joyId===null){
-    joyId=e.pointerId; joyOrigin=[e.clientX,e.clientY];
-    const jb=$("joyBase"); jb.style.display="block";
-    jb.style.left=(e.clientX-60)+"px"; jb.style.top=(e.clientY-60)+"px";
-  }else if(lookId===null){ lookId=e.pointerId; lastLook=[e.clientX,e.clientY]; }
+
+  // 화면 좌측 48%: 가상 조이스틱
+  if(e.clientX<innerWidth*0.48&&joyId===null){
+    joyId=e.pointerId;
+    joyOrigin=[e.clientX,e.clientY];
+    const jb=$("joyBase");
+    if(jb){
+      jb.style.display="block";
+      jb.style.left=(e.clientX-60)+"px";
+      jb.style.top=(e.clientY-60)+"px";
+    }
+  }else if(lookId===null){
+    // 화면 우측: 시점 회전 및 터치 탭
+    lookId=e.pointerId;
+    lastLook=[e.clientX,e.clientY];
+    lookStartPos=[e.clientX,e.clientY];
+    lookStartTime=performance.now();
+  }
 });
+
 addEventListener("pointermove",e=>{
-  if(!IS_TOUCH)return;
   if(G.mirror){
     if(e.pointerId===paintTouch){
-      // 색칠을 시작한 손가락은 지우개 밖으로 나가도 끝까지 색칠 입력으로 유지합니다.
       tryPaintAt(e.clientX,e.clientY);
     }else if(e.pointerId===lookId&&lastLook){
-      // 지우개가 아니라 카메라가 지우개 주위를 돕니다.
       mirrorAngle-=(e.clientX-lastLook[0])*0.008;
       mirrorPitch=clamp(mirrorPitch+(e.clientY-lastLook[1])*0.006,-0.18,1.12);
       lastLook=[e.clientX,e.clientY];
     }
     return;
   }
-  if(e.pointerId===joyId){
-    const dx=e.clientX-joyOrigin[0],dy=e.clientY-joyOrigin[1];
-    const len=Math.hypot(dx,dy),m=Math.min(len,50)/50;
-    G.moveIn.x=len?dx/len*m:0; G.moveIn.z=len?-dy/len*m:0;
-    $("joyKnob").style.left=(34+clamp(dx,-40,40))+"px";
-    $("joyKnob").style.top=(34+clamp(dy,-40,40))+"px";
+
+  if(e.pointerId===joyId&&joyOrigin){
+    const dx=e.clientX-joyOrigin[0], dy=e.clientY-joyOrigin[1];
+    const len=Math.hypot(dx,dy);
+    const maxR=45;
+    const clampedR=Math.min(len,maxR);
+    const nx=len>0?dx/len:0;
+    const ny=len>0?dy/len:0;
+    const factor=clampedR/maxR;
+
+    G.moveIn.x=nx*factor;
+    G.moveIn.z=-ny*factor;
+
+    const jk=$("joyKnob");
+    if(jk){
+      jk.style.left=(34+nx*clampedR)+"px";
+      jk.style.top=(34+ny*clampedR)+"px";
+    }
   }else if(e.pointerId===lookId&&lastLook){
     G.yaw-=(e.clientX-lastLook[0])*0.006;
     G.pitch=clamp(G.pitch-(e.clientY-lastLook[1])*0.006,-1.4,1.4);
     lastLook=[e.clientX,e.clientY];
   }
 });
+
 function releasePointerInput(e){
-  if(e.pointerId===joyId){joyId=null;G.moveIn.x=0;G.moveIn.z=0;$("joyBase").style.display="none";
-    $("joyKnob").style.left="34px";$("joyKnob").style.top="34px";}
-  if(e.pointerId===lookId){lookId=null;lastLook=null;}
-  if(e.pointerId===paintTouch){paintTouch=null;lastPaintPx=null;}
-  if(e.pointerId===flightUpId){flightUpId=null;G.flyUp=false;}
-  if(e.pointerId===flightDownId){flightDownId=null;G.flyDown=false;}
-  try{renderer.domElement.releasePointerCapture?.(e.pointerId);}catch(_e){}
+  if(e.pointerId===joyId){
+    joyId=null; joyOrigin=null;
+    G.moveIn.x=0; G.moveIn.z=0;
+    const jb=$("joyBase"); if(jb)jb.style.display="none";
+    const jk=$("joyKnob"); if(jk){jk.style.left="34px";jk.style.top="34px";}
+  }
+  if(e.pointerId===lookId){
+    // 화면 터치 탭 판정 (시간 300ms 이내, 이동 거리 15px 이내)
+    if(lookStartPos&&!G.mirror){
+      const dt=performance.now()-lookStartTime;
+      const dist=Math.hypot(e.clientX-lookStartPos[0],e.clientY-lookStartPos[1]);
+      if(dt<300&&dist<15){
+        triggerPrimaryGameAction(e.clientX,e.clientY);
+      }
+    }
+    lookId=null;
+    lastLook=null;
+    lookStartPos=null;
+  }
+  if(e.pointerId===paintTouch){
+    paintTouch=null;
+    lastPaintPx=null;
+  }
+  if(e.pointerId===flightUpId){
+    flightUpId=null;
+    G.flyUp=false;
+  }
+  if(e.pointerId===flightDownId){
+    flightDownId=null;
+    G.flyDown=false;
+  }
 }
+
 addEventListener("pointerup",releasePointerInput);
 addEventListener("pointercancel",releasePointerInput);
-renderer.domElement.addEventListener("lostpointercapture",releasePointerInput);
 addEventListener("touchcancel",()=>{
-  joyId=null;lookId=null;paintTouch=null;flightUpId=null;flightDownId=null;lastLook=null;lastPaintPx=null;
-  G.moveIn.x=0;G.moveIn.z=0;G.flyUp=false;G.flyDown=false;
-  $("joyBase").style.display="none";
+  resetMovementInputs();
 },{passive:true});
+
+/* 모바일 버튼 바인딩 */
 $("btnJump").onpointerdown=e=>{
   e.preventDefault();e.stopPropagation();Audio2.resume();
   flightUpId=e.pointerId;
-  try{e.currentTarget.setPointerCapture(e.pointerId);}catch(_e){}
   if(G.spectating||G.role==="ghost")G.flyUp=true;else handleJumpPress();
 };
 $("btnFlyDown").onpointerdown=e=>{
   e.preventDefault();e.stopPropagation();Audio2.resume();
   flightDownId=e.pointerId;
-  try{e.currentTarget.setPointerCapture(e.pointerId);}catch(_e){}
   handleFlyDownPress();
 };
+
 const releaseFlightButton=e=>{
   if(e.pointerId===flightUpId){flightUpId=null;G.flyUp=false;}
   if(e.pointerId===flightDownId){flightDownId=null;G.flyDown=false;}
 };
-$("btnJump").addEventListener("lostpointercapture",releaseFlightButton);
-$("btnFlyDown").addEventListener("lostpointercapture",releaseFlightButton);
-$("btnArrest").onpointerdown=e=>{ e.preventDefault(); e.stopPropagation(); Audio2.resume(); doArrestAction(); };
-$("btnRescue").onpointerdown=e=>{
+$("btnJump").addEventListener("pointerup",releaseFlightButton);
+$("btnFlyDown").addEventListener("pointerup",releaseFlightButton);
+
+if($("btnArrest")) $("btnArrest").onpointerdown=e=>{ e.preventDefault(); e.stopPropagation(); Audio2.resume(); doArrestAction(); };
+if($("btnRescue")) $("btnRescue").onpointerdown=e=>{
   e.preventDefault(); e.stopPropagation(); Audio2.resume();
-  if(currentMapId === "gym") tryGymDunkAction();
+  if(currentMapId==="gym"&&GymHoops&&GymHoops.some(h=>Math.hypot(G.pos.x-h.x,G.pos.z-h.z)<7.5)) tryGymDunkAction();
   else doRescueAction();
 };
-$("btnCopsStatus").onpointerdown=e=>{ e.preventDefault(); e.stopPropagation(); Audio2.resume(); toggleCopsStatusModal(); };
-$("btnCloseCopsStatus").onclick=()=>toggleCopsStatusModal(false);
-$("btnItem").onpointerdown=e=>{ e.preventDefault(); e.stopPropagation(); Audio2.resume(); doItemBuffAction(); };
-$("btnJudge").onpointerdown=()=>{tryJudge();Audio2.resume();};
-$("btnMirror").onpointerdown=()=>{setMirror(true);Audio2.resume();};
-$("btnMirrorDone").onpointerdown=()=>setMirror(false);
-$("btnSpoit").onpointerdown=e=>{
+if($("btnCopsStatus")) $("btnCopsStatus").onpointerdown=e=>{ e.preventDefault(); e.stopPropagation(); Audio2.resume(); toggleCopsStatusModal(); };
+if($("btnCloseCopsStatus")) $("btnCloseCopsStatus").onclick=()=>toggleCopsStatusModal(false);
+if($("btnItem")) $("btnItem").onpointerdown=e=>{ e.preventDefault(); e.stopPropagation(); Audio2.resume(); doItemBuffAction(); };
+if($("btnIceTag")) $("btnIceTag").onpointerdown=e=>{ e.preventDefault(); e.stopPropagation(); Audio2.resume(); doIceTagAction(); };
+if($("btnIceSelf")) $("btnIceSelf").onpointerdown=e=>{ e.preventDefault(); e.stopPropagation(); Audio2.resume(); doIceSelfAction(); };
+if($("btnJudge")) $("btnJudge").onpointerdown=e=>{ e.preventDefault(); e.stopPropagation(); Audio2.resume(); tryJudge(); };
+if($("btnMirror")) $("btnMirror").onpointerdown=()=>{setMirror(true);Audio2.resume();};
+if($("btnMirrorDone")) $("btnMirrorDone").onpointerdown=()=>setMirror(false);
+if($("btnSpoit")) $("btnSpoit").onpointerdown=e=>{
   e.stopPropagation();Audio2.resume();
   spoitMode=!spoitMode;
   $("btnSpoit").style.background=spoitMode?"var(--yellow)":"";
   toast(spoitMode?"💧 스포이트: 원하는 교실 부분을 터치하세요":"스포이트를 취소했어요");
 };
-$("btnPaintHold").onpointerdown=()=>{}; // 색칠 모드에서는 캐릭터를 직접 터치해 칠합니다.
-$("btnFillAll").onclick=()=>{
+if($("btnPaintHold")) $("btnPaintHold").onpointerdown=()=>{};
+if($("btnFillAll")) $("btnFillAll").onclick=()=>{
   Audio2.resume();
   fillWholeFairy();
-  // 몸 전체 칠하기 뒤에도 색칠 모드를 유지해 세부 색칠을 이어갈 수 있습니다.
   mirrorDrag=null;
   mirrorLast=null;
   lastPaintPx=null;
@@ -5765,6 +6139,17 @@ const Net={
       const before=this.players[s.key]||{}; const after=s.val();
       this.players[s.key]=after;
       ensureRemote(s.key,after);
+      const rem = remotes.get(s.key);
+      if (rem) {
+        if (rem.target) {
+          rem.target.escortedBy = after.escortedBy !== undefined ? after.escortedBy : null;
+          rem.target.imprisoned = !!after.imprisoned;
+          rem.target.zombieState = after.zombieState || 0;
+        }
+        if (rem.fairy && typeof isIceMode === "function" && isIceMode() && rem.target?.zombieState !== undefined) {
+          applyZombieSkinToFairy(rem.fairy, rem.target.zombieState);
+        }
+      }
       if (s.key === this.uid) {
         const prevZ = G.zombieState;
         G.zombieState = after.zombieState || 0;
@@ -5954,11 +6339,26 @@ const Net={
     r.target.x=+a[0];r.target.y=+a[1];r.target.z=+a[2];r.target.ry=+a[3];
     r.target.pose=POSES[+a[4]||0]||"stand";
     r.target.flying=a[5]==="1";
-    r.target.zombieState=+a[6]||0;
+    if(a[6] !== undefined && +a[6] > 0){
+      r.target.zombieState = +a[6];
+      if(info) info.zombieState = r.target.zombieState;
+    } else if(info && (info.zombieState || 0) === 0){
+      r.target.zombieState = 0;
+    }
     r.target.hp=a[7] !== undefined ? +a[7] : 3;
-    r.target.escortedBy=a[8]||null;
-    r.target.imprisoned=a[9]==="1";
-    if(info){ info.escortedBy=r.target.escortedBy; info.imprisoned=r.target.imprisoned; }
+    if(a[8]){
+      r.target.escortedBy = a[8];
+      if(info) info.escortedBy = a[8];
+    } else if(info && !info.escortedBy){
+      r.target.escortedBy = null;
+    }
+    if(a[9] === "1"){
+      r.target.imprisoned = true;
+      if(info) info.imprisoned = true;
+    } else if(info && !info.imprisoned){
+      r.target.imprisoned = false;
+    }
+    r.target.wallStuck = a[10] === "1";
     if(r.cur.x===0&&r.cur.y===0&&r.cur.z===0){Object.assign(r.cur,{x:r.target.x,y:r.target.y,z:r.target.z,ry:r.target.ry});}
   },
   sendPos(){
@@ -5966,7 +6366,7 @@ const Net={
     if(G.lobbyPractice||G.role==="ghost"||G.spectating)return;
     if(G.role==="seeker"&&G.phase==="PAINT")return; // 술래는 숨는 시간에 스폰 전
     const pi=Math.max(0, POSES.indexOf(G.pose));
-    const str=[G.pos.x.toFixed(2),G.pos.y.toFixed(2),G.pos.z.toFixed(2),(G.fairyYaw%(Math.PI*2)).toFixed(2),pi,G.flying?1:0,G.zombieState||0,G.hp !== undefined ? G.hp : 3,G.escortedBy||"",G.imprisoned?1:0].join(",");
+    const str=[G.pos.x.toFixed(2),G.pos.y.toFixed(2),G.pos.z.toFixed(2),(G.fairyYaw%(Math.PI*2)).toFixed(2),pi,G.flying?1:0,G.zombieState||0,G.hp !== undefined ? G.hp : 3,G.escortedBy||"",G.imprisoned?1:0,G.wallStuck?1:0].join(",");
     if(str===G.lastPosSent)return;
     G.lastPosSent=str;
     this.positions[this.uid]=str;
@@ -6238,11 +6638,11 @@ const Net={
         }
       }).finally(()=>{this.phaseAdvanceLock=false;});
     }else if(m.phase==="SEEK"){
-      const hiders=Object.entries(this.players).filter(([u,p])=>p.role==="hider");
+      const hiders=Object.entries(this.players).filter(([u,p])=>p.role==="hider"||p.role==="fairy");
       let gameOver = false;
       let winner = "hider";
       if (zombieMode) {
-        const allInfected = hiders.length > 0 && hiders.every(([u,p])=>p.zombieState > 0);
+        const allInfected = hiders.length > 0 && hiders.every(([u,p])=>(p.zombieState||0) > 0);
         if (allInfected || now >= m.phaseEndsAt) {
           gameOver = true;
           winner = allInfected ? "seeker" : "hider";
@@ -6252,6 +6652,12 @@ const Net={
         if (allArrested || now >= m.phaseEndsAt) {
           gameOver = true;
           winner = allArrested ? "seeker" : "hider";
+        }
+      } else if (iceMode) {
+        const allFrozen = hiders.length > 0 && hiders.every(([u,p])=>(p.zombieState||0) > 0);
+        if (allFrozen || now >= m.phaseEndsAt) {
+          gameOver = true;
+          winner = allFrozen ? "seeker" : "hider";
         }
       } else {
         const allFound=hiders.length>0&&hiders.every(([u,p])=>p.found);
@@ -6358,13 +6764,20 @@ const Net={
         roleUpd[`rooms/${this.code}/players/${u}/tex`]=null;
         roleUpd[`rooms/${this.code}/players/${u}/foundAt`]=null;
         roleUpd[`rooms/${this.code}/players/${u}/foundBy`]=null;
+        roleUpd[`rooms/${this.code}/players/${u}/imprisoned`]=false;
+        roleUpd[`rooms/${this.code}/players/${u}/escortedBy`]=null;
+        roleUpd[`rooms/${this.code}/players/${u}/invincibleTimer`]=0;
+        roleUpd[`rooms/${this.code}/players/${u}/hp`]=3;
         
         // 좀비 모드이더라도 시작 대기시간 동안은 좀비 상태 0(인간)으로 설정
         const zState = 0;
         roleUpd[`rooms/${this.code}/players/${u}/zombieState`]=zState;
         
         roleUpd[`rooms/${this.code}/pos/${u}`]=null;
-        this.players[u]=Object.assign({},latestPlayers[u],{role,found:false,tex:null,foundAt:null,foundBy:null,zombieState:zState});
+        this.players[u]=Object.assign({},latestPlayers[u],{
+          role,found:false,tex:null,foundAt:null,foundBy:null,zombieState:zState,
+          imprisoned:false,escortedBy:null,invincibleTimer:0,hp:3
+        });
       });
       await update(ref(this.db),roleUpd);
 
@@ -6448,6 +6861,9 @@ function clearAllRoundGimmicks() {
   G.found = false;
   G.speedBoostTimer = 0;
   G.infiniteFlightTimer = 0;
+  G.wallStuck = false;
+  G.wallCollider = null;
+  if (typeof updateWallStickButton === "function") updateWallStickButton();
 }
 
 async function onPhaseChange(phase,prev){
@@ -6805,7 +7221,8 @@ function updateResultReveal(){
   }
 }
 $("btnSkipReveal").onclick=finishResultReveal;
-function enterResult(){
+function enterResult(overrideWinner){
+  if (overrideWinner) G.practiceWinner = overrideWinner;
   G.spectating=false;setMirror(false);Music.stop();updateSpectatorButton();
   G.tvMode=false; $("tvHud").classList.add("hidden"); $("tvFollowBar").classList.add("hidden");
   resetFrozenBanner();
@@ -6851,9 +7268,11 @@ function enterResult(){
     return;
   }
 
-  const winner=(Net.mode==="online"?Net.meta.winner:G.practiceWinner)||"hider";
+  const winner=(overrideWinner||(Net.mode==="online"?Net.meta?.winner:G.practiceWinner))||"hider";
   const seekWin=winner==="seeker";
   const isZMode = isZombieMode();
+  const isCops = typeof isCopsMode === "function" && isCopsMode();
+  const isIce = typeof isIceMode === "function" && isIceMode();
   
   if (isZMode) {
     if (winner === "seeker") {
@@ -6861,6 +7280,10 @@ function enterResult(){
     } else {
       $("resultTitle").textContent = "🛡️ 인간 생존자 최종 승리!";
     }
+  } else if (isCops) {
+    $("resultTitle").textContent = seekWin ? "👮 경찰 팀 최종 승리 (도둑 전원 체포)!" : "🏃 도둑 팀 최종 승리 (탈출 성공)!";
+  } else if (isIce) {
+    $("resultTitle").textContent = seekWin ? "🧊 술래 최종 승리 (모든 요정 얼림)!" : "🧚 도망자 요정 팀 최종 승리!";
   } else {
     $("resultTitle").textContent=seekWin?"✏️ 술래 연필 팀 승리!":"🧼 지우개 팀 승리!";
   }
@@ -6868,33 +7291,53 @@ function enterResult(){
   Audio2.sfxFanfare();
   let body="";
   if(Net.mode==="online"){
-    const hiders=Object.entries(Net.players).filter(([u,p])=>p.role==="hider");
+    const hiders=Object.entries(Net.players).filter(([u,p])=>p.role==="hider"||p.role==="fairy");
     let survivors = [];
     if (isZMode) {
-      const humanSurvivors = hiders.filter(([u,p])=>p.zombieState === 0).map(([u,p])=>p.nick);
+      const humanSurvivors = hiders.filter(([u,p])=>(p.zombieState||0) === 0).map(([u,p])=>p.nick);
       if(humanSurvivors.length) {
         body += `좀비 감염을 이겨낸 인간 생존자: <b>${humanSurvivors.join(", ")}</b><br>`;
       } else {
         body += `생존한 인간이 아무도 없습니다. 모두 좀비로 감염되었습니다.<br>`;
+      }
+    } else if (isCops) {
+      const freeRobbers = hiders.filter(([u,p])=>!p.imprisoned && !p.escortedBy).map(([u,p])=>p.nick);
+      if (freeRobbers.length) {
+        body += `체포되지 않고 탈출한 자유 도둑: <b>${freeRobbers.join(", ")}</b><br>`;
+      } else {
+        body += `모든 도둑이 경찰에게 체포되어 감옥에 수감되었습니다.<br>`;
+      }
+    } else if (isIce) {
+      const freeRunners = hiders.filter(([u,p])=>(p.zombieState||0) === 0).map(([u,p])=>p.nick);
+      if (freeRunners.length) {
+        body += `끝까지 얼지 않고 살아남은 요정: <b>${freeRunners.join(", ")}</b><br>`;
+      } else {
+        body += `모든 요정이 술래에게 잡혀 꽁꽁 얼었습니다.<br>`;
       }
     } else {
       survivors=hiders.filter(([u,p])=>!p.found).map(([u,p])=>p.nick);
       if(survivors.length) body+=`끝까지 살아남은 지우개: <b>${survivors.join(", ")}</b><br>`;
     }
     
-    if (!isZMode) {
+    if (!isZMode && !isCops && !isIce) {
       let best=null;
       if(survivors.length===0&&hiders.length){
         best=hiders.reduce((a,b)=>((a[1].foundAt||0)>(b[1].foundAt||0)?a:b))[1].nick;
       }else if(survivors.length) best=survivors.join(", ");
       if(best) body+=`<span class="best">🏆 최고의 지우개: ${best}</span>`;
     }
+  } else if (Net.mode === "practice") {
+    if (isCops) {
+      body += seekWin ? "경찰이 모든 도둑을 체포하였습니다!" : "도둑들이 경찰을 따돌리고 승리하였습니다!";
+    } else if (isIce) {
+      body += seekWin ? "술래가 모든 요정을 얼렸습니다!" : "요정들이 술래를 따돌리고 승리하였습니다!";
+    }
   }
   $("resultBody").innerHTML=body||"수고했어요!";
   $("btnNextRound").classList.toggle("hidden",!G.isHost);
   $("btnToLobby").classList.toggle("hidden",!G.isHost);
   showScreen("RESULT");
-  if (isZMode) {
+  if (isZMode || isCops || isIce) {
     finishResultReveal();
   } else {
     startResultReveal();
@@ -6953,17 +7396,18 @@ function showScreen(name){
   $("screenResult").classList.toggle("hidden",name!=="RESULT");
   $("hud").classList.toggle("hidden",name!=="GAME");
   $("zombieScoreBoard").classList.toggle("hidden", name!=="GAME" || !isZombieMode());
-  $("mobileUI").classList.toggle("hidden",!(IS_TOUCH&&name==="GAME"));
+  $("mobileUI").classList.toggle("hidden",!(isTouchMode()&&name==="GAME"));
   $("btnPracticeReturn").classList.toggle("hidden",!(name==="GAME"&&G.lobbyPractice));
   if(name!=="GAME"){ $("paintPanel").classList.add("hidden"); $("blockOverlay").classList.add("hidden");
     $("teacherPanel").classList.add("hidden"); $("tvHud").classList.add("hidden");
     $("btnTvSpectateToggle").classList.add("hidden");
     stopCaseGame();
     document.exitPointerLock&&document.exitPointerLock(); }
-  if(name==="GAME"&&!IS_TOUCH&&!G.mirror) $("deskHint").classList.remove("hidden");
+  if(name==="GAME"&&!isTouchMode()&&!G.mirror) $("deskHint").classList.remove("hidden");
   else $("deskHint").classList.add("hidden");
   syncLocalFairy();
   updateSpectatorButton();
+  updateControlModeUI();
 }
 $("deskHint").textContent="3인칭 이동 · WASD/방향키 · 마우스 시점 · Space 점프(빠르게 두 번: 비행) · E 색칠 모드 · 1/2/3 포즈";
 
@@ -8106,15 +8550,19 @@ function doArrestAction() {
 
   const copPos = G.pos;
   let target = null;
-  let targetDist = 4.5;
+  let targetDist = 6.0;
 
   if (Net.mode === "practice") {
     practiceAIList.forEach(bot => {
-      if (bot.role === "hider" && !bot.imprisoned && !bot.escortedBy) {
-        const d = copPos.distanceTo(bot.pos);
-        if (d < targetDist) {
-          targetDist = d;
-          target = { isBot: true, data: bot };
+      if ((bot.role === "hider" || bot.role === "fairy") && !bot.imprisoned && !bot.escortedBy) {
+        const hDist = Math.hypot(copPos.x - bot.pos.x, copPos.z - bot.pos.z);
+        const vDist = Math.abs(copPos.y - bot.pos.y);
+        if (hDist < 5.5 && vDist < 5.0) {
+          const d = Math.hypot(hDist, vDist);
+          if (d < targetDist) {
+            targetDist = d;
+            target = { isBot: true, data: bot };
+          }
         }
       }
     });
@@ -8142,10 +8590,14 @@ function doArrestAction() {
           return;
         }
 
-        const d = copPos.distanceTo(rPos);
-        if (d < targetDist) {
-          targetDist = d;
-          target = { isBot: false, uid, nick: pData.nick || (r && r.info && r.info.nick) || "도둑" };
+        const hDist = Math.hypot(copPos.x - rPos.x, copPos.z - rPos.z);
+        const vDist = Math.abs(copPos.y - rPos.y);
+        if (hDist < 5.5 && vDist < 5.0) {
+          const d = Math.hypot(hDist, vDist);
+          if (d < targetDist) {
+            targetDist = d;
+            target = { isBot: false, uid, nick: pData.nick || (r && r.info && r.info.nick) || "도둑" };
+          }
         }
       }
     });
@@ -8158,23 +8610,29 @@ function doArrestAction() {
       target.data.escortedBy = Net.uid || "local_host";
       toast(`👮 봇_${target.data.id.slice(4, 8)}을 체포하여 연행합니다!`);
     } else {
+      if (Net.players && Net.players[target.uid]) Net.players[target.uid].escortedBy = Net.uid;
+      const r = remotes.get(target.uid);
+      if (r) {
+        if (r.info) r.info.escortedBy = Net.uid;
+        if (r.target) r.target.escortedBy = Net.uid;
+      }
       Net.fb.update(Net.fb.ref(Net.db, `rooms/${Net.code}/players/${target.uid}`), { escortedBy: Net.uid }).catch(()=>{});
       toast(`👮 ${target.nick}님을 체포하여 연행합니다!`);
     }
   } else {
-    toast("🔍 근처 4.5m 이내에 체포할 수 있는 자유 도둑이 없습니다.");
+    toast("🔍 근처 5.5m 이내에 체포할 수 있는 자유 도둑이 없습니다.");
   }
 }
 
 function doRescueAction() {
   if (!isCopsMode() || G.screen !== "GAME") return;
-  if (G.role !== "hider" || G.imprisoned || G.escortedBy) return;
+  if ((G.role !== "hider" && G.role !== "fairy") || G.imprisoned || G.escortedBy) return;
 
   const mapId = practiceMapId || activeMapId || "classroom";
   const pZone = getPrisonZone(mapId);
   const distToPrison = G.pos.distanceTo(pZone.center);
 
-  if (distToPrison < pZone.radius + 1.0) {
+  if (distToPrison < pZone.radius + 1.5) {
     let rescuedCount = 0;
     if (Net.mode === "practice") {
       practiceAIList.forEach(bot => {
@@ -8190,6 +8648,12 @@ function doRescueAction() {
         const pData = Net.players[uid] || {};
         const r = remotes.get(uid);
         if (pData.imprisoned || (r && r.target?.imprisoned)) {
+          if (Net.players && Net.players[uid]) { Net.players[uid].imprisoned = false; Net.players[uid].escortedBy = null; }
+          const rem = remotes.get(uid);
+          if (rem) {
+            if (rem.info) { rem.info.imprisoned = false; rem.info.escortedBy = null; }
+            if (rem.target) { rem.target.imprisoned = false; rem.target.escortedBy = null; }
+          }
           Net.fb.update(Net.fb.ref(Net.db, `rooms/${Net.code}/players/${uid}`), { imprisoned: false, escortedBy: null, invincibleTimer: 2.5 }).catch(()=>{});
           rescuedCount++;
         }
@@ -8207,12 +8671,16 @@ function doRescueAction() {
   const allowRescueEscort = (settings.copsRescueEscort !== false);
   if (allowRescueEscort) {
     let target = null;
-    let minD = 4.5;
+    let minD = 6.0;
     if (Net.mode === "practice") {
       practiceAIList.forEach(bot => {
         if (bot.escortedBy) {
-          const d = G.pos.distanceTo(bot.pos);
-          if (d < minD) { minD = d; target = { isBot: true, data: bot }; }
+          const hDist = Math.hypot(G.pos.x - bot.pos.x, G.pos.z - bot.pos.z);
+          const vDist = Math.abs(G.pos.y - bot.pos.y);
+          if (hDist < 5.5 && vDist < 5.0) {
+            const d = Math.hypot(hDist, vDist);
+            if (d < minD) { minD = d; target = { isBot: true, data: bot }; }
+          }
         }
       });
     } else {
@@ -8236,8 +8704,12 @@ function doRescueAction() {
             return;
           }
 
-          const d = G.pos.distanceTo(rPos);
-          if (d < minD) { minD = d; target = { isBot: false, uid, nick: pData.nick || (r && r.info && r.info.nick) || "동료" }; }
+          const hDist = Math.hypot(G.pos.x - rPos.x, G.pos.z - rPos.z);
+          const vDist = Math.abs(G.pos.y - rPos.y);
+          if (hDist < 5.5 && vDist < 5.0) {
+            const d = Math.hypot(hDist, vDist);
+            if (d < minD) { minD = d; target = { isBot: false, uid, nick: pData.nick || (r && r.info && r.info.nick) || "동료" }; }
+          }
         }
       });
     }
@@ -8246,13 +8718,23 @@ function doRescueAction() {
       burst(G.pos.clone().add(new THREE.Vector3(0, 0.5, 0)), "#34c759", 14, 2.5, 0.4);
       if (target.isBot) {
         target.data.escortedBy = null;
+        target.data.invincibleTimer = 2.5;
         toast(`🔓 연행 중인 봇_${target.data.id.slice(4, 8)}을 구출했습니다!`);
       } else {
-        Net.fb.update(Net.fb.ref(Net.db, `rooms/${Net.code}/players/${target.uid}`), { escortedBy: null }).catch(()=>{});
+        if (Net.players && Net.players[target.uid]) Net.players[target.uid].escortedBy = null;
+        const r = remotes.get(target.uid);
+        if (r) {
+          if (r.info) r.info.escortedBy = null;
+          if (r.target) r.target.escortedBy = null;
+        }
+        Net.fb.update(Net.fb.ref(Net.db, `rooms/${Net.code}/players/${target.uid}`), { escortedBy: null, invincibleTimer: 2.5 }).catch(()=>{});
         toast(`🔓 연행 중인 ${target.nick}님을 구출했습니다!`);
       }
+      return;
     }
   }
+
+  toast("💡 감옥 근처(1.5m)로 가거나, 연행 중인 동료 근처(5.5m)에서 [F/터치]로 구출할 수 있습니다.");
 }
 
 /* ================================================================
@@ -9235,7 +9717,7 @@ function updateCopsStatusModalUI() {
       if (role === "seeker") { pState = "👮 경찰"; pColor = "#007aff"; }
       else if (p.imprisoned) { pState = "🔒 수감"; pColor = "#ff3b30"; imprisonedCount++; }
       else if (p.escortedBy) { pState = "⛓️ 연행 중"; pColor = "#ff9500"; escortCount++; }
-      else if (role === "hider") { freeCount++; }
+      else if (role === "hider" || role === "fairy") { freeCount++; }
       addRow(p.nick || uid.slice(0, 4), role, pState, pColor);
     });
   }
@@ -9258,23 +9740,34 @@ function checkCopsWinConditions() {
   if (!isCopsMode() || G.screen !== "GAME") return;
   if (G.phase !== "SEEK") return;
 
+  let totalRobbers = 0;
   let freeCount = 0;
   if (Net.mode === "practice") {
-    if (G.role === "hider" && !G.imprisoned && !G.escortedBy) freeCount++;
+    if (G.role === "hider" || G.role === "fairy") {
+      totalRobbers++;
+      if (!G.imprisoned && !G.escortedBy) freeCount++;
+    }
     practiceAIList.forEach(bot => {
-      if (bot.role === "hider" && !bot.imprisoned && !bot.escortedBy) freeCount++;
+      if (bot.role === "hider" || bot.role === "fairy") {
+        totalRobbers++;
+        if (!bot.imprisoned && !bot.escortedBy) freeCount++;
+      }
     });
   } else {
     const players = Net.players || {};
     Object.keys(players).forEach(uid => {
       const p = players[uid];
-      if ((p.role || "hider") === "hider" && !p.imprisoned && !p.escortedBy) {
-        freeCount++;
+      const r = p.role || "hider";
+      if (r === "hider" || r === "fairy") {
+        totalRobbers++;
+        if (!p.imprisoned && !p.escortedBy) {
+          freeCount++;
+        }
       }
     });
   }
 
-  if (freeCount === 0) {
+  if (totalRobbers > 0 && freeCount === 0) {
     if (Net.mode === "practice") {
       if (G.phase === "SEEK") {
         G.phase = "RESULT";
@@ -10060,6 +10553,19 @@ function initOfflinePracticeObjects() {
     spawnPracticeAI("hider", 0, "team1", "none");
     spawnPracticeAI("hider", 0, "team1", "none");
     spawnPracticeAI("hider", 0, "team1", "none");
+  } else if (gm === "ice") {
+    // 얼음땡 봇 스폰 (플레이어가 술래면 도망자 4명, 플레이어가 도망자면 술래 1명 + 동료 도망자 3명)
+    if (G.role === "seeker") {
+      spawnPracticeAI("hider", 0, "team1", "none");
+      spawnPracticeAI("hider", 0, "team1", "none");
+      spawnPracticeAI("hider", 0, "team1", "none");
+      spawnPracticeAI("hider", 0, "team1", "none");
+    } else {
+      spawnPracticeAI("seeker", 0, "team2", "none");
+      spawnPracticeAI("hider", 0, "team1", "none");
+      spawnPracticeAI("hider", 0, "team1", "none");
+      spawnPracticeAI("hider", 0, "team1", "none");
+    }
   }
 }
 
@@ -10186,6 +10692,10 @@ function updatePracticeAI(dt) {
     if (gm === "cops" && (bot.imprisoned || bot.escortedBy)) {
       return;
     }
+    if (gm === "ice" && (bot.zombieState || 0) > 0) {
+      animateFairyMovement(bot.fairy, dt, 0, "stand", true, false, bot.zombieState);
+      return;
+    }
 
     bot.changeDirTimer -= dt;
     if (bot.changeDirTimer <= 0) {
@@ -10260,6 +10770,57 @@ function updatePracticeAI(dt) {
             } else {
               bot.moveDir.set((Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2).normalize();
             }
+          }
+        }
+      } else if (gm === "ice") {
+        if (bot.role === "seeker") {
+          let closestTarget = null;
+          let minDist = 999;
+          if ((G.role === "hider" || G.role === "fairy") && (G.zombieState || 0) === 0) {
+            const d = bot.pos.distanceTo(G.pos);
+            if (d < minDist) { minDist = d; closestTarget = G.pos; }
+          }
+          practiceAIList.forEach(b => {
+            if ((b.role === "hider" || b.role === "fairy") && (b.zombieState || 0) === 0) {
+              const d = bot.pos.distanceTo(b.pos);
+              if (d < minDist) { minDist = d; closestTarget = b.pos; }
+            }
+          });
+          if (closestTarget) {
+            const dir = new THREE.Vector2(closestTarget.x - bot.pos.x, closestTarget.z - bot.pos.z).normalize();
+            bot.moveDir.copy(dir);
+          } else {
+            bot.moveDir.set((Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2).normalize();
+          }
+        } else {
+          let frozenFriend = null;
+          let minFriendDist = 999;
+          if ((G.role === "hider" || G.role === "fairy") && (G.zombieState || 0) > 0) {
+            const d = bot.pos.distanceTo(G.pos);
+            if (d < minFriendDist) { minFriendDist = d; frozenFriend = G.pos; }
+          }
+          practiceAIList.forEach(b => {
+            if (b.id !== bot.id && (b.role === "hider" || b.role === "fairy") && (b.zombieState || 0) > 0) {
+              const d = bot.pos.distanceTo(b.pos);
+              if (d < minFriendDist) { minFriendDist = d; frozenFriend = b.pos; }
+            }
+          });
+
+          let seekerPos = null;
+          if (G.role === "seeker") seekerPos = G.pos;
+          else {
+            const sBot = practiceAIList.find(b => b.role === "seeker");
+            if (sBot) seekerPos = sBot.pos;
+          }
+
+          if (frozenFriend && (!seekerPos || bot.pos.distanceTo(seekerPos) > 6.0)) {
+            const dir = new THREE.Vector2(frozenFriend.x - bot.pos.x, frozenFriend.z - bot.pos.z).normalize();
+            bot.moveDir.copy(dir);
+          } else if (seekerPos) {
+            const dir = new THREE.Vector2(bot.pos.x - seekerPos.x, bot.pos.z - seekerPos.z).normalize();
+            bot.moveDir.copy(dir);
+          } else {
+            bot.moveDir.set((Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2).normalize();
           }
         }
       } else {
@@ -10473,21 +11034,6 @@ function injectIceButtons() {
     }
 }
 
-window.addEventListener("keydown", e => {
-  if (isIceMode() && G.screen === "GAME") {
-     const code = e.code;
-     const key = e.key ? e.key.toLowerCase() : "";
-     if ((code === "KeyQ" || key === "q" || key === "ㅂ") && !e.repeat) {
-         e.preventDefault();
-         doIceSelfAction();
-     }
-     if ((code === "KeyF" || key === "f" || key === "ㄹ") && !e.repeat) {
-         e.preventDefault();
-         doIceTagAction();
-     }
-  }
-});
-
 function doIceSelfAction() {
     if (!isIceMode() || G.screen !== "GAME") return;
     const isHider = (G.role === "hider" || G.role === "fairy");
@@ -10515,7 +11061,7 @@ function doIceTagAction() {
     if (!isIceMode() || G.screen !== "GAME") return;
     const myPos = G.pos;
     let target = null;
-    let minDist = 4.5;
+    let minDist = 6.0;
 
     const isSeeker = (G.role === "seeker");
     const isHider = (G.role === "hider" || G.role === "fairy");
@@ -10525,8 +11071,12 @@ function doIceTagAction() {
         if (Net.mode === "practice") {
             practiceAIList.forEach(bot => {
                 if ((bot.role === "hider" || bot.role === "fairy") && (bot.zombieState || 0) === 0) {
-                    const d = myPos.distanceTo(bot.pos);
-                    if (d < minDist) { minDist = d; target = bot; }
+                    const hDist = Math.hypot(myPos.x - bot.pos.x, myPos.z - bot.pos.z);
+                    const vDist = Math.abs(myPos.y - bot.pos.y);
+                    if (hDist < 5.5 && vDist < 5.0) {
+                        const d = Math.hypot(hDist, vDist);
+                        if (d < minDist) { minDist = d; target = bot; }
+                    }
                 }
             });
         } else {
@@ -10552,8 +11102,12 @@ function doIceTagAction() {
                         return;
                     }
 
-                    const d = myPos.distanceTo(rPos);
-                    if (d < minDist) { minDist = d; target = { uid, nick: pData.nick || (r && r.info && r.info.nick) || "도망자" }; }
+                    const hDist = Math.hypot(myPos.x - rPos.x, myPos.z - rPos.z);
+                    const vDist = Math.abs(myPos.y - rPos.y);
+                    if (hDist < 5.5 && vDist < 5.0) {
+                        const d = Math.hypot(hDist, vDist);
+                        if (d < minDist) { minDist = d; target = { uid, nick: pData.nick || (r && r.info && r.info.nick) || "도망자" }; }
+                    }
                 }
             });
         }
@@ -10563,21 +11117,32 @@ function doIceTagAction() {
             burst(myPos.clone().add(new THREE.Vector3(0,1,0)), "#4aa8ff", 15, 2.5, 0.4);
             toast(`🥶 ${target.nick || "상대"}님을 터치했습니다 (아웃)!`);
             if (target.uid && Net.mode === "online") {
+                if (Net.players && Net.players[target.uid]) Net.players[target.uid].zombieState = 2;
+                const r = remotes.get(target.uid);
+                if (r) {
+                    if (r.info) r.info.zombieState = 2;
+                    if (r.target) r.target.zombieState = 2;
+                    if (r.fairy) applyZombieSkinToFairy(r.fairy, 2);
+                }
                 Net.fb.update(Net.fb.ref(Net.db, `rooms/${Net.code}/players/${target.uid}`), {zombieState: 2}).catch(()=>{});
             } else if (target.zombieState !== undefined) {
                 target.zombieState = 2;
                 if (target.fairy) applyZombieSkinToFairy(target.fairy, 2);
             }
         } else {
-            toast("🔍 근처 4.5m 이내에 잡을 수 있는 도망자가 없습니다. (얼음 상태는 터치 불가)");
+            toast("🔍 근처 5.5m 이내에 잡을 수 있는 도망자가 없습니다. (얼음 상태는 터치 불가)");
         }
     } else if (isHider && G.zombieState === 0) {
         // 도망자 → 얼음 상태(zombieState > 0)인 동료를 구출
         if (Net.mode === "practice") {
             practiceAIList.forEach(bot => {
                 if ((bot.role === "hider" || bot.role === "fairy") && (bot.zombieState || 0) > 0) {
-                    const d = myPos.distanceTo(bot.pos);
-                    if (d < minDist) { minDist = d; target = bot; }
+                    const hDist = Math.hypot(myPos.x - bot.pos.x, myPos.z - bot.pos.z);
+                    const vDist = Math.abs(myPos.y - bot.pos.y);
+                    if (hDist < 5.5 && vDist < 5.0) {
+                        const d = Math.hypot(hDist, vDist);
+                        if (d < minDist) { minDist = d; target = bot; }
+                    }
                 }
             });
         } else {
@@ -10603,8 +11168,12 @@ function doIceTagAction() {
                         return;
                     }
 
-                    const d = myPos.distanceTo(rPos);
-                    if (d < minDist) { minDist = d; target = { uid, nick: pData.nick || (r && r.info && r.info.nick) || "동료" }; }
+                    const hDist = Math.hypot(myPos.x - rPos.x, myPos.z - rPos.z);
+                    const vDist = Math.abs(myPos.y - rPos.y);
+                    if (hDist < 5.5 && vDist < 5.0) {
+                        const d = Math.hypot(hDist, vDist);
+                        if (d < minDist) { minDist = d; target = { uid, nick: pData.nick || (r && r.info && r.info.nick) || "동료" }; }
+                    }
                 }
             });
         }
@@ -10614,30 +11183,66 @@ function doIceTagAction() {
             burst(myPos.clone().add(new THREE.Vector3(0,1,0)), "#ffd700", 15, 2.5, 0.4);
             toast(`🔔 땡! ${target.nick || "동료"}님을 구했습니다!`);
             if (target.uid && Net.mode === "online") {
+                if (Net.players && Net.players[target.uid]) Net.players[target.uid].zombieState = 0;
+                const r = remotes.get(target.uid);
+                if (r) {
+                    if (r.info) r.info.zombieState = 0;
+                    if (r.target) r.target.zombieState = 0;
+                    if (r.fairy) applyZombieSkinToFairy(r.fairy, 0);
+                }
                 Net.fb.update(Net.fb.ref(Net.db, `rooms/${Net.code}/players/${target.uid}`), {zombieState: 0}).catch(()=>{});
             } else if (target.zombieState !== undefined) {
                 target.zombieState = 0;
                 if (target.fairy) applyZombieSkinToFairy(target.fairy, 0);
             }
         } else {
-            toast("💡 근처 4.5m 이내에 구해줄 수 있는 얼음 동료가 없습니다.");
+            toast("💡 근처 5.5m 이내에 구해줄 수 있는 얼음 동료가 없습니다.");
         }
     }
 }
 
 function checkIceWinConditions() {
     if (!isIceMode() || G.screen !== "GAME" || G.phase !== "SEEK") return;
+    let totalRunners = 0;
     let freeCount = 0;
-    const players = Net.players || {};
-    Object.keys(players).forEach(uid => {
-        const p = players[uid];
-        if ((p.role || "hider") === "hider" && (p.zombieState || 0) === 0) {
-            freeCount++;
+
+    if (Net.mode === "practice") {
+        if (G.role === "hider" || G.role === "fairy") {
+            totalRunners++;
+            if ((G.zombieState || 0) === 0) freeCount++;
         }
-    });
-    if (freeCount === 0 && G.isHost && Net.mode==="online") {
-        Audio2.sfxFound();
-        Net.setPhase("RESULT", 0, { winner: "seeker" });
+        practiceAIList.forEach(bot => {
+            if (bot.role === "hider" || bot.role === "fairy") {
+                totalRunners++;
+                if ((bot.zombieState || 0) === 0) freeCount++;
+            }
+        });
+    } else {
+        const players = Net.players || {};
+        Object.keys(players).forEach(uid => {
+            const p = players[uid];
+            const r = p.role || "hider";
+            if (r === "hider" || r === "fairy") {
+                totalRunners++;
+                if ((p.zombieState || 0) === 0) {
+                    freeCount++;
+                }
+            }
+        });
+    }
+
+    if (totalRunners > 0 && freeCount === 0) {
+        if (Net.mode === "practice") {
+            if (G.phase === "SEEK") {
+                G.phase = "RESULT";
+                showRoleCard("🧊 술래 승리!", "모든 요정을 얼렸습니다! 술래 승리!");
+                Audio2.sfxFound();
+                setTimeout(() => { if (G.screen === "GAME") enterResult("seeker"); }, 1200);
+            }
+        } else if (G.isHost && Net.mode === "online") {
+            Audio2.sfxFound();
+            Net.setPhase("RESULT", 0, { winner: "seeker" });
+        }
     }
 }
 
