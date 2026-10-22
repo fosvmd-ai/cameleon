@@ -16,42 +16,50 @@ html,body{width:100%;height:100%;overflow:hidden;background:#111;
 canvas.gl{position:fixed;inset:0;display:block;}
 
 /* ===== 공통 오버레이 ===== */
-.screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  z-index:50;padding:16px;}
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+  z-index:50;padding:28px 20px;overflow-y:auto;overflow-x:hidden;touch-action:pan-y;-webkit-overflow-scrolling:touch;}
+.screen>*:first-child{margin-top:auto;}
+.screen>*:last-child{margin-bottom:auto;}
 .hidden{display:none !important;}
-.panel{background:var(--cream);border:4px solid var(--ink);border-radius:16px;padding:22px 26px;
-  box-shadow:6px 6px 0 rgba(0,0,0,.35);max-width:520px;width:min(92vw,520px);
+.panel{background:var(--cream);border:4px solid var(--ink);border-radius:16px;padding:18px 22px;
+  box-shadow:6px 6px 0 rgba(0,0,0,.35);max-width:520px;width:min(92vw,520px);flex-shrink:0;touch-action:pan-y;
   background-image:repeating-linear-gradient(transparent,transparent 27px,rgba(74,127,181,.18) 27px,rgba(74,127,181,.18) 28px);}
-.panel h2{font-size:22px;margin-bottom:12px;}
-button{font-family:inherit;font-weight:800;font-size:17px;color:var(--ink);
-  background:var(--yellow);border:3px solid var(--ink);border-radius:16px;padding:12px 20px;
+.panel *{touch-action:pan-y;}
+.panel h2{font-size:22px;margin-bottom:10px;}
+button{font-family:inherit;font-weight:800;font-size:16px;color:var(--ink);
+  background:var(--yellow);border:3px solid var(--ink);border-radius:14px;padding:10px 18px;
   cursor:pointer;box-shadow:3px 3px 0 rgba(0,0,0,.3);transition:transform .06s;}
 button:active{transform:translate(2px,2px);box-shadow:0 0 0;}
 button.secondary{background:#fff;}
 button.blue{background:var(--blue);color:#fff;}
 button:disabled{opacity:.45;cursor:default;}
-input[type=text]{font-family:inherit;font-weight:700;font-size:18px;padding:10px 12px;
+input[type=text]{font-family:inherit;font-weight:700;font-size:17px;padding:9px 12px;
   border:3px solid var(--ink);border-radius:12px;width:100%;background:#fff;text-align:center;}
-.row{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;justify-content:center;}
-.note{font-size:13px;font-weight:600;opacity:.75;margin-top:10px;line-height:1.5;}
+.row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;justify-content:center;}
+.note{font-size:12.5px;font-weight:600;opacity:.78;margin-top:8px;line-height:1.45;}
 
 /* ===== 타이틀 (칠판) ===== */
 #screenTitle{background:
   radial-gradient(ellipse at 30% 20%, rgba(255,255,255,.06), transparent 60%),
   #2E5E4E;}
-#screenTitle::before{content:"";position:absolute;inset:12px;border:10px solid #8a5a33;border-radius:8px;
-  box-shadow:inset 0 0 40px rgba(0,0,0,.4);pointer-events:none;}
-.chalkTitle{color:#fdfdf5;text-align:center;margin-bottom:8px;
+#screenTitle::before{content:"";position:fixed;inset:12px;border:10px solid #8a5a33;border-radius:8px;
+  box-shadow:inset 0 0 40px rgba(0,0,0,.4);pointer-events:none;z-index:52;}
+.chalkTitle{color:#fdfdf5;text-align:center;margin-bottom:4px;flex-shrink:0;
   text-shadow:0 0 6px rgba(255,255,255,.35);letter-spacing:2px;}
-.chalkTitle .small{font-size:clamp(15px,3vw,20px);opacity:.85;display:block;margin-bottom:6px;}
-.chalkTitle .big{font-size:clamp(30px,7vw,54px);
-  text-decoration:underline wavy rgba(255,255,255,.5) 3px;text-underline-offset:10px;}
-.chalkSub{color:#cfe7da;font-size:14px;font-weight:600;margin:14px 0 20px;text-align:center;line-height:1.6;}
+.chalkTitle .small{font-size:clamp(14px,2.5vw,18px);opacity:.85;display:block;margin-bottom:4px;}
+.chalkTitle .big{font-size:clamp(26px,5.5vw,44px);
+  text-decoration:underline wavy rgba(255,255,255,.5) 3px;text-underline-offset:8px;}
+.chalkSub{color:#cfe7da;font-size:13px;font-weight:600;margin:8px 0 12px;text-align:center;line-height:1.5;flex-shrink:0;}
+@media(max-height:820px){
+  .chalkTitle .big{font-size:clamp(22px,4.5vw,34px);}
+  .chalkSub{margin:4px 0 8px;font-size:12px;}
+  .screen{padding:22px 16px;}
+}
 
 /* ===== 로비 ===== */
 #screenLobby{background:rgba(20,30,40,.88);backdrop-filter:blur(3px);}
-#screenLobby .panel{max-height:94vh;overflow-y:auto;}
-@media(max-height:700px){#qrWrap canvas{width:150px !important;height:150px !important}#roomCodeBig{font-size:44px}.panel{padding:14px 18px}}
+#screenLobby .panel{max-height:92vh;overflow-y:auto;}
+@media(max-height:700px){#qrWrap canvas{width:140px !important;height:140px !important}#roomCodeBig{font-size:40px}.panel{padding:14px 16px}}
 #roomCodeBig{font-size:clamp(40px,10vw,72px);letter-spacing:12px;color:var(--blue);
   text-align:center;margin:4px 0 8px;}
 #qrWrap{display:flex;justify-content:center;margin:8px 0;}
@@ -76,10 +84,11 @@ label.chk{display:flex;align-items:center;gap:8px;justify-content:center;font-si
 label.chk input{width:20px;height:20px;}
 
 /* ===== v2: 맵 카드 ===== */
-.mapCardBox{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px;}
-.mapCard{width:104px;padding:8px 6px;border:3px solid var(--ink);border-radius:12px;background:#fff;
-  cursor:pointer;font-size:12px;text-align:center;box-shadow:2px 2px 0 rgba(0,0,0,.25);}
-.mapCard .ico{font-size:26px;}
+.mapCardBox{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:8px;width:100%;}
+@media(max-width:420px){.mapCardBox{grid-template-columns:repeat(2,minmax(0,1fr));}}
+.mapCard{width:100%;padding:6px 4px;border:2.5px solid var(--ink);border-radius:10px;background:#fff;
+  cursor:pointer;font-size:11.5px;text-align:center;box-shadow:2px 2px 0 rgba(0,0,0,.22);line-height:1.25;}
+.mapCard .ico{font-size:21px;line-height:1.15;margin-bottom:2px;}
 .mapCard.sel{background:var(--yellow);}
 .mapCard.disabled{opacity:.45;cursor:default;}
 .mapCard.readonly{cursor:default;}
@@ -109,15 +118,14 @@ label.chk input{width:20px;height:20px;}
 .rouletteSlot.spin{animation:rouletteShake .08s linear infinite;}
 @keyframes rouletteShake{0%{transform:translateY(-2px);}50%{transform:translateY(2px);}100%{transform:translateY(-2px);}}
 
-/* ===== v2: 게임 중 선생님 패널 (화면 왼쪽 위. 선생님 역할이 무엇이든 표시) ===== */
-/* column: 토글 버튼이 위, 펼친 내용이 아래로 열립니다. */
-/* 색칠 팔레트(#paintPanel: left 10px, 폭 158px → 우측 끝 168px)와 겹치지 않도록
-   팔레트 바로 오른쪽(left 178px)에 배치합니다. 선생님이 요정 역할로 함께 플레이해도
-   팔레트와 선생님 패널이 나란히 보입니다. */
-#teacherPanel{position:fixed;left:178px;top:10px;right:auto;bottom:auto;z-index:55;pointer-events:auto;
+/* ===== v2: 게임 중 선생님 패널 ===== */
+#teacherPanel{position:fixed;left:184px;top:10px;right:auto;bottom:auto;z-index:55;pointer-events:auto;
   display:flex;flex-direction:column;gap:6px;
   background:rgba(255,248,231,.96);border:3px solid var(--ink);border-radius:14px;padding:6px;
   max-width:210px;max-height:82vh;box-shadow:4px 4px 0 rgba(0,0,0,.3);}
+@media(max-width:768px){
+  #teacherPanel{left:10px;top:auto;bottom:14px;max-width:170px;}
+}
 #teacherPanelToggle{font-size:12px;padding:7px 9px;width:100%;background:#fff;border-radius:11px;}
 #teacherPanelBody{display:flex;flex-direction:column;gap:6px;overflow-y:auto;}
 #teacherPanelBody.collapsed{display:none;}
@@ -131,31 +139,30 @@ label.chk input{width:20px;height:20px;}
 #tvRemain{font-size:clamp(24px,4vw,34px);color:var(--yellow);text-shadow:3px 3px 0 rgba(0,0,0,.6);margin-top:6px;font-weight:800;}
 #tvLog{margin-top:10px;display:flex;flex-direction:column;gap:3px;align-items:center;}
 #tvLog div{font-size:16px;color:#fff;background:rgba(0,0,0,.4);padding:3px 12px;border-radius:8px;}
-/* v3: 숨는 시간엔 위치를 일부러 안 보여준다는 안내(화면 중앙) */
 #tvBlockedNotice{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;
   color:#fff;background:rgba(0,0,0,.5);border-radius:16px;padding:18px 26px;max-width:min(86vw,520px);}
 #tvBlockedNotice.hidden{display:none;}
 #tvBlockedNotice .big{font-size:clamp(20px,4vw,30px);font-weight:800;}
 #tvBlockedNotice .small{font-size:clamp(13px,2.4vw,16px);opacity:.85;margin-top:6px;}
-#btnTvSpectateToggle{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);pointer-events:auto;z-index:41;}
-/* v2: 얼음 모드 버튼 활성 표시 */
+#btnTvSpectateToggle{font-size:13px;padding:7px 14px;border-radius:12px;background:rgba(255,248,231,.95);pointer-events:auto;}
 #btnFreeze.frozen{background:#7ecbff;color:var(--ink);}
-/* v2: TV 술래 추적 컨트롤 (TV 모드일 때만 표시) */
-#tvFollowBar{position:fixed;left:50%;bottom:74px;transform:translateX(-50%);z-index:42;
-  display:flex;gap:8px;align-items:center;pointer-events:auto;
-  background:rgba(20,25,35,.7);padding:8px 12px;border-radius:14px;border:2px solid rgba(255,255,255,.5);}
+#tvFollowBar{display:flex;gap:8px;align-items:center;pointer-events:auto;
+  background:rgba(20,25,35,.85);padding:6px 12px;border-radius:14px;border:2px solid rgba(255,255,255,.5);}
 #tvFollowBar.hidden{display:none;}
-#tvFollowBar button{font-size:15px;padding:8px 14px;border-radius:10px;}
-#tvFollowName{color:#fff;font-size:clamp(16px,2.4vw,22px);min-width:120px;text-align:center;
-  text-shadow:2px 2px 0 rgba(0,0,0,.6);}
-/* v2: 학생 화면 "얼음!" 표시 */
-#frozenBanner{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:60;
-  font-size:clamp(24px,6vw,48px);color:#bff0ff;text-shadow:0 0 14px #4ab8ff,3px 3px 0 rgba(0,0,0,.5);
+#tvFollowBar button{font-size:14px;padding:6px 12px;border-radius:10px;}
+#tvFollowName{color:#fff;font-size:clamp(15px,2.2vw,20px);min-width:120px;text-align:center;text-shadow:2px 2px 0 rgba(0,0,0,.6);}
+
+/* ===== 학생 "얼음!" 배너 & 중앙 공지 (위치 분리 및 정돈) ===== */
+#frozenBanner{position:fixed;top:23%;left:50%;transform:translate(-50%,-50%);z-index:65;
+  background:rgba(10,35,70,.88);border:2px solid #77ddff;border-radius:24px;padding:8px 24px;
+  font-size:clamp(20px,4.5vw,34px);font-weight:900;color:#bff0ff;text-shadow:0 0 12px #4ab8ff,2px 2px 0 rgba(0,0,0,.6);
+  box-shadow:0 8px 32px rgba(0,0,0,.5),inset 0 0 16px rgba(74,184,255,.4);backdrop-filter:blur(8px);
   pointer-events:none;animation:frozenPulse 1.2s ease-in-out infinite;}
 #frozenBanner.hidden{display:none;}
-#centerAlert{position:fixed;top:38%;left:50%;transform:translate(-50%,-50%);z-index:58;
-  font-size:clamp(38px,10vw,90px);font-weight:900;color:#ffe27a;text-align:center;white-space:nowrap;
-  text-shadow:0 0 26px #ff8a00,4px 4px 0 rgba(0,0,0,.55);
+#centerAlert{position:fixed;top:31%;left:50%;transform:translate(-50%,-50%);z-index:58;
+  font-size:clamp(22px,4.5vw,42px);font-weight:900;color:#ffe27a;text-align:center;white-space:nowrap;
+  background:rgba(20,15,10,.78);padding:6px 20px;border-radius:20px;border:2px solid rgba(255,170,0,.6);
+  text-shadow:0 0 20px #ff8a00,2px 2px 0 rgba(0,0,0,.7);
   pointer-events:none;animation:frozenPulse 0.55s ease-in-out infinite;}
 #centerAlert.hidden{display:none;}
 #lobbyPracticeBox{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;
@@ -164,7 +171,6 @@ label.chk input{width:20px;height:20px;}
 #lobbyPracticeBox .lpCard{background:var(--cream);border:3px solid var(--ink);border-radius:16px;
   padding:18px 20px;max-width:520px;width:100%;max-height:88vh;overflow-y:auto;text-align:center;
   box-shadow:5px 5px 0 rgba(0,0,0,.3);}
-/* 서버 선택 행: 이름 + 사용량 게이지 + 인원 */
 @keyframes frozenPulse{0%,100%{transform:translate(-50%,-50%) scale(1);}50%{transform:translate(-50%,-50%) scale(1.08);}}
 
 /* ===== v2: 기록 모달 ===== */
@@ -185,18 +191,25 @@ label.chk input{width:20px;height:20px;}
 .hicon{width:13px;height:20px;border-radius:3px;border:2px solid rgba(0,0,0,.55);background:#fff;
   box-shadow:1px 1px 0 rgba(0,0,0,.3);}
 .hicon.found{background:var(--red);}
-#gaugeBox{position:absolute;top:12px;left:12px;display:flex;align-items:center;gap:8px;}
-#gaugeBox .pal{width:34px;height:28px;background:var(--cream);border:3px solid var(--ink);border-radius:50% 50% 45% 45%;position:relative;}
-#gaugeBox .pal::after{content:"";position:absolute;right:5px;top:8px;width:8px;height:8px;border-radius:50%;background:#fff;border:2px solid var(--ink);}
-#gaugeBar{width:110px;height:16px;border:3px solid var(--ink);border-radius:8px;background:#fff;overflow:hidden;position:relative;}
-#gaugeBar::after{content:"∞";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--ink);text-shadow:0 0 2px #fff;z-index:2;}
+.hudScoreBoard{display:flex;align-items:center;justify-content:center;margin-top:5px;border-radius:12px;pointer-events:none;}
+
+/* ===== 좌측 상단 통합 HUD 스택 (겹침 완전 방지 Flex 컬럼) ===== */
+#topLeftArea{position:fixed;top:10px;left:10px;z-index:45;display:flex;flex-direction:column;align-items:flex-start;gap:6px;pointer-events:none;}
+#topLeftArea>*{position:static !important;pointer-events:auto;margin:0 !important;}
+#gaugeBox{display:flex;align-items:center;gap:8px;background:rgba(255,248,231,.94);border:2.5px solid var(--ink);border-radius:14px;padding:4px 9px;box-shadow:2px 2px 0 rgba(0,0,0,.25);}
+#gaugeBox .pal{width:28px;height:24px;background:var(--cream);border:2.5px solid var(--ink);border-radius:50% 50% 45% 45%;position:relative;}
+#gaugeBox .pal::after{content:"";position:absolute;right:4px;top:6px;width:6px;height:6px;border-radius:50%;background:#fff;border:1.5px solid var(--ink);}
+#gaugeBar{width:96px;height:14px;border:2px solid var(--ink);border-radius:7px;background:#fff;overflow:hidden;position:relative;}
+#gaugeBar::after{content:"∞";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--ink);text-shadow:0 0 2px #fff;z-index:2;}
 #gaugeFill{height:100%;width:100%;background:linear-gradient(90deg,#e455a0,#F5C518,#57c76a,#4A7FB5);}
-#curColorDot{width:22px;height:22px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 2px rgba(0,0,0,.4);}
-#flyGaugeBox{position:absolute;top:48px;left:12px;display:flex;align-items:center;gap:8px;z-index:31;}
-#flyGaugeBox.hidden{display:none;}
-#flyGaugeBox .wing-icon{font-size:18px;text-shadow:1px 1px 0 rgba(0,0,0,.65);}
-#flyGaugeBar{width:110px;height:12px;border:3px solid var(--ink);border-radius:6px;background:#fff;overflow:hidden;position:relative;}
+#curColorDot{width:20px;height:20px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 2px rgba(0,0,0,.4);}
+
+#flyGaugeBox{display:flex;align-items:center;gap:7px;background:rgba(255,248,231,.94);border:2.5px solid var(--ink);border-radius:12px;padding:4px 9px;box-shadow:2px 2px 0 rgba(0,0,0,.25);}
+#flyGaugeBox.hidden{display:none !important;}
+#flyGaugeBox .wing-icon{font-size:16px;text-shadow:1px 1px 0 rgba(0,0,0,.65);}
+#flyGaugeBar{width:96px;height:11px;border:2px solid var(--ink);border-radius:6px;background:#fff;overflow:hidden;position:relative;}
 #flyGaugeFill{height:100%;width:100%;background:linear-gradient(90deg,#88d3ff,#4aa8ff);transition:width 0.1s linear;}
+
 #crossWrap{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:56px;height:56px;}
 #crosshair{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   font-size:22px;color:#fff;text-shadow:1px 1px 0 rgba(0,0,0,.7);}
@@ -209,18 +222,19 @@ label.chk input{width:20px;height:20px;}
 #crosshair.paintAim::before{content:"";width:30px;height:30px;border:3px solid currentColor;border-radius:50%;
   box-shadow:0 0 0 1px rgba(0,0,0,.5);}
 #cooldownRing{position:absolute;inset:0;}
-#netStatus{position:absolute;top:12px;right:12px;font-size:12px;color:#fff;text-shadow:1px 1px 0 #000;opacity:.85;text-align:right;}
-#btnSpectate{position:absolute;top:66px;right:12px;left:auto;pointer-events:auto;
-  font-size:13px;padding:9px 12px;border-radius:12px;background:rgba(255,248,231,.94);
-  z-index:41;max-width:min(46vw,210px);white-space:normal;line-height:1.25;}
+
+/* ===== 우측 상단 HUD 버튼 영역 (겹침 방지 Flex 컨테이너) ===== */
+#topRightArea{position:fixed;top:10px;right:12px;display:flex;flex-direction:column;align-items:flex-end;gap:6px;z-index:50;pointer-events:none;}
+#topRightArea>*{position:static !important;pointer-events:auto;margin:0 !important;}
+#netStatus{font-size:12px;color:#fff;text-shadow:1px 1px 0 #000;opacity:.85;text-align:right;pointer-events:none;}
+#btnShowQR{font-size:12px;padding:7px 11px;border-radius:12px;background:rgba(255,248,231,.95);
+  box-shadow:2px 2px 0 rgba(0,0,0,.3);white-space:nowrap;line-height:1.2;}
+#btnSpectate{font-size:12px;padding:7px 11px;border-radius:12px;background:rgba(255,248,231,.95);
+  box-shadow:2px 2px 0 rgba(0,0,0,.3);max-width:min(46vw,200px);white-space:normal;line-height:1.2;}
 #btnSpectate.on{background:var(--yellow);}
-#btnWallStick{position:absolute;top:110px;right:12px;left:auto;pointer-events:auto;
-  font-size:13px;padding:9px 12px;border-radius:12px;background:rgba(255,248,231,.94);
-  z-index:41;max-width:min(46vw,210px);white-space:normal;line-height:1.25;}
+#btnWallStick{font-size:12px;padding:7px 11px;border-radius:12px;background:rgba(255,248,231,.95);
+  box-shadow:2px 2px 0 rgba(0,0,0,.3);max-width:min(46vw,200px);white-space:normal;line-height:1.2;}
 #btnWallStick.on{background:#e53e3e;color:#fff;font-weight:bold;}
-#btnShowQR{position:absolute;top:40px;right:12px;left:auto;pointer-events:auto;
-  font-size:13px;padding:8px 12px;border-radius:12px;background:rgba(255,248,231,.94);
-  z-index:55;white-space:normal;line-height:1.25;}
 #roleCard{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:60;pointer-events:none;}
 #roleCard .card{background:var(--cream);border:5px solid var(--ink);border-radius:20px;padding:26px 40px;
   font-size:clamp(22px,5vw,34px);box-shadow:8px 8px 0 rgba(0,0,0,.4);transform:scale(.6);opacity:0;
@@ -232,29 +246,32 @@ label.chk input{width:20px;height:20px;}
 @keyframes popup{0%{transform:translate(-50%,-50%) scale(.4);opacity:0;}
   20%{transform:translate(-50%,-60%) scale(1.15);opacity:1;}
   100%{transform:translate(-50%,-120%) scale(1);opacity:0;}}
-#toasts{position:fixed;top:90px;right:12px;z-index:56;display:flex;flex-direction:column;gap:6px;pointer-events:none;}
-.toast{background:rgba(43,43,43,.92);color:#fff;font-size:14px;padding:8px 14px;border-radius:10px;
-  border:2px solid #fff;animation:tin .25s ease-out;}
-@keyframes tin{from{transform:translateX(30px);opacity:0;}}
 
-/* ===== 물감 패널 ===== */
-#paintPanel{position:fixed;left:10px;top:10px;bottom:84px;transform:none;z-index:40;
-  background:rgba(255,248,231,.96);border:3px solid var(--ink);border-radius:14px;padding:10px;
-  display:flex;flex-direction:column;gap:8px;align-items:center;width:158px;height:max-content;
-  max-height:calc(100vh - 94px);overflow-y:auto;box-shadow:4px 4px 0 rgba(0,0,0,.3);}
+/* ===== 토스트 알림창 (스코어보드 아래인 top: 118px에 배치하여 겹침 방지) ===== */
+#toasts{position:fixed;top:118px;left:50%;transform:translateX(-50%);z-index:100;display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none;max-width:min(90vw,480px);width:max-content;}
+.toast{background:rgba(22,27,38,.95);color:#fff;font-size:13px;font-weight:700;padding:7px 16px;border-radius:20px;
+  border:1.5px solid rgba(255,255,255,.8);box-shadow:0 4px 16px rgba(0,0,0,.45);text-align:center;line-height:1.35;
+  animation:toastSlideDown .22s ease-out;backdrop-filter:blur(6px);pointer-events:none;}
+@keyframes toastSlideDown{from{transform:translateY(-10px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+
+/* ===== 물감 패널 (topLeftArea 내부 수직 배치로 조작모드 버튼 및 게이지와 겹침 제거) ===== */
+#paintPanel{background:rgba(255,248,231,.96);border:3px solid var(--ink);border-radius:14px;padding:8px 10px;
+  display:flex;flex-direction:column;gap:6px;align-items:center;width:158px;height:max-content;
+  max-height:calc(100vh - 190px);overflow-y:auto;box-shadow:4px 4px 0 rgba(0,0,0,.3);}
 #paintPanel.collapsed>*:not(#panelToggle){display:none;}
-#panelToggle{font-size:13px;padding:6px 10px;width:100%;background:#fff;}
-#hsvWheel{border-radius:50%;border:3px solid var(--ink);cursor:crosshair;touch-action:none;}
-#valSlider{width:130px;height:16px;border:2px solid var(--ink);border-radius:8px;cursor:pointer;touch-action:none;}
+#panelToggle{font-size:12.5px;padding:5px 9px;width:100%;background:#fff;}
+#hsvWheel{border-radius:50%;border:2.5px solid var(--ink);cursor:crosshair;touch-action:none;width:116px;height:116px;}
+#valSlider{width:120px;height:15px;border:2px solid var(--ink);border-radius:8px;cursor:pointer;touch-action:none;}
 .swatches{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;width:100%;}
 .sw{width:100%;aspect-ratio:1;border:2px solid var(--ink);border-radius:5px;cursor:pointer;}
 .sw.recent{border-style:dashed;}
 .brushRow{display:flex;gap:6px;align-items:center;justify-content:center;width:100%;}
-.brushBtn{width:34px;height:34px;border-radius:50%;background:#fff;border:2px solid var(--ink);
+.brushBtn{width:32px;height:32px;border-radius:50%;background:#fff;border:2px solid var(--ink);
   display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;box-shadow:none;}
 .brushBtn.on{background:var(--yellow);}
 .brushBtn i{display:block;border-radius:50%;background:var(--ink);}
-#paintPanel .tag{font-size:11px;font-weight:800;opacity:.7;}
+#paintPanel .tag{font-size:10.5px;font-weight:800;opacity:.7;}
+#btnFillAll{font-size:12px;padding:7px 8px;border-radius:10px;width:100%;}
 
 /* ===== 술래 대기 오버레이 (필통 속) ===== */
 #blockOverlay{background:
@@ -314,51 +331,64 @@ label.chk input{width:20px;height:20px;}
 #btnJump{width:74px;height:74px;right:18px;bottom:22px;}
 #btnPaintHold{display:none !important;}
 #btnSpoit{width:60px;height:60px;right:26px;bottom:112px;}
-#btnMirror{width:70px;height:70px;right:104px;bottom:40px;}
+#btnMirror{width:70px;height:70px;right:104px;bottom:32px;}
 #btnJudge{width:100px;height:100px;right:18px;bottom:20px;background:rgba(245,197,24,.95);font-size:16px;}
 #btnFlyDown{width:66px;height:66px;right:22px;bottom:26px;}
-/* 비행 중에는 상승·하강을 한 열에 두고 스포이트·색칠 버튼은 옆 열로 분리합니다. */
+
+/* 비행 중 컨트롤 (상승·하강을 우측 열에 두고 액션 버튼들을 좌측 열로 분리) */
 #mobileUI.flyingControls #btnJump{right:18px;bottom:184px;}
 #mobileUI.flyingControls #btnFlyDown{right:22px;bottom:104px;}
-#mobileUI.flyingControls #btnSpoit{right:104px;bottom:132px;}
-#mobileUI.flyingControls #btnMirror{right:104px;bottom:48px;}
-#mobileUI.seekerControls #btnJump{right:136px;bottom:32px;}
-#mobileUI.seekerControls #btnFlyDown{right:140px;bottom:32px;}
-#mobileUI.seekerControls.flyingControls #btnJump{right:136px;bottom:116px;}
-#mobileUI.seekerControls.flyingControls #btnFlyDown{right:140px;bottom:34px;}
+#mobileUI.flyingControls #btnSpoit{right:104px;bottom:108px;}
+#mobileUI.flyingControls #btnMirror{right:104px;bottom:36px;}
+
+/* 액션/술래 컨트롤 활성화 시 (우측 하단에 메인 액션 버튼이 있을 때 점프 버튼을 안쪽 열로 이동) */
+#mobileUI.seekerControls #btnJump{right:110px;bottom:22px;}
+#mobileUI.seekerControls #btnFlyDown{right:110px;bottom:26px;}
+#mobileUI.seekerControls.flyingControls #btnJump{right:18px;bottom:184px;}
+#mobileUI.seekerControls.flyingControls #btnFlyDown{right:22px;bottom:104px;}
 
 /* 조작 모드 토글 버튼 */
-#btnControlMode{position:fixed;top:82px;left:12px;z-index:95;font-size:12px;font-weight:800;
+#btnControlMode{font-size:12px;font-weight:800;
   padding:6px 12px;border-radius:12px;background:rgba(255,248,231,.95);border:2.5px solid var(--ink);
-  cursor:pointer;box-shadow:2px 2px 0 rgba(0,0,0,.3);display:flex;align-items:center;gap:6px;pointer-events:auto;}
+  cursor:pointer;box-shadow:2px 2px 0 rgba(0,0,0,.3);display:flex;align-items:center;gap:6px;pointer-events:auto;white-space:nowrap;}
 #btnControlMode:active{transform:translate(1px,1px);box-shadow:1px 1px 0 rgba(0,0,0,.3);}
 @media(max-width:600px){
-  #btnControlMode{top:74px;left:8px;font-size:11px;padding:5px 9px;}
+  #btnControlMode{font-size:11px;padding:5px 9px;}
 }
 
-/* 경찰과 도둑 & 얼음땡 전용 모바일 버튼 스타일 및 위치 */
+/* 경찰과 도둑 & 얼음땡 전용 모바일 버튼 스타일 및 위치 (2열 체계로 겹침 완전 방지) */
 #btnArrest{width:80px;height:80px;right:18px;bottom:20px;background:#FF3B30;color:#fff;font-size:15px;z-index:46;}
 #btnRescue{width:80px;height:80px;right:18px;bottom:20px;background:#34C759;color:#fff;font-size:14px;z-index:46;}
-#btnCopsStatus{width:60px;height:60px;right:26px;bottom:184px;background:#007AFF;color:#fff;font-size:12px;z-index:45;}
-#btnItem{width:60px;height:60px;right:104px;bottom:116px;background:#FFCC00;color:#000;font-size:12px;z-index:45;}
 #btnIceTag{width:82px;height:82px;right:18px;bottom:20px;background:#FFCC00;color:#000;font-size:15px;z-index:46;}
-#btnIceSelf{width:72px;height:72px;right:104px;bottom:36px;background:#a9d9ee;color:#000;font-size:13px;z-index:46;}
+
+#btnCopsStatus{width:60px;height:60px;right:26px;bottom:184px;background:#007AFF;color:#fff;font-size:12px;z-index:45;}
+#btnItem{width:62px;height:62px;right:26px;bottom:112px;background:#FFCC00;color:#000;font-size:12px;z-index:45;}
+#btnIceSelf{width:66px;height:66px;right:26px;bottom:112px;background:#a9d9ee;color:#000;font-size:13px;z-index:46;}
 
 /* 비행 중 컨트롤 레이아웃 정돈 */
 #mobileUI.flyingControls #btnArrest,
 #mobileUI.flyingControls #btnRescue,
-#mobileUI.flyingControls #btnIceTag{right:104px;bottom:34px;}
-#mobileUI.flyingControls #btnIceSelf{right:176px;bottom:34px;}
-#mobileUI.flyingControls #btnItem{right:104px;bottom:184px;}
-#mobileUI.flyingControls #btnCopsStatus{right:176px;bottom:116px;}
+#mobileUI.flyingControls #btnIceTag{right:104px;bottom:22px;}
+#mobileUI.flyingControls #btnIceSelf{right:104px;bottom:108px;}
+#mobileUI.flyingControls #btnItem{right:104px;bottom:108px;}
+#mobileUI.flyingControls #btnCopsStatus{right:104px;bottom:184px;}
 .poseCol{position:absolute;left:14px;bottom:14px;display:flex;flex-direction:row;flex-wrap:wrap;gap:5px;max-width:280px;z-index:42;}
 .poseCol .mbtn{position:relative;width:48px;height:48px;font-size:10px;padding:2px;}
 .pchip{position:relative;}
 .kickBtn{font-size:11px;padding:3px 7px;border-width:2px;border-radius:999px;background:#ffb0b0;box-shadow:none;margin-left:3px;}
 #btnLobbyPractice{font-size:14px;}
-#btnPracticeReturn{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:43;pointer-events:auto;
-  font-size:14px;padding:9px 14px;background:rgba(255,248,231,.95);}
-#btnMirrorDone{position:absolute;right:16px;top:16px;pointer-events:auto;}
+#btnPracticeReturn{font-size:13px;padding:7px 14px;border-radius:12px;background:rgba(255,248,231,.95);pointer-events:auto;}
+#btnMirrorDone{position:absolute;right:18px;bottom:24px;z-index:50;font-size:15px;padding:10px 16px;background:var(--yellow);border-radius:14px;pointer-events:auto;}
+
+/* ===== 화면 하단 중앙 전용 통합 영역 (안내문 및 하단 버튼 겹침 완전 방지) ===== */
+#bottomCenterArea{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:43;
+  display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none;max-width:92vw;}
+#bottomCenterArea>*{position:static !important;pointer-events:auto;margin:0 !important;transform:none !important;}
+#mirrorHint{display:none !important;}
+#deskHint{background:rgba(18,24,34,.84);color:#fff;font-size:12.5px;font-weight:700;
+  padding:5px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.22);
+  box-shadow:0 2px 10px rgba(0,0,0,.35);white-space:nowrap;max-width:90vw;overflow:hidden;
+  text-overflow:ellipsis;text-align:center;backdrop-filter:blur(4px);pointer-events:none;}
 
 /* ===== 기타 ===== */
 #rotateOverlay{background:#1a2230;color:#fff;z-index:200;font-size:20px;text-align:center;line-height:1.7;}
@@ -370,10 +400,6 @@ label.chk input{width:20px;height:20px;}
 #setupNotice{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);z-index:120;
   background:rgba(230,69,69,.95);color:#fff;font-size:13px;padding:10px 16px;border-radius:10px;
   max-width:min(92vw,560px);text-align:center;line-height:1.55;font-weight:700;box-shadow:0 4px 14px rgba(0,0,0,.35);}
-#mirrorHint{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);z-index:40;
-  color:#fff;font-size:14px;text-shadow:1px 1px 0 #000;pointer-events:none;text-align:center;}
-#deskHint{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);z-index:32;
-  color:#fff;font-size:12px;text-shadow:1px 1px 0 #000;opacity:.8;pointer-events:none;text-align:center;}
 
 /* ===== 🧟 좀비 시야 비넷 오버레이 (Zombie Red Vision Vignette) ===== */
 #zombieVignette {
@@ -478,7 +504,35 @@ if (typeof window.TEACHER_CODE === "undefined" || !window.TEACHER_CODE) window.T
 </head>
 <body>
 <div id="zombieVignette"></div>
-<button id="btnControlMode" title="조작 모드 전환 (마우스 ↔ 화면 터치)">🎮 조작: 🖱️ 마우스</button>
+
+<!-- 좌측 상단 통합 HUD 스택: 조작 버튼, 물감 게이지, 비행 게이지, 물감 패널 수직 정렬 -->
+<div id="topLeftArea">
+  <button id="btnControlMode" title="조작 모드 전환 (마우스 ↔ 화면 터치)">🎮 조작: 🖱️ 마우스</button>
+  <div id="gaugeBox" class="hidden">
+    <div class="pal"></div>
+    <div id="gaugeBar"><div id="gaugeFill"></div></div>
+    <div id="curColorDot"></div>
+  </div>
+  <div id="flyGaugeBox" class="hidden">
+    <div class="wing-icon">🕊️</div>
+    <div id="flyGaugeBar"><div id="flyGaugeFill"></div></div>
+  </div>
+  <div id="paintPanel" class="hidden">
+    <button id="panelToggle">🎨 물감 접기</button>
+    <canvas id="hsvWheel" width="120" height="120"></canvas>
+    <canvas id="valSlider" width="130" height="16"></canvas>
+    <div class="tag">최근 색</div>
+    <div class="swatches" id="recentSw"></div>
+    <div class="tag">교실 색깔</div>
+    <div class="swatches" id="presetSw"></div>
+    <div class="brushRow">
+      <button class="brushBtn" data-b="6"><i style="width:6px;height:6px;"></i></button>
+      <button class="brushBtn on" data-b="10"><i style="width:11px;height:11px;"></i></button>
+      <button class="brushBtn" data-b="18"><i style="width:18px;height:18px;"></i></button>
+    </div>
+    <button id="btnFillAll">🪣 선택한 색으로 몸 전체 칠하기</button>
+  </div>
+</div>
 
 <!-- 타이틀 -->
 <div id="screenTitle" class="screen">
@@ -487,30 +541,39 @@ if (typeof window.TEACHER_CODE === "undefined" || !window.TEACHER_CODE) window.T
     <span class="big">사라진 지우개 찾기</span>
   </div>
   <div class="chalkSub">새하얀 지우개가 되어 몸에 물감을 칠하고 교실에 숨자!<br>연필 술래는 시간 안에 모두를 콕 찍어 찾아내자!</div>
-  <div class="panel" style="max-width:420px;">
+  <div class="panel" style="max-width:460px;">
     <input type="text" id="nickInput" maxlength="6" placeholder="닉네임 (최대 6자)">
     <div class="row">
       <button id="btnCreate" class="blue">🏫 방 만들기 (선생님)</button>
       <button id="btnJoinOpen">🎒 코드로 입장</button>
     </div>
-    <div id="joinBox" class="hidden" style="margin-top:12px;">
+    <div id="joinBox" class="hidden" style="margin-top:10px;">
       <input type="text" id="codeInput" maxlength="4" placeholder="방 코드 4자리" inputmode="numeric">
       <div class="row"><button id="btnJoin">입장하기</button></div>
     </div>
     <div class="row"><button id="btnPractice" class="secondary" style="font-size:14px;">🎨 혼자 연습 모드 (오프라인)</button></div>
-    <div id="practiceBox" class="hidden" style="margin-top:12px;">
-      <div class="note" style="margin-bottom:2px;">연습할 게임 모드를 선택해 주세요</div>
-      <div class="row" style="margin-bottom:10px;">
-        <select id="selPracticeGameMode" style="padding:6px 10px; border:2px solid var(--ink); border-radius:6px; font-family:inherit; font-weight:bold; width:100%;">
-          <option value="hide">🙈 숨바꼭질 모드</option>
-          <option value="zombie">🧟 좀비 추격 모드</option>
-          <option value="cops">👮 경찰과 도둑 모드</option>
-          <option value="ice">🧊 얼음땡 모드</option>
-        </select>
+    <div id="practiceBox" class="hidden" style="margin-top:10px;border-top:2px dashed rgba(0,0,0,.15);padding-top:8px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px;text-align:left;">
+        <div>
+          <div class="note" style="margin:0 0 3px 2px;font-size:11.5px;">🎮 게임 모드</div>
+          <select id="selPracticeGameMode" style="padding:6px 8px; border:2px solid var(--ink); border-radius:8px; font-family:inherit; font-weight:bold; width:100%; font-size:13px; background:#fff;">
+            <option value="hide">🙈 숨바꼭질 모드</option>
+            <option value="zombie">🧟 좀비 추격 모드</option>
+            <option value="cops">👮 경찰과 도둑 모드</option>
+            <option value="ice">🧊 얼음땡 모드</option>
+          </select>
+        </div>
+        <div>
+          <div class="note" style="margin:0 0 3px 2px;font-size:11.5px;">🎭 내 역할</div>
+          <select id="selPracticeRole" style="padding:6px 8px; border:2px solid var(--ink); border-radius:8px; font-family:inherit; font-weight:bold; width:100%; font-size:13px; background:#fff;">
+            <option value="hider">🏃 도망자/지우개/도둑</option>
+            <option value="seeker">👮 술래/경찰/숙주좀비</option>
+          </select>
+        </div>
       </div>
-      <div class="note" style="margin-bottom:2px;">연습할 맵을 골라주세요</div>
+      <div class="note" style="margin:4px 0 2px;text-align:center;">연습할 맵을 골라주세요</div>
       <div id="practiceMapBox" class="mapCardBox"></div>
-      <div class="row" style="margin-top:10px;"><button id="btnPracticeStart" class="blue">▶ 이 맵으로 연습 시작</button></div>
+      <div class="row" style="margin-top:10px;"><button id="btnPracticeStart" class="blue" style="width:100%;">▶ 이 맵으로 연습 시작</button></div>
     </div>
     <div class="note" id="titleNote"></div>
   </div>
@@ -696,15 +759,6 @@ if (typeof window.TEACHER_CODE === "undefined" || !window.TEACHER_CODE) window.T
       </div>
     </div>
   </div>
-  <div id="gaugeBox">
-    <div class="pal"></div>
-    <div id="gaugeBar"><div id="gaugeFill"></div></div>
-    <div id="curColorDot"></div>
-  </div>
-  <div id="flyGaugeBox" class="hidden">
-    <div class="wing-icon">🕊️</div>
-    <div id="flyGaugeBar"><div id="flyGaugeFill"></div></div>
-  </div>
   <div id="crossWrap">
     <div id="crosshair">＋</div>
     <svg id="cooldownRing" viewBox="0 0 56 56">
@@ -713,11 +767,12 @@ if (typeof window.TEACHER_CODE === "undefined" || !window.TEACHER_CODE) window.T
         stroke-dasharray="150.8" stroke-dashoffset="150.8" transform="rotate(-90 28 28)"/>
     </svg>
   </div>
-  <div id="netStatus"></div>
-  <button id="btnSpectate" class="hidden">👀 숨기 완료 · 구경하기</button>
-  <button id="btnWallStick" class="hidden">🕷️ 벽 붙기[R]</button>
-  <button id="btnShowQR" class="hidden">🔗 QR 보여주기</button>
-  <button id="btnPracticeReturn" class="hidden">↩ 우리 반 게임방으로 돌아가기</button>
+  <div id="topRightArea">
+    <div id="netStatus"></div>
+    <button id="btnShowQR" class="hidden">🔗 QR 보여주기</button>
+    <button id="btnSpectate" class="hidden">👀 숨기 완료 · 구경하기</button>
+    <button id="btnWallStick" class="hidden">🕷️ 벽 붙기[R]</button>
+  </div>
 </div>
 
 <!-- v2: 게임 중 선생님 패널 (방장 전용) -->
@@ -744,15 +799,7 @@ if (typeof window.TEACHER_CODE === "undefined" || !window.TEACHER_CODE) window.T
     <div class="small">찾는 시간이 되면 술래를 따라 화면을 중계할게요!</div>
   </div>
 </div>
-<button id="btnTvSpectateToggle" class="hidden">👀 자유 시점 ↔ 📺 TV</button>
-
-<!-- v2: TV 술래 추적 컨트롤 -->
-<div id="tvFollowBar" class="hidden">
-  <button id="tvFollowPrev">◀</button>
-  <div id="tvFollowName">술래 없음</div>
-  <button id="tvFollowNext">▶</button>
-  <button id="tvFollowWide" title="전체 조망">🏫</button>
-</div>
+<!-- v2: TV 조망 안내 -->
 
 <!-- v2: 학생 "얼음!" 배너 -->
 <div id="frozenBanner" class="hidden">🧊 얼음!</div>
@@ -770,29 +817,25 @@ if (typeof window.TEACHER_CODE === "undefined" || !window.TEACHER_CODE) window.T
 </div>
 
 
-<div id="paintPanel" class="hidden">
-  <button id="panelToggle">🎨 물감 접기</button>
-  <canvas id="hsvWheel" width="120" height="120"></canvas>
-  <canvas id="valSlider" width="130" height="16"></canvas>
-  <div class="tag">최근 색</div>
-  <div class="swatches" id="recentSw"></div>
-  <div class="tag">교실 색깔</div>
-  <div class="swatches" id="presetSw"></div>
-  <div class="brushRow">
-    <button class="brushBtn" data-b="6"><i style="width:6px;height:6px;"></i></button>
-    <button class="brushBtn on" data-b="10"><i style="width:11px;height:11px;"></i></button>
-    <button class="brushBtn" data-b="18"><i style="width:18px;height:18px;"></i></button>
-  </div>
-  <button id="btnFillAll">🪣 선택한 색으로 몸 전체 칠하기</button>
-</div>
-
 <div id="roleCard"><div class="card" id="roleCardText"></div></div>
 <div id="popupLayer"></div>
 <div id="toasts"></div>
 <div id="wipe"><div class="eraser"></div></div>
-<div id="mirrorHint" class="hidden"></div>
-<div id="deskHint" class="hidden"></div>
 <div id="setupNotice" class="hidden"></div>
+
+<!-- 화면 하단 중앙 전용 통합 스택: 복수 안내문 및 조작 버튼 수직 정렬로 겹침 완전 방지 -->
+<div id="bottomCenterArea">
+  <div id="tvFollowBar" class="hidden">
+    <button id="tvFollowPrev">◀</button>
+    <div id="tvFollowName">술래 없음</div>
+    <button id="tvFollowNext">▶</button>
+    <button id="tvFollowWide" title="전체 조망">🏫</button>
+  </div>
+  <button id="btnTvSpectateToggle" class="hidden">👀 자유 시점 ↔ 📺 TV</button>
+  <button id="btnPracticeReturn" class="hidden">↩ 우리 반 게임방으로 돌아가기</button>
+  <div id="mirrorHint" class="hidden"></div>
+  <div id="deskHint" class="hidden"></div>
+</div>
 
 <!-- 모바일 -->
 <div id="mobileUI" class="hidden">
@@ -1225,7 +1268,22 @@ let mazePortalCooldown=0;
 let mapRoot=new THREE.Group(); scene.add(mapRoot);
 function clearMap(){
   G.wallStuck = false;
+  G.wallCollider = null;
   if(typeof updateWallStickButton === "function") updateWallStickButton();
+  if(typeof sciCleanup === "function") sciCleanup();
+  if(typeof steamCleanup === "function") steamCleanup();
+  if(typeof cartCleanup === "function") cartCleanup();
+  if(typeof playgroundCleanup === "function") playgroundCleanup();
+  if(typeof gymCleanup === "function") gymCleanup();
+  if(typeof lavaCleanup === "function") lavaCleanup();
+  if(typeof mazeCleanup === "function") mazeCleanup();
+  ROOM_W = 120;
+  ROOM_D = 90;
+  WALL_H = 56;
+  if(!TEX.floor || !TEX.grass) buildTextures();
+  if(scene && scene.fog) scene.fog = null;
+  if(ambientLight && ambientLight.color){ ambientLight.color.setHex(0xffffff); ambientLight.intensity = AMB_BASE; }
+  if(sun && sun.color){ sun.color.setHex(0xffe0b8); sun.intensity = SUN_BASE; }
   while(mapRoot.children.length) mapRoot.remove(mapRoot.children[0]);
   colliders.length=0; samplables.length=0; refillZones.length=0;
   hiderSpawns=[]; seekerSpawns.length=0;
@@ -1586,7 +1644,7 @@ const LIB_PAL=[0xE64545,0xF5C518,0x3f9d5a,0x4A7FB5,0x8a5ab9,0xe07f3e,0x2ec4b6,0x
    🧪 맵 1. 과학실 — buildScienceLab + updateScienceLabGimmick(정전)
    ================================================================ */
 function buildScienceLab(){
-  WALL_H=33;   // 다른 맵보다 낮은 천장(다른 맵은 56) — 실험실이 답답하지 않으면서도 덜 높게
+  ROOM_W=120; ROOM_D=90; WALL_H=33;   // 다른 맵보다 낮은 천장(다른 맵은 56) — 실험실이 답답하지 않으면서도 덜 높게
   const floorTex=canvasTex(256,256,(g,w,h)=>{
     g.fillStyle="#dfe4e8";g.fillRect(0,0,w,h);
     g.strokeStyle="rgba(120,132,142,.55)";g.lineWidth=2;
@@ -1828,7 +1886,8 @@ function sciCleanup(){
   if(scene.fog){scene.fog=null;}
   if(Sci.spot)Sci.spot.visible=false;
   Sci.blackout=false; Sci.warnedCycle=-1; Sci.localStart=0;
-  const ca=document.getElementById("centerAlert"); if(ca)ca.classList.add("hidden");
+  const ca=document.getElementById("centerAlert");
+  if(ca && ca.textContent && ca.textContent.includes("정전")) ca.classList.add("hidden");
 }
 function updateScienceLabGimmick(dt){
   if(!Sci.spot){
@@ -1857,12 +1916,14 @@ function updateScienceLabGimmick(dt){
   const ca=$("centerAlert");
   if(preWarn){ ca.textContent="⚡ 곧 정전!"; ca.classList.remove("hidden"); }
   else if(blackout&&cyc<LIGHT+2.6){ ca.textContent="🔦 정전!"; ca.classList.remove("hidden"); }
-  else ca.classList.add("hidden");
-  // 밝기 lerp(약 1.5초) — 정전 때 어둡게 (기본값 살짝 완화: 0.08→0.12)
-  const tA=blackout?AMB_BASE*0.12:AMB_BASE, tS=blackout?SUN_BASE*0.12:SUN_BASE;
-  const k=Math.min(1,dt/1.5);
-  ambientLight.intensity+=(tA-ambientLight.intensity)*k;
-  sun.intensity+=(tS-sun.intensity)*k;
+  else if(ca && ca.textContent && ca.textContent.includes("정전")) ca.classList.add("hidden");
+  // 밝기 lerp(약 1.5초) — 좀비 밤 주기 중이 아닐 때 또는 정전 중일 때 밝기 제어
+  if(!isZombieMode() || blackout || preWarn){
+    const tA=blackout?AMB_BASE*0.12:AMB_BASE, tS=blackout?SUN_BASE*0.12:SUN_BASE;
+    const k=Math.min(1,dt/1.5);
+    ambientLight.intensity+=(tA-ambientLight.intensity)*k;
+    sun.intensity+=(tS-sun.intensity)*k;
+  }
   if(preWarn){ const bl=Math.sin(elapsed*20)>0?1:0.45; ambientLight.intensity=AMB_BASE*(0.55+0.45*bl); } // 2회 깜빡
   // 안개(더 짙게)
   if(blackout){ if(!scene.fog)scene.fog=new THREE.Fog(0x080b10,12,72); }
@@ -1881,7 +1942,7 @@ function updateScienceLabGimmick(dt){
    ================================================================ */
 let CAFE_SLIP=[], CAFE_STEAM=[], CAFE_BELT=null, CAFE_STEAM_SPR=[], CAFE_TRAYS=[];
 function buildCafeteria(){
-  WALL_H=36;   // 전엔 56으로 너무 높아 휑했음 — 급식실 규모에 맞게 낮춤(가장 높은 메뉴판 top ~23.5 위로 여유)
+  ROOM_W=120; ROOM_D=90; WALL_H=36;   // 전엔 56으로 너무 높아 휑했음 — 급식실 규모에 맞게 낮춤(가장 높은 메뉴판 top ~23.5 위로 여유)
   CAFE_SLIP=[]; CAFE_STEAM=[]; CAFE_BELT=null; CAFE_STEAM_SPR=[]; CAFE_TRAYS=[];
   const floorTex=canvasTex(256,256,(g,w,h)=>{
     for(let r=0;r<8;r++)for(let c=0;c<8;c++){ g.fillStyle=((r+c)%2)?"#e7ded0":"#d3c7b2";
@@ -2143,7 +2204,7 @@ function buildBookRow(cx,height,seed,dir){
   });
 }
 function buildLibrary(){
-  WALL_H=56;
+  ROOM_W=120; ROOM_D=90; WALL_H=56;
   Carts=[];
   const floorTex=canvasTex(256,256,(g,w,h)=>{
     for(let i=0;i<7;i++){ g.fillStyle=i%2?"#bd8f56":"#c69a63"; g.fillRect(0,i*38,w,38); }  // 원목 플랭크(교차 톤)
@@ -2294,7 +2355,8 @@ function buildLibrary(){
 let Sprinklers = [];
 
 function buildPlayground(){
-  WALL_H=40;
+  ROOM_W=120; ROOM_D=90; WALL_H=40;
+  if(!TEX.grass || !TEX.sand) buildTextures();
   
   // 1) 바닥 (잔디)
   const floor=new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W,ROOM_D),lambert({map:TEX.grass}));
@@ -2655,6 +2717,7 @@ function updatePlaygroundGimmick(dt){
       // 스프링클러 물벼락 충돌 감지 (거리가 15 이내이고 y 높이가 5 이하일 때 넉백 발생)
       if(dist < 15 && G.pos.y < 5) {
         amISprinkled = true;
+        if(G.wallStuck) detachFromWall(false);
         
         // [넉백 물리] 닿는 즉시 외곽으로 강하게 밀려나서 붕 날아감
         const pushSpeed = 28.0;
@@ -2717,6 +2780,7 @@ function tryGymDunkAction(){
     const dz = G.pos.z - h.z;
     const dist = Math.hypot(dx, dz);
     if(dist < 7.5 && Math.abs(G.pos.y - h.y) < 14.0){
+      if(G.wallStuck) detachFromWall(false);
       // 반대편 농구골대로 덩크슛 발사!
       const targetHoop = GymHoops[(i + 1) % GymHoops.length];
       
@@ -3158,13 +3222,13 @@ function cartCleanup(){ Carts=[]; }
 
 /* 현재 맵에 맞는 기믹만 호출. 다른 맵엔 어떤 영향도 주지 않도록 정리 함수 병행. */
 function updateMapGimmicks(dt){
-  if(currentMapId==="science") updateScienceLabGimmick(dt); else sciCleanup();
-  if(currentMapId==="cafeteria"){ updateSlipZones(dt); updateConveyor(dt); updateSteam(dt); } else steamCleanup();
-  if(currentMapId!=="library") cartCleanup(); else updateBookCarts(dt);
-  if(currentMapId==="playground") updatePlaygroundGimmick(dt); else playgroundCleanup();
-  if(currentMapId==="gym") updateGymGimmick(dt); else gymCleanup();
-  if(currentMapId==="lava") updateLavaGimmick(dt); else lavaCleanup();
-  if(currentMapId==="maze") updateMazeGimmick(dt); else mazeCleanup();
+  if(currentMapId==="science") updateScienceLabGimmick(dt);
+  else if(currentMapId==="cafeteria"){ updateSlipZones(dt); updateConveyor(dt); updateSteam(dt); }
+  else if(currentMapId==="library") updateBookCarts(dt);
+  else if(currentMapId==="playground") updatePlaygroundGimmick(dt);
+  else if(currentMapId==="gym") updateGymGimmick(dt);
+  else if(currentMapId==="lava") updateLavaGimmick(dt);
+  else if(currentMapId==="maze") updateMazeGimmick(dt);
 
   if(typeof updateCopsGame === "function") updateCopsGame(dt);
   if(typeof updateIceGame === "function") updateIceGame(dt);
@@ -3359,8 +3423,11 @@ function isIceMode() {
 }
 
 function isZombieMode() {
-  const gm = getActiveGameMode();
-  return gm === "zombie" || !!Net.meta?.settings?.zombieMode;
+  return getActiveGameMode() === "zombie";
+}
+
+function isHideMode() {
+  return getActiveGameMode() === "hide";
 }
 
 /* group 원점 = 발바닥 중앙 */
@@ -3678,11 +3745,19 @@ function buildFairy(canvas,isPencil=false){
 function rebuildMyFairy() {
   // 1. 기존에 칠해둔 캔버스 백업 (지우개 요정인 경우 유지)
   let backupCanvas = null;
-  const isPencil = G.role === "seeker" || G.zombieState === 2;
-  const isRobber = typeof isCopsMode === "function" && isCopsMode() && (G.role === "hider" || G.role === "fairy");
+  const gm = typeof getActiveGameMode === "function" ? getActiveGameMode() : "hide";
+  const isCop = (gm === "cops");
+  const isIce = (gm === "ice");
+  const isHide = (gm === "hide");
+  const isSeeker = (G.role === "seeker");
+  const isHideSeeker = isHide && isSeeker;
+  const isCopSeeker = isCop && isSeeker;
+  const isIceSeeker = isIce && isSeeker;
+  const isCustomSeekerMesh = isHideSeeker || isCopSeeker || isIceSeeker;
+  const isRobber = isCop && (G.role === "hider" || G.role === "fairy");
   
   // 연필이나 도둑이 아닐 때만 기존 캔버스 백업
-  if (!isPencil && !isRobber && typeof myFairy !== "undefined" && myFairy && myFairy.canvas) {
+  if (!isCustomSeekerMesh && !isRobber && typeof myFairy !== "undefined" && myFairy && myFairy.canvas) {
     backupCanvas = document.createElement("canvas");
     backupCanvas.width = 256; backupCanvas.height = 256;
     backupCanvas.getContext("2d").drawImage(myFairy.canvas, 0, 0);
@@ -3714,7 +3789,7 @@ function rebuildMyFairy() {
 
   // 3. 새 캔버스 생성 (백업이 있으면 복원)
   let canvas;
-  if (isPencil) {
+  if (isHideSeeker) {
     canvas = makePencilCanvas();
   } else if (isRobber) {
     canvas = makeRobberCanvas();
@@ -3728,7 +3803,7 @@ function rebuildMyFairy() {
   }
 
   // 4. 캐릭터 다시 빌드
-  const newFairy = buildFairy(canvas, isPencil);
+  const newFairy = buildFairy(canvas, isCustomSeekerMesh);
   newFairy.group.position.copy(G.pos);
   newFairy.group.rotation.y = G.yaw + Math.PI;
   newFairy.group.visible = false;
@@ -3890,6 +3965,17 @@ function applyZombieSkinToFairy(f, state){
     return;
   }
 
+  // 좀비 모드가 아니고 얼음땡 모드도 아닌 경우 (경찰과도둑, 숨바꼭질 등)
+  if (!isZombieMode()) {
+    f.parts.forEach(part => {
+      if(part.material && part.userData && part.userData.isOriginalColorSaved) {
+        part.material.color.setHex(part.userData.origColorHex);
+      }
+    });
+    if(f.zomEyes) f.zomEyes.visible = false;
+    return;
+  }
+
   const isZombie = state === 2;
   const isInfected = state === 1;
   
@@ -3927,8 +4013,18 @@ function applyZombieSkinToFairy(f, state){
 function animateFairyMovement(f,dt,moveAmount,pose="stand",grounded=true,flying=false,zombieState=0){
   if(!f||!f.arms||!f.legs)return;
   
-  // 좀비 애니메이션 분기
-  if(zombieState===2){
+  // 얼음땡 모드 동결 분기
+  if(typeof isIceMode === "function" && isIceMode() && zombieState > 0){
+    f.arms[0].rotation.set(0, 0, f.arms[0].userData.baseRz || 0.12);
+    f.arms[1].rotation.set(0, 0, f.arms[1].userData.baseRz || -0.12);
+    f.legs[0].rotation.set(0, 0, 0);
+    f.legs[1].rotation.set(0, 0, 0);
+    f.bodyM.rotation.set(0, 0, 0);
+    return;
+  }
+
+  // 좀비 애니메이션 분기: 오직 좀비 모드일 때만 적용
+  if(typeof isZombieMode === "function" && isZombieMode() && zombieState===2){
     f.walkPhase+=(moveAmount>0.05?dt*5.5:dt*1.5);
     const moving=moveAmount>0.05;
     const armSwing=-Math.PI/2; // 팔을 앞으로 평행하게 쭉 뻗음
@@ -4049,8 +4145,14 @@ function popText(txt,x,y,color){
   $("popupLayer").appendChild(el); setTimeout(()=>el.remove(),1050);
 }
 function toast(msg){
+  const container = $("toasts");
+  if(!container) return;
+  // 알림창 겹침 및 과도한 화면 누적 방지: 최대 3개까지만 유지
+  while(container.children.length >= 3){
+    container.removeChild(container.firstChild);
+  }
   const el=document.createElement("div");el.className="toast";el.textContent=msg;
-  $("toasts").appendChild(el); setTimeout(()=>el.remove(),2600);
+  container.appendChild(el); setTimeout(()=>el.remove(),2600);
 }
 function runWipe(){ const w=$("wipe"); w.classList.remove("run"); void w.offsetWidth; w.classList.add("run");
   setTimeout(()=>w.classList.remove("run"),700); }
@@ -4165,8 +4267,8 @@ function findNearestWallFace(pos, maxDist = 2.8) {
 }
 
 function updateWallStickButton() {
-  const isZom = typeof isZombieMode === "function" && isZombieMode() && (G.zombieState || 0) > 0;
-  const can = G.screen === "GAME" && (G.role === "hider" || G.role === "fairy") && !G.found && !isZom && (G.phase === "PAINT" || G.phase === "SEEK");
+  const isZom = (G.zombieState || 0) > 0;
+  const can = G.screen === "GAME" && (G.role === "hider" || G.role === "fairy") && !G.found && !G.imprisoned && !G.escortedBy && !isZom && (G.phase === "PAINT" || G.phase === "SEEK" || G.lobbyPractice);
   const b = $("btnWallStick");
   if (!b) return;
   b.classList.toggle("hidden", !can);
@@ -4175,7 +4277,7 @@ function updateWallStickButton() {
 }
 
 function toggleWallStick(force) {
-  if (G.screen !== "GAME" || G.spectating || G.role === "ghost" || (G.zombieState || 0) > 0) {
+  if (G.screen !== "GAME" || G.spectating || (G.role !== "hider" && G.role !== "fairy") || G.found || G.imprisoned || G.escortedBy || (G.zombieState || 0) > 0) {
     if (G.wallStuck) detachFromWall(false);
     return;
   }
@@ -4260,19 +4362,28 @@ function ensureRemote(uid,info){
   if(uid===Net.uid) return null;
   let r=remotes.get(uid);
   
-  const isPencil=info.role==="seeker";
+  const gm = typeof getActiveGameMode === "function" ? getActiveGameMode() : "hide";
+  const isCop = (gm === "cops");
+  const isIce = (gm === "ice");
+  const isHide = (gm === "hide");
+  const isSeeker = (info.role === "seeker");
+  const isHideSeeker = isHide && isSeeker;
+  const isCopSeeker = isCop && isSeeker;
+  const isIceSeeker = isIce && isSeeker;
+  const isCustomSeekerMesh = isHideSeeker || isCopSeeker || isIceSeeker;
+  const isRobber = isCop && (info.role === "hider" || info.role === "fairy");
+
   if(r && r.lastRole !== info.role){
     removeRemote(uid);
     r = null;
   }
 
   if(!r){
-    const isRobber = typeof isCopsMode === "function" && isCopsMode() && (info.role === "hider" || info.role === "fairy");
     let canvas;
-    if (isPencil) canvas = makePencilCanvas();
+    if (isHideSeeker) canvas = makePencilCanvas();
     else if (isRobber) canvas = makeRobberCanvas();
     else canvas = makeEraserCanvas("#FFFFFF");
-    const fairy=buildFairy(canvas,isPencil);
+    const fairy=buildFairy(canvas,isCustomSeekerMesh);
     fairy.group.userData.baseY=0;
     fairy.group.visible=(info.role!=="ghost");
     scene.add(fairy.group);
@@ -4562,7 +4673,7 @@ function poseFitsHere(pose,x=G.pos.x,y=G.pos.y,z=G.pos.z){
 }
 /* v2: 안전장치 — 어쩌다 에셋 안으로 파고들면 가장 얕은 축으로 밀어냅니다(뚫림 방지). */
 function resolveClipping(){
-  if(G.role==="ghost"||G.spectating)return;
+  if(G.role==="ghost"||G.spectating||G.wallStuck)return;
   const {hx,hz,H}=playerDims();
   for(let iter=0;iter<5;iter++){
     let pushed=false;
@@ -4901,7 +5012,7 @@ function updateMovement(dt){
     G.pos.y+=vertical*speed*0.8*dt;
     enforceRoomBounds();
   }else if(G.wallStuck){
-    if((G.zombieState||0)>0 || G.role==="seeker" || G.spectating){
+    if((G.zombieState||0)>0 || G.role==="seeker" || G.spectating || G.imprisoned || G.escortedBy){
       G.wallStuck = false;
       G.wallCollider = null;
       updateWallStickButton();
@@ -4923,6 +5034,7 @@ function updateMovement(dt){
       if (Math.abs(norm.x) > 0.5 && G.wallPoint) G.pos.x = G.wallPoint.x;
       if (Math.abs(norm.z) > 0.5 && G.wallPoint) G.pos.z = G.wallPoint.z;
 
+      let detachedThisFrame = false;
       // 장애물 벽면 범위 제한 (허공 이동 방지) 및 꼭대기/바닥 탈출
       if (G.wallCollider && G.wallCollider.min && G.wallCollider.max) {
         const c = G.wallCollider;
@@ -4941,9 +5053,9 @@ function updateMovement(dt){
           G.wallCollider = null;
           G.grounded = true;
           G.vy = 0;
+          detachedThisFrame = true;
           toast("🧗 장애물 꼭대기에 올라섰습니다!");
           updateWallStickButton();
-          return;
         }
       } else {
         // 룸 외벽인 경우
@@ -4956,27 +5068,29 @@ function updateMovement(dt){
       }
 
       // 바닥에 도달했을 때: 걷기 모드로 부드럽게 복귀
-      if (G.pos.y <= 0.3) {
+      if (!detachedThisFrame && G.pos.y <= 0.3 && totalUp < 0) {
         G.pos.y = 0;
         G.wallStuck = false;
         G.wallCollider = null;
         G.grounded = true;
         G.vy = 0;
+        detachedThisFrame = true;
         toast("👟 바닥에 도착하여 벽에서 내려왔습니다.");
         updateWallStickButton();
-        return;
       }
 
-      // 기어가는 방향 각도 계산 (요정 기어가기 애니메이션용)
-      if (Math.hypot(sideInput, totalUp) > 0.15) {
-        G.wallCrawlAngle = Math.atan2(sideInput, totalUp);
-      }
-      G.vy = 0;
-      G.grounded = true;
+      if (!detachedThisFrame) {
+        // 기어가는 방향 각도 계산 (요정 기어가기 애니메이션용)
+        if (Math.hypot(sideInput, totalUp) > 0.15) {
+          G.wallCrawlAngle = Math.atan2(sideInput, totalUp);
+        }
+        G.vy = 0;
+        G.grounded = true;
 
-      // 이동 시 마법 가루 이펙트
-      if (Math.random() < 0.2 && Math.hypot(vertVel, sideVel) > 0.1) {
-        burst(G.pos.clone().add(new THREE.Vector3((Math.random()-0.5)*0.5, Math.random()*0.6, (Math.random()-0.5)*0.5)), "#4aa8ff", 2, 0.5, 0.2);
+        // 이동 시 마법 가루 이펙트
+        if (Math.random() < 0.2 && Math.hypot(vertVel, sideVel) > 0.1) {
+          burst(G.pos.clone().add(new THREE.Vector3((Math.random()-0.5)*0.5, Math.random()*0.6, (Math.random()-0.5)*0.5)), "#4aa8ff", 2, 0.5, 0.2);
+        }
       }
     }
   }else if(G.flying){
@@ -5113,6 +5227,146 @@ function flySampleRing(cx,cy,col){
 /* ================= 색칠 모드 ================= */
 let mirrorAngle=0,mirrorPitch=0.28;
 let mirrorLast=null;
+function getModeControlHintText() {
+  const touch = isTouchMode();
+  const gm = typeof getActiveGameMode === "function" ? getActiveGameMode() : "hide";
+  const role = G.role;
+  const isSpectator = G.spectating || role === "ghost" || G.screen !== "GAME";
+
+  // 0. 🎨 색칠 모드 (Painting / Mirror mode) — 단일 하단 바로 통합하여 중복/겹침 완전 차단
+  if (G.mirror) {
+    if (touch) {
+      return "🎨 색칠 모드: 보이는 부위만 손가락으로 칠하기 · 우측 하단 [색칠 완료] 터치";
+    }
+    return "🎨 색칠 모드: 현재 시점 그대로 보이는 부위만 클릭·드래그 · 우클릭 스포이트 · [E] 색칠 완료";
+  }
+
+  // 1. 관전 / 참관 모드
+  if (isSpectator) {
+    if (touch) {
+      return "👀 참관/관전: 조이스틱 비행 이동 · 드래그 시점 · ↑상승 · ↓하강";
+    }
+    return "👀 참관/관전: WASD 비행 이동 · 마우스 시점 · Space 상승 · Shift 하강 · 마우스 휠 속도";
+  }
+
+  // 2. 대기 화면 (필통 오버레이)
+  const bo = $("blockOverlay");
+  if (bo && !bo.classList.contains("hidden")) {
+    if (gm === "cops") {
+      return touch ? "👮 경찰 출동 대기 중... 잠시 후 추격전이 시작됩니다!" : "👮 경찰 출동 대기 중... 잠시 후 도둑 추격전이 시작됩니다!";
+    } else if (gm === "ice") {
+      return touch ? "🧊 얼음땡 술래 대기 중... 잠시 후 추격전이 시작됩니다!" : "🧊 얼음땡 술래 대기 중... 잠시 후 얼음땡 추격전이 시작됩니다!";
+    }
+    return touch ? "✏️ 필통 대기 중: 부스러기를 터치하여 미니게임을 즐기세요!" : "✏️ 필통 대기 중: 부스러기를 클릭하여 지우개 가루 먹기 미니게임을 즐기세요!";
+  }
+
+  // 3. 벽타기 (Wall-Sticking) 상태
+  if (G.wallStuck) {
+    if (touch) {
+      return "🧗 벽타기 중: 조이스틱 위/아래 등반 및 좌우 이동 · 🧗버튼/점프로 떼기";
+    }
+    return "🧗 벽타기 중: W/S 위아래 등반 · A/D 좌우 이동 · Space/R 벽에서 떼기 · 1~9 포즈";
+  }
+
+  // 4. 비행 (Flying) 상태
+  if (G.flying) {
+    if (touch) {
+      return "✈️ 비행 중: 조이스틱 이동 · ↑상승 · ↓하강 · 점프(착지)";
+    }
+    return "✈️ 비행 중: WASD 이동 · Space 상승 · Shift 하강 · Space 2번 착지";
+  }
+
+  // 5. 경찰과 도둑 모드 (Cops & Robbers)
+  if (gm === "cops") {
+    if (role === "seeker") {
+      if (touch) {
+        return "👮 경찰: 조이스틱 추격 · 도둑 접근 시 👮체포 버튼 · 📋체포 현황";
+      }
+      return "👮 경찰: WASD 추격 · 마우스 시점 · [F]키/접근 체포 및 감옥 연행 · Space 자유 비행 · Tab 체포 현황";
+    } else {
+      if (G.imprisoned || G.escortedBy) {
+        return "🚨 체포됨: 동료 도둑이 감옥으로 와서 [F]키로 구출해줄 때까지 대기!";
+      }
+      if (touch) {
+        return "🏃 도둑: 조이스틱 도망 · 감옥 접근 시 🚑구출 버튼 · 🧗벽붙기";
+      }
+      return "🏃 도둑: WASD 도망 · 마우스 시점 · [F]키 감옥 동료 구출 · R 벽붙기 · Space 점프 · Tab 체포 현황";
+    }
+  }
+
+  // 6. 얼음땡 모드 (Ice Tag)
+  if (gm === "ice") {
+    if (role === "seeker") {
+      if (touch) {
+        return "🧊 얼음땡 술래: 조이스틱 추격 · 도망자 접근 시 🥶얼리기 버튼";
+      }
+      return "🧊 얼음땡 술래: WASD 추격 · 마우스 시점 · [F]키/접근 얼리기 · Space 자유 비행";
+    } else {
+      if ((G.zombieState || 0) > 0) {
+        return "🧊 꽁꽁 얼어붙음! 동료가 다가와 [F]키(땡)로 구출해줄 때까지 대기!";
+      }
+      if (touch) {
+        return "🏃 도망자: 조이스틱 도망 · [얼음] 위기 탈출 · 언 친구 접근 시 🔔땡/구출 버튼";
+      }
+      return "🏃 도망자: WASD 도망 · [Q] 얼음(위기 모면) · [F] 꽁꽁 언 동료 땡(구출) · Space 점프";
+    }
+  }
+
+  // 7. 좀비 추격 모드 (Zombie Mode)
+  if (gm === "zombie") {
+    if (G.zombieState === 2) {
+      if (touch) {
+        return "🧟 좀비: 조이스틱 빠른 추격 · 인간에게 몸을 부딪혀 감염시키기";
+      }
+      return "🧟 좀비: WASD 빠른 추격 · 마우스 시점 · 인간에게 몸을 부딪혀 감염 · Space 점프";
+    } else if (G.zombieState === 1) {
+      return "⚠️ 좀비 바이러스 감염 중! 5초 안에 💊치료제를 먹지 못하면 좀비로 변합니다!";
+    } else {
+      if (touch) {
+        return "🏃 인간 생존자: 조이스틱 전력 도망 · 좀비 피하기 · 💊치료제 캡슐 획득";
+      }
+      return "🏃 인간 생존자: WASD 전력 도망 · 좀비 피하기 · 💊파란 치료제 획득 시 바이러스 면역 · Space 점프";
+    }
+  }
+
+  // 8. 숨바꼭질 모드 (Hide & Seek / 기본)
+  if (role === "seeker") {
+    if (touch) {
+      return "✏️ 술래: 조이스틱 이동 · 오른쪽 드래그 시점 · 화면 탭 / 콕찍기 버튼으로 찾기";
+    }
+    return "✏️ 술래: WASD 이동 · 마우스 조준 · [좌클릭] 콕 찍기 · Space 점프(빠르게 2번: 비행)";
+  } else {
+    if (touch) {
+      return "🧼 지우개: 조이스틱 이동 · 드래그 시점 · 🎨색칠 · 💧스포이트 · 🧗벽붙기 · 포즈 버튼";
+    }
+    return "🧼 지우개: WASD 이동 · 마우스 시점 · E 색칠 모드 · 우클릭 스포이트 · R 벽붙기 · Space 점프 · 1~9 포즈";
+  }
+}
+
+function updateBottomHints(){
+  const inGame = (G.screen === "GAME");
+  const showHint = inGame && !G.tvMode && G.phase !== "RESULT";
+
+  // 중복 겹침 방지: mirrorHint는 단일 통합 deskHint로 일원화하고 완전히 숨김 처리
+  const mh = $("mirrorHint");
+  if(mh){
+    mh.classList.add("hidden");
+    mh.style.display = "none";
+    mh.textContent = "";
+  }
+
+  const dh = $("deskHint");
+  if(dh){
+    dh.classList.toggle("hidden", !showHint);
+    if(showHint){
+      const hintText = getModeControlHintText();
+      if(dh.textContent !== hintText){
+        dh.textContent = hintText;
+      }
+    }
+  }
+}
+
 function setMirror(on){
   if(on&&!(G.role==="hider"&&(G.lobbyPractice||G.phase==="PAINT"||G.phase==="SEEK")&&!G.found))return;
   if(on&&G.spectating)toggleSpectatorMode(false);
@@ -5123,12 +5377,11 @@ function setMirror(on){
     mirrorPitch=clamp(0.28+G.pitch*0.22,-0.18,1.12);
     mirrorLast=null;
     document.exitPointerLock&&document.exitPointerLock();
-    $("mirrorHint").textContent=IS_TOUCH?"색칠 모드: 보이는 부위만 손가락으로 칠하기":"색칠 모드: 현재 시점 그대로 보이는 부위만 클릭·드래그 / E = 완료";
-    $("mirrorHint").classList.remove("hidden");
     if(IS_TOUCH){$("btnMirrorDone").classList.remove("hidden");$("joyBase").style.display="none";}
   }else{
-    $("mirrorHint").classList.add("hidden");$("btnMirrorDone").classList.add("hidden");
+    $("btnMirrorDone").classList.add("hidden");
   }
+  updateBottomHints();
   syncLocalFairy();updateMobileButtons();
 }
 function updateMirrorCamera(){
@@ -5256,8 +5509,8 @@ function isJudgeBlocked(targetPoint,targetDistance){
 
 async function tryJudge(cx,cy){
   if(G.role!=="seeker"||G.phase!=="SEEK")return;
-  const gm = (Net.meta && Net.meta.settings && Net.meta.settings.gameMode) || G.practiceGameMode || "hide";
-  if (gm === "cops" || gm === "ice") return;
+  const gm = typeof getActiveGameMode === "function" ? getActiveGameMode() : "hide";
+  if (gm !== "hide") return;
   const now=performance.now();
   if(now<G.cdUntil)return;
 
@@ -5278,6 +5531,15 @@ async function tryJudge(cx,cy){
       targets.push(r.fairy.hitbox);
     }
   });
+  if(Net.mode==="practice"){
+    practiceAIList.forEach(bot=>{
+      if(bot.role!=="hider"||bot.found||!bot.fairy||!bot.fairy.hitbox)return;
+      bot.fairy.hitbox.userData.uid=bot.id;
+      bot.fairy.hitbox.userData.isBot=true;
+      bot.fairy.hitbox.userData.taggable=true;
+      targets.push(bot.fairy.hitbox);
+    });
+  }
 
   let selectedUid=null;
   let selectedPoint=null;
@@ -5299,9 +5561,9 @@ async function tryJudge(cx,cy){
   // 2차: 터치 조작 오차를 보정하는 약한 조준 보정
   // 중앙선에서 몸 크기 정도만 벗어난 대상만 허용하며 벽 너머 판정은 불가합니다.
   if(!selectedUid){
-    remotes.forEach((r,uid)=>{
-      if(r.info.role!=="hider"||r.info.found||!r.fairy.hitbox)return;
-      r.fairy.hitbox.getWorldPosition(_judgeCenter);
+    const checkCandidate=(uid,hitbox)=>{
+      if(!hitbox)return;
+      hitbox.getWorldPosition(_judgeCenter);
       _judgeToTarget.copy(_judgeCenter).sub(camera.position);
       const distance=_judgeToTarget.length();
       if(distance<=0.05||distance>JUDGE_RANGE)return;
@@ -5320,12 +5582,40 @@ async function tryJudge(cx,cy){
         selectedDistance=distance;
         selectedScore=score;
       }
+    };
+    remotes.forEach((r,uid)=>{
+      if(r.info.role!=="hider"||r.info.found)return;
+      checkCandidate(uid,r.fairy.hitbox);
     });
+    if(Net.mode==="practice"){
+      practiceAIList.forEach(bot=>{
+        if(bot.role!=="hider"||bot.found||!bot.fairy)return;
+        checkCandidate(bot.id,bot.fairy.hitbox);
+      });
+    }
   }
 
   if(selectedUid){
     // 연속 중복 transaction을 막는 짧은 성공 쿨다운
     G.cdUntil=now+300;
+    if(Net.mode==="practice"){
+      const bot=practiceAIList.find(b=>b.id===selectedUid);
+      if(bot && !bot.found){
+        bot.found=true;
+        setFairyFound(bot.fairy);
+        Audio2.sfxFound();
+        burst(bot.pos.clone().add(new THREE.Vector3(0,1,0)),"#F5C518",12,3.5,0.5,true,0.7);
+        popText("찾았다!",innerWidth/2,innerHeight/2-60);
+        toast(`✏️ 봇_${bot.id.slice(4,8)} 발견!`);
+        const remainBots=practiceAIList.filter(b=>b.role==="hider"&&!b.found);
+        if(remainBots.length===0 && G.phase==="SEEK"){
+          G.phase="RESULT";
+          showRoleCard("✏️ 술래 승리!","숨어있는 모든 지우개 봇을 찾아냈습니다!");
+          setTimeout(()=>{ if(G.screen==="GAME") enterResult("seeker"); },1200);
+        }
+        return;
+      }
+    }
     const committed=await Net.tagFound(selectedUid,selectedPoint);
     if(!committed){
       G.cdUntil=now+500;
@@ -5344,9 +5634,8 @@ async function tryJudge(cx,cy){
 let pokeT=0;
 function pokePencil(){ pokeT=0.25; }
 function updatePencil(dt){
-  const isCops = typeof isCopsMode === "function" && isCopsMode();
-  const isIce = typeof isIceMode === "function" && isIceMode();
-  pencilFP.visible=(G.role==="seeker"&&G.phase==="SEEK"&&G.screen==="GAME"&&!isCops&&!isIce);
+  const gm = typeof getActiveGameMode === "function" ? getActiveGameMode() : "hide";
+  pencilFP.visible = (gm === "hide" && G.role === "seeker" && G.phase === "SEEK" && G.screen === "GAME");
   if(pokeT>0){ pokeT-=dt;
     const k=Math.sin((1-pokeT/0.25)*Math.PI);
     pencilFP.position.z=-1.1-k*0.7; pencilFP.position.x=0.55-k*0.25;
@@ -5416,7 +5705,7 @@ addEventListener("keydown",e=>{
   if(e.code==="Digit7")setPose("squat");
   if(e.code==="Digit8")setPose("star");
   if(e.code==="Digit9")setPose("bridge");
-  if(Net.mode === "practice") {
+  if(Net.mode === "practice" && isZombieMode()) {
     if(e.code==="KeyZ") {
       G.zombieState = (G.zombieState === 2) ? 0 : 2;
       applyZombieSkinToFairy(myFairy, G.zombieState);
@@ -5445,13 +5734,11 @@ function updateControlModeUI(){
       btn.innerHTML="🎮 조작: 📱 화면 터치";
       btn.title="현재 조작 방식: 화면 터치 고정 (클릭 시 마우스로 전환)";
     }
+    // 색칠 페이즈 중에는 물감 패널과 겹치지 않도록 조작 모드 버튼을 숨김
+    btn.classList.toggle("hidden", G.screen === "GAME" && G.phase === "PAINT");
   }
   updateMobileButtons();
-  if($("deskHint")){
-    $("deskHint").textContent=touch
-      ?"📱 화면 터치: 왼쪽 조이스틱 이동 · 오른쪽 드래그 시점 · 화면 탭 콕찍기/스포이트"
-      :"🖱️ 마우스: WASD 이동 · 마우스 시점 · 좌클릭 조작 · 우클릭 색추출 · Space 점프";
-  }
+  updateBottomHints();
 }
 
 function cycleControlMode(){
@@ -5652,11 +5939,13 @@ function updateMobileButtons(){
   const isCops=typeof isCopsMode==="function"&&isCopsMode();
   const isFly=G.flying||G.spectating||G.role==="ghost";
 
-  // Hide & Seek Seeker: 콕 찍기!
-  if($("btnJudge")) $("btnJudge").classList.toggle("hidden",!seek||isIce||isCops);
+  const isHide = typeof isHideMode === "function" ? isHideMode() : (!isIce && !isCops);
+
+  // Hide & Seek Seeker: 콕 찍기! (오직 숨바꼭질 모드 술래만)
+  if($("btnJudge")) $("btnJudge").classList.toggle("hidden", !(seek && isHide));
 
   // 우측 하단에 메인 액션 버튼(콕 찍기, 체포, 땡 등)이 있으면 점프 버튼을 좌측으로 이동
-  const hasPrimaryAction=(seek&&!isIce&&!isCops)||isIce||(isCops&&G.phase==="SEEK");
+  const hasPrimaryAction=(seek&&isHide)||isIce||(isCops&&G.phase==="SEEK");
   mob.classList.toggle("seekerControls",hasPrimaryAction);
   mob.classList.toggle("flyingControls",isFly);
 
@@ -5675,9 +5964,9 @@ function updateMobileButtons(){
     btnFlyDown.classList.toggle("hidden",G.mirror||!isFly);
   }
 
-  // Spoit & Mirror
-  if($("btnSpoit")) $("btnSpoit").classList.toggle("hidden",!(hidePaint&&!isCops&&!isIce));
-  if($("btnMirror")) $("btnMirror").classList.toggle("hidden",!hidePaint||G.mirror);
+  // Spoit & Mirror (오직 숨바꼭질 모드 숨는 사람만)
+  if($("btnSpoit")) $("btnSpoit").classList.toggle("hidden", !(hidePaint && isHide));
+  if($("btnMirror")) $("btnMirror").classList.toggle("hidden", !(hidePaint && isHide) || G.mirror);
 
   // Cops & Robbers buttons
   const nearGymHoop=currentMapId==="gym"&&GymHoops&&GymHoops.some(h=>Math.hypot(G.pos.x-h.x,G.pos.z-h.z)<7.5);
@@ -6154,11 +6443,38 @@ const Net={
       }
       if (s.key === this.uid) {
         const prevZ = G.zombieState;
+        const prevEsc = G.escortedBy;
+        const prevImp = G.imprisoned;
         G.zombieState = after.zombieState || 0;
         G.teamId = after.teamId || "team1";
         G.teamColor = TEAM_COLORS[G.teamId]?.color || "#FF3B30";
         G.escortedBy = after.escortedBy !== undefined ? after.escortedBy : null;
         G.imprisoned = !!after.imprisoned;
+        if (after.invincibleTimer !== undefined && after.invincibleTimer > G.invincibleTimer) {
+          G.invincibleTimer = after.invincibleTimer;
+        }
+        if (typeof isCopsMode === "function" && isCopsMode()) {
+          if (!prevEsc && G.escortedBy) {
+            if (G.wallStuck) detachFromWall(false);
+            G.flying = false;
+            Audio2.sfxFound();
+            toast("👮 경찰에게 체포되었습니다! 감옥으로 연행됩니다!");
+          } else if (!prevImp && G.imprisoned) {
+            if (G.wallStuck) detachFromWall(false);
+            G.flying = false;
+            const pZone = getPrisonZone(currentMapId);
+            const rx = pZone.center.x + (Math.random() - 0.5) * (pZone.radius * 0.6);
+            const rz = pZone.center.z + (Math.random() - 0.5) * (pZone.radius * 0.6);
+            G.pos.set(rx, pZone.center.y, rz);
+            Audio2.sfxFound();
+            toast("🔒 감옥에 수감되었습니다! 동료가 구출[F]해 줄 때까지 기다리세요!");
+          } else if ((prevImp && !G.imprisoned) || (prevEsc && !G.escortedBy && !G.imprisoned)) {
+            G.invincibleTimer = Math.max(G.invincibleTimer || 0, 2.5);
+            Audio2.sfxRefill();
+            toast("🔓 동료가 구출해 주었습니다! 2.5초간 무적 상태입니다. 도망치세요!");
+          }
+          updateMobileButtons();
+        }
         if (G.zombieState !== prevZ) {
           rebuildMyFairy();
           if (G.zombieState > 0 && G.spectating) toggleSpectatorMode(false);
@@ -6592,7 +6908,7 @@ const Net={
     const now=this.now();
     const settings=m.settings||{paintSec:60,seekSec:180};
     const gameMode = settings.gameMode || "hide";
-    const zombieMode = (gameMode === "zombie") || !!settings.zombieMode;
+    const zombieMode = (gameMode === "zombie");
     const inkMode = (gameMode === "splatoon") || !!settings.inkMode;
     const copsMode = (gameMode === "cops");
     const iceMode = (gameMode === "ice");
@@ -6627,6 +6943,15 @@ const Net={
         for (let i = shuffled.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
           [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        if (hostRole === "seeker" && shuffled.includes(this.uid)) {
+          const hIdx = shuffled.indexOf(this.uid);
+          shuffled.splice(hIdx, 1);
+          shuffled.unshift(this.uid);
+        } else if (hostRole === "fairy" && shuffled.length > 1 && shuffled.includes(this.uid)) {
+          const hIdx = shuffled.indexOf(this.uid);
+          shuffled.splice(hIdx, 1);
+          shuffled.push(this.uid);
         }
         const numZombies = Math.max(1, Math.floor(ids.length * 0.25));
         for (let i = 0; i < ids.length; i++) {
@@ -6714,7 +7039,7 @@ const Net={
       // v2: 술래 지정 3가지 경로 — ①직접 지정 있으면 그것만 ②없으면 랜덤(5명당 1명, 공평성) ③교사 역할 반영
       const settings=this.meta.settings||{paintSec:60,seekSec:180};
       const gameMode = settings.gameMode || "hide";
-      const zombieMode = (gameMode === "zombie") || !!settings.zombieMode;
+      const zombieMode = (gameMode === "zombie");
 
       const seekers=new Set();
       let usedRandom=false;
@@ -6843,16 +7168,19 @@ function clearAllRoundGimmicks() {
     cureSpawns.forEach(c => { if (c.mesh) { scene.remove(c.mesh); if (c.mesh.parent) c.mesh.parent.remove(c.mesh); } });
     cureSpawns.length = 0;
   }
-  if (typeof feathers !== "undefined" && Array.isArray(feathers)) {
-    feathers.forEach(f => { if (f.mesh) { scene.remove(f.mesh); if (f.mesh.parent) f.mesh.parent.remove(f.mesh); } });
-    feathers.length = 0;
+  if (typeof featherSpawns !== "undefined" && Array.isArray(featherSpawns)) {
+    featherSpawns.forEach(f => { if (f.mesh) { scene.remove(f.mesh); if (f.mesh.parent) f.mesh.parent.remove(f.mesh); } });
+    featherSpawns.length = 0;
   }
   if (typeof weaponBoxSpawns !== "undefined" && Array.isArray(weaponBoxSpawns)) {
     weaponBoxSpawns.forEach(w => { if (w.group) { scene.remove(w.group); if (w.group.parent) w.group.parent.remove(w.group); } });
     weaponBoxSpawns.length = 0;
   }
   if (typeof gameItems !== "undefined" && Array.isArray(gameItems)) {
-    gameItems.forEach(i => { if (i.mesh) { scene.remove(i.mesh); if (i.mesh.parent) i.mesh.parent.remove(i.mesh); } });
+    gameItems.forEach(i => {
+      const obj = i.group || i.mesh;
+      if (obj) { scene.remove(obj); if (obj.parent) obj.parent.remove(obj); }
+    });
     gameItems.length = 0;
   }
 
@@ -6889,12 +7217,13 @@ async function onPhaseChange(phase,prev){
     }catch(err){console.warn("내 역할 확인 실패, 로컬 값 사용",err);}
   }
   const me=Net.mode==="online"?Net.players[Net.uid]:null;
-  if(me){G.role=me.role;G.found=!!me.found;}
-  // 신규 맵: 게임 화면 페이즈로 들어갈 때 방이 고른 맵을 실제로 빌드한다.
-  // (기존 onPhaseChange는 맵을 빌드하지 않아 어떤 맵을 골라도 초기 교실로 시작되는 버그가 있었다)
+  if(me){G.role=me.role==="fairy"?"hider":me.role;G.found=!!me.found;}
+  // 신규 맵: 라운드 시작(ROULETTE 또는 PAINT 진입) 시에만 강제 재빌드하고,
+  // PAINT -> SEEK 전환 시에는 기존 맵과 벽붙기 상태를 그대로 유지합니다.
   if(phase!=="LOBBY"&&phase!=="RESULT"){
     const wantMap=(Net.mode==="online"&&Net.meta&&Net.meta.mapId)||"classroom";
-    try{ await buildActiveMap(wantMap, true); }
+    const forceRebuild=(phase==="ROULETTE"||(phase==="PAINT"&&prev!=="ROULETTE"));
+    try{ await buildActiveMap(wantMap, forceRebuild); }
     catch(e){ console.warn("맵 빌드 실패, 교실로 진행",e); }
     if(G.phase!==phase)return;
   }
@@ -6906,6 +7235,11 @@ async function onPhaseChange(phase,prev){
     initGameItems();
     initCopsGame();
     enterPaint(); 
+  }
+  else if(phase==="ZOMBIE_CHOOSE"){
+    $("paintPanel").classList.add("hidden");
+    $("phaseLabel").textContent = "🧟 5초 뒤 숙주 좀비 출현!";
+    showRoleCard("🧟 숙주 좀비 선정 중...", "5초 뒤 누군가 숙주 좀비로 변신합니다! 멀리 떨어지세요!");
   }
   else if(phase==="SEEK")enterSeek();
   else if(phase==="RESULT")enterResult();
@@ -6953,7 +7287,7 @@ function enterPaint(){
   
   [...remotes.keys()].forEach(removeRemote);
   const me=Net.mode==="online"?Net.players[Net.uid]:{role:G.role};
-  G.role=me.role||"hider";
+  G.role=(me.role==="fairy"?"hider":me.role)||"hider";
   if (typeof rebuildMyFairy === "function") rebuildMyFairy();
 
   const isRobber = typeof isCopsMode === "function" && isCopsMode() && (G.role === "hider" || G.role === "fairy");
@@ -6961,7 +7295,7 @@ function enterPaint(){
   const canvas = isRobber ? makeRobberCanvas() : makeEraserCanvas("#FFFFFF");
   g.drawImage(canvas,0,0); myFairy.tex.needsUpdate=true;
 
-  const gm = Net.meta?.settings?.gameMode || "hide";
+  const gm = typeof getActiveGameMode === "function" ? getActiveGameMode() : (Net.meta?.settings?.gameMode || "hide");
 
   if(G.role==="hider"){
     const idx=Math.abs(hashUid(Net.uid||"p"))%hiderSpawns.length;
@@ -6975,7 +7309,8 @@ function enterPaint(){
     } else {
       showRoleCard("🧼 당신은 지우개!","몸에 물감을 칠하고 교실에 숨자!");
     }
-    $("paintPanel").classList.remove("hidden");
+    const isHideMode = (gm === "hide");
+    $("paintPanel").classList.toggle("hidden", !isHideMode);
     $("blockOverlay").classList.add("hidden");
     stopCaseGame();
   }else if(G.role==="seeker"){
@@ -7013,10 +7348,11 @@ function enterSeek(){
   setMirror(false);
   stopCaseGame();
   $("blockOverlay").classList.add("hidden");
-  $("paintPanel").classList.toggle("hidden",G.role!=="hider"||G.found);
+  const gm = typeof getActiveGameMode === "function" ? getActiveGameMode() : (Net.meta?.settings?.gameMode || "hide");
+  const isHideMode = (gm === "hide");
+  $("paintPanel").classList.toggle("hidden", !isHideMode || G.role !== "hider" || G.found);
+  if (isTouchMode()) $("paintPanel").classList.add("collapsed");
   G.lastPosSent="";
-
-  const gm = Net.meta?.settings?.gameMode || "hide";
   if (typeof rebuildMyFairy === "function") rebuildMyFairy();
 
   if(G.role==="seeker"){
@@ -7033,7 +7369,9 @@ function enterSeek(){
       showRoleCard("🧊 얼음땡 술래 출발!","도망자들을 쫓아가 [F]키나 터치로 얼리세요!");
     }
   }
-  else if(G.role==="hider"){
+  else if(G.role==="hider"||G.role==="fairy"){
+    G.role="hider";
+    const wasMidgame=G.joinedMidgame;
     if(G.joinedMidgame){
       const idx=Math.abs(hashUid(Net.uid||"p"))%hiderSpawns.length;
       G.pos.copy(hiderSpawns[idx]); G.vy=0; G.pose="stand";
@@ -7046,7 +7384,7 @@ function enterSeek(){
     } else if (gm === "ice") {
       showRoleCard("🧊 얼음땡!","술래를 피해 도망치고, [F]를 눌러 얼어붙은 친구를 구해주세요!");
     } else {
-      showRoleCard("🤫 들키지 마!","게임 도중 합류! 얼른 숨을 곳을 찾자!");
+      showRoleCard("🤫 들키지 마!",wasMidgame?"게임 도중 합류! 얼른 숨을 곳을 찾자!":"술래가 찾으러 왔어요! 들키지 않게 조심하세요!");
     }
   }
 
@@ -7333,11 +7671,17 @@ function enterResult(overrideWinner){
       body += seekWin ? "경찰이 모든 도둑을 체포하였습니다!" : "도둑들이 경찰을 따돌리고 승리하였습니다!";
     } else if (isIce) {
       body += seekWin ? "술래가 모든 요정을 얼렸습니다!" : "요정들이 술래를 따돌리고 승리하였습니다!";
+    } else if (isZMode) {
+      body += seekWin ? "모든 인간이 좀비로 감염되었습니다!" : "인간 생존자가 끝까지 살아남았습니다!";
+    } else {
+      body += seekWin ? "숨어있는 모든 지우개를 찾아냈습니다!" : "지우개들이 끝까지 살아남았습니다!";
     }
   }
   $("resultBody").innerHTML=body||"수고했어요!";
-  $("btnNextRound").classList.toggle("hidden",!G.isHost);
-  $("btnToLobby").classList.toggle("hidden",!G.isHost);
+  const showResultBtns = G.isHost || Net.mode === "practice";
+  $("btnNextRound").classList.toggle("hidden",!showResultBtns);
+  $("btnToLobby").classList.toggle("hidden",!showResultBtns);
+  $("btnToLobby").textContent = Net.mode === "practice" ? "처음 화면으로" : "로비로";
   showScreen("RESULT");
   if (isZMode || isCops || isIce) {
     finishResultReveal();
@@ -7405,13 +7749,17 @@ function showScreen(name){
     $("btnTvSpectateToggle").classList.add("hidden");
     stopCaseGame();
     document.exitPointerLock&&document.exitPointerLock(); }
-  if(name==="GAME"&&!isTouchMode()&&!G.mirror) $("deskHint").classList.remove("hidden");
-  else $("deskHint").classList.add("hidden");
+  updateBottomHints();
+  const tl = $("topLeftArea");
+  if(tl){
+    tl.style.top = (name === "TITLE") ? "22px" : "10px";
+    tl.style.left = (name === "TITLE") ? "22px" : "10px";
+  }
   syncLocalFairy();
   updateSpectatorButton();
   updateControlModeUI();
 }
-$("deskHint").textContent="3인칭 이동 · WASD/방향키 · 마우스 시점 · Space 점프(빠르게 두 번: 비행) · E 색칠 모드 · 1/2/3 포즈";
+updateBottomHints();
 
 function refreshLobbyGrid(){
   if(G.screen!=="LOBBY"&&G.phase!=="LOBBY")return;
@@ -7422,14 +7770,16 @@ function refreshLobbyGrid(){
   });
   const manualSeekers=Net.meta.manualSeekers||{};
   const gameMode = Net.meta.settings?.gameMode || "hide";
+  const canPickSeeker = (gameMode === "hide" || gameMode === "cops" || gameMode === "ice");
+  const seekerIcon = gameMode === "cops" ? "👮 " : (gameMode === "ice" ? "🧊 " : "✏️ ");
   entries.forEach(([u,p])=>{
     const d=document.createElement("div");
-    const isSeekerPick=gameMode === "hide" && !!manualSeekers[u];
-    const pickable=G.isHost&&u!==Net.uid&&gameMode==="hide";
+    const isSeekerPick=canPickSeeker && !!manualSeekers[u];
+    const pickable=G.isHost&&u!==Net.uid&&canPickSeeker;
     d.className="pchip"+(u===Net.meta.host?" host":"")+(isSeekerPick?" seeker":"")+(pickable?" pickable":"");
-    d.innerHTML=`<span class="er"></span><span>${isSeekerPick?"✏️ ":""}${escapeHtml(p.nick||"?")}${u===Net.meta.host?" 👑":""}</span>`;
+    d.innerHTML=`<span class="er"></span><span>${isSeekerPick?seekerIcon:""}${escapeHtml(p.nick||"?")}${u===Net.meta.host?" 👑":""}</span>`;
     if(pickable){
-      d.title="눌러서 술래 지정/해제";
+      d.title="눌러서 술래/경찰 지정/해제";
       d.onclick=()=>{Audio2.resume();Net.toggleManualSeeker(u);};
       const kick=document.createElement("button");
       kick.className="kickBtn";kick.textContent="강퇴";kick.title=`${p.nick||"참가자"} 내보내기`;
@@ -7445,7 +7795,7 @@ function refreshLobbyGrid(){
     grid.appendChild(d);
   });
   $("waitMsg").textContent=G.isHost?`${entries.length}명 실시간 접속 중`:"선생님이 시작하기를 기다리는 중...";
-  $("seekerPickNote").classList.toggle("hidden",!(G.isHost && gameMode === "hide"));
+  $("seekerPickNote").classList.toggle("hidden",!(G.isHost && canPickSeeker));
 }
 /* v2: 게임 설정 슬라이더 표시/동기화 */
 function fmtMinSec(sec){ const m=Math.floor(sec/60),s=sec%60; return s?`${m}분 ${s}초`:`${m}분`; }
@@ -7582,6 +7932,7 @@ function refreshIconRow(){
   });
 }
 function updateHUD(){
+  updateBottomHints();
   // 학생이 튕겼을 때 선생님이 바로 QR을 다시 보여줄 수 있게
   $("btnShowQR").classList.toggle("hidden",!(G.isHost&&Net.mode==="online"&&currentQRCanvas));
   updateTeacherPanelUI();
@@ -7658,10 +8009,18 @@ function updateHUD(){
     }
   }else t.textContent="";
   updateSpectatorButton();
-  // 물감 게이지: 도망가는 지우개는 항상 무제한
+  // 물감 게이지: 숨바꼭질 모드의 지우개에게만 표시 (좀비, 경찰과 도둑, 얼음땡 모드에서는 숨김)
   G.paint=1000;
   $("gaugeFill").style.width="100%";
-  $("gaugeBox").style.visibility=(G.role==="hider"&&(G.lobbyPractice||G.phase==="PAINT"||G.phase==="SEEK"||Net.mode==="practice"))?"visible":"hidden";
+  const currentGm = (Net.meta?.settings?.gameMode) || G.practiceGameMode || "hide";
+  const isPureHideMode = (currentGm === "hide");
+  const showGauge = isPureHideMode && G.screen === "GAME" && G.role === "hider" && !G.found && (G.lobbyPractice||G.phase==="PAINT"||G.phase==="SEEK"||Net.mode==="practice");
+  $("gaugeBox").classList.toggle("hidden", !showGauge);
+  
+  // 모드별 상단 스코어보드 상호 배타적 표시 보장
+  if($("zombieScoreBoard")) $("zombieScoreBoard").classList.toggle("hidden", G.screen !== "GAME" || G.tvMode || currentGm !== "zombie");
+  if($("copsScoreBoard")) $("copsScoreBoard").classList.toggle("hidden", G.screen !== "GAME" || G.tvMode || currentGm !== "cops");
+  if($("iconRow")) $("iconRow").style.display = (G.screen === "GAME" && !G.tvMode && currentGm === "hide" && Net.mode === "online") ? "flex" : "none";
   // 십자선
   const ch=$("crosshair");
   ch.classList.toggle("seekerAim",G.role==="seeker"&&!G.mirror);
@@ -7699,8 +8058,15 @@ function getNick(){
   localStorage.setItem("er_nick",n); return n;
 }
 $("nickInput").value=localStorage.getItem("er_nick")||"";
-$("btnJoinOpen").onclick=()=>{ $("joinBox").classList.toggle("hidden");
-  $("codeInput").value=localStorage.getItem("er_code")||""; };
+$("btnJoinOpen").onclick=()=>{
+  const jb=$("joinBox");
+  jb.classList.toggle("hidden");
+  if(!jb.classList.contains("hidden")){
+    $("practiceBox").classList.add("hidden");
+    $("codeInput").value=localStorage.getItem("er_code")||"";
+    setTimeout(()=>{ if($("btnJoin").scrollIntoView) $("btnJoin").scrollIntoView({behavior:"smooth",block:"nearest"}); }, 50);
+  }
+};
 $("btnCreate").onclick=()=>{
   Audio2.resume();
   // 배포 전 설정이 안 됐으면, 코드 입력 전에 바로 안내를 띄워줍니다.
@@ -7921,7 +8287,7 @@ async function startLobbyPractice(){
     G.flying=false;G.flyUp=false;G.flyDown=false;G.lastJumpTap=0;G.lastFlyDownTap=0;G.vy=0;
     G.spectating=false;G.mirror&&setMirror(false);G.pose="stand";
     const sp=(hiderSpawns&&hiderSpawns.length)?hiderSpawns[0]:null;
-    if(sp)G.pos.set(sp.x,0,sp.z); else G.pos.set(0,0,10);
+    if(sp)G.pos.copy(sp); else G.pos.set(0,0,10);
     const ctx=myFairy.canvas.getContext("2d");
     const bgColor = isInkMode() ? G.teamColor : "#FFFFFF";
     ctx.drawImage(makeEraserCanvas(bgColor),0,0);myFairy.tex.needsUpdate=true;
@@ -7964,8 +8330,18 @@ async function startRoundButton(btn){
   try{await Net.startGame();}finally{if(btn)btn.disabled=false;}
 }
 $("btnStart").onclick=()=>startRoundButton($("btnStart"));
-$("btnNextRound").onclick=()=>{if(G.isHost)startRoundButton($("btnNextRound"));};
-$("btnToLobby").onclick=()=>{ if(G.isHost)Net.setPhase("LOBBY",0); };
+$("btnNextRound").onclick=()=>{
+  if(Net.mode==="practice") startOfflinePractice();
+  else if(G.isHost) startRoundButton($("btnNextRound"));
+};
+$("btnToLobby").onclick=()=>{
+  if(Net.mode==="practice"){
+    clearAllRoundGimmicks();
+    showScreen("TITLE");
+  } else if(G.isHost){
+    Net.setPhase("LOBBY",0);
+  }
+};
 
 /* ================= v2: 술래 룰렛 연출 ================= */
 function enterRoulette(){
@@ -8246,7 +8622,11 @@ $("btnPractice").onclick=()=>{
   Audio2.resume();
   const box=$("practiceBox");
   box.classList.toggle("hidden");
-  if(!box.classList.contains("hidden")) renderPracticeMapCards();
+  if(!box.classList.contains("hidden")){
+    $("joinBox").classList.add("hidden");
+    renderPracticeMapCards();
+    setTimeout(()=>{ if($("btnPracticeStart").scrollIntoView) $("btnPracticeStart").scrollIntoView({behavior:"smooth",block:"nearest"}); }, 50);
+  }
 };
 async function startOfflinePractice(){
   Audio2.resume();
@@ -8254,35 +8634,66 @@ async function startOfflinePractice(){
   const btn=$("btnPracticeStart"); btn.disabled=true;
   const prev=btn.textContent; btn.textContent="맵 준비 중...";
   try{
-    Net.mode="practice"; G.role="hider"; G.isHost=false; G.phase="PAINT";
-    G.practiceGameMode = $("selPracticeGameMode").value || "hide";
+    const selectedMode = ($("selPracticeGameMode") && $("selPracticeGameMode").value) || "hide";
+    const selectedRole = ($("selPracticeRole") && $("selPracticeRole").value) || "hider";
+    Net.mode="practice";
+    G.practiceGameMode = selectedMode;
+    G.isHost=false;
+    if (selectedMode === "zombie") {
+      G.role = "hider";
+      G.zombieState = (selectedRole === "seeker") ? 2 : 0;
+      G.phase = "SEEK";
+    } else {
+      G.role = selectedRole === "seeker" ? "seeker" : "hider";
+      G.zombieState = 0;
+      G.phase = (selectedMode === "hide" && G.role === "hider") ? "PAINT" : "SEEK";
+    }
     
     // 연습 모드 설정 상태에 맞춰 맵을 강제로 완전 재건설합니다.
-    try{ await buildActiveMap(practiceMapId); }
+    try{ await buildActiveMap(practiceMapId, true); }
     catch(e){ console.warn("맵 준비 실패, 교실로 진행",e); }
     
     if (isInkMode()) {
       initSharedFloorCanvas();
       G.inkWeapon = "rifle";
     }
+    if (typeof initFeatherGame === "function") initFeatherGame();
     if (typeof initOfflinePracticeObjects === "function") {
       initOfflinePracticeObjects();
     }
-    G.zombieState=0; G.found=false; G.spectating=false; G.lobbyPractice=false; G.pose="stand"; G.vy=0;
-    // 고른 맵의 안전한 숨는 자리에서 시작합니다. (없으면 교실 기본 위치)
-    const sp=(hiderSpawns&&hiderSpawns.length)?hiderSpawns[0]:null;
-    if(sp) G.pos.set(sp.x,0,sp.z); else G.pos.set(0,0,10);
+    G.found=false; G.spectating=false; G.lobbyPractice=false; G.pose="stand"; G.vy=0;
+    const spawnPool = (G.role === "seeker" && seekerSpawns && seekerSpawns.length) ? seekerSpawns : hiderSpawns;
+    const sp = (spawnPool && spawnPool.length) ? spawnPool[0] : null;
+    if(sp) G.pos.copy(sp); else G.pos.set(0,0,10);
     G.paint=1000; G.flying=false; G.flyUp=false; G.flyDown=false;
+    if (typeof rebuildMyFairy === "function") rebuildMyFairy();
     const isRobber = typeof isCopsMode === "function" && isCopsMode() && (G.role === "hider" || G.role === "fairy");
-    const g=myFairy.canvas.getContext("2d");
-    const canvas = isRobber ? makeRobberCanvas() : makeEraserCanvas(isInkMode() ? G.teamColor : "#FFFFFF");
-    g.drawImage(canvas,0,0); myFairy.tex.needsUpdate=true;
+    if (G.role !== "seeker" && G.zombieState !== 2) {
+      const g=myFairy.canvas.getContext("2d");
+      const canvas = isRobber ? makeRobberCanvas() : makeEraserCanvas(isInkMode() ? G.teamColor : "#FFFFFF");
+      g.drawImage(canvas,0,0); myFairy.tex.needsUpdate=true;
+    }
     showScreen("GAME");
-    $("paintPanel").classList.remove("hidden");
+    const showPaint = (selectedMode === "hide" && G.role === "hider");
+    $("paintPanel").classList.toggle("hidden", !showPaint);
     const mapName=(MAPS[practiceMapId]&&MAPS[practiceMapId].name)||"교실";
-    $("phaseLabel").textContent="🎨 자유 연습 · "+mapName;
-    showRoleCard("🧼 연습 모드",`${mapName}에서 마음껏 칠하고 숨어보자! (E 또는 색칠 모드 버튼)`);
-    Music.start("PAINT");
+    if (selectedMode === "cops") {
+      $("phaseLabel").textContent = `👮 경찰과 도둑 연습 · ${mapName}`;
+      showRoleCard(G.role === "seeker" ? "👮 경찰 연습 모드" : "🏃 도둑 연습 모드", G.role === "seeker" ? "도둑 봇들을 추격해 [F]키/터치로 체포하고 감옥으로 연행하세요!" : "경찰 봇을 피해 도망치고 [F]키로 동료를 구출하세요!");
+    } else if (selectedMode === "ice") {
+      $("phaseLabel").textContent = `🧊 얼음땡 연습 · ${mapName}`;
+      showRoleCard(G.role === "seeker" ? "🧊 얼음땡 술래 연습" : "🏃 얼음땡 도망자 연습", G.role === "seeker" ? "도망자 봇들을 [F]키/터치로 모두 얼리세요!" : "[Q]키로 얼음이 되고, [F]키로 언 동료를 땡 해주세요!");
+    } else if (selectedMode === "zombie") {
+      $("phaseLabel").textContent = `🧟 좀비 추격 연습 · ${mapName}`;
+      showRoleCard(G.zombieState === 2 ? "🧟 숙주 좀비 연습" : "🏃 인간 생존자 연습", G.zombieState === 2 ? "인간 봇들에게 다가가 모두 좀비로 감염시키세요!" : "좀비 봇을 피해 생존하고 치료제를 획득하세요!");
+    } else if (G.role === "seeker") {
+      $("phaseLabel").textContent = `🔍 술래 찾기 연습 · ${mapName}`;
+      showRoleCard("✏️ 술래 연습 모드", `${mapName} 곳곳에 숨어있는 지우개 봇 4명을 찾아 콕 찍어보세요!`);
+    } else {
+      $("phaseLabel").textContent="🎨 자유 연습 · "+mapName;
+      showRoleCard("🧼 연습 모드",`${mapName}에서 마음껏 칠하고 숨어보자! (E 또는 색칠 모드 버튼)`);
+    }
+    Music.start(G.phase === "SEEK" ? "SEEK" : "PAINT");
     syncLocalFairy();
     updateMobileButtons();
   }finally{ btn.disabled=false; btn.textContent=prev; }
@@ -8383,16 +8794,25 @@ function spawnCureOnFirebase() {
   if (!hiderSpawns.length) return;
   const sp = hiderSpawns[Math.floor(Math.random() * hiderSpawns.length)];
   const id = "cure_" + Math.floor(Math.random() * 1000000);
-  const cureData = { id, x: sp.x, y: 1.0, z: sp.z };
+  const cureData = { id, x: sp.x, y: (sp.y || 0) + 1.0, z: sp.z };
   Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/cures/${id}`), cureData).catch(()=>{});
 }
 
 function updateDayNightCycle(dt) {
   if (!isZombieMode()) {
-    isNight = false;
-    sun.intensity = lerp(sun.intensity, SUN_BASE, dt * 1.5);
-    ambientLight.intensity = lerp(ambientLight.intensity, AMB_BASE, dt * 1.5);
-    ambientLight.color.lerp(new THREE.Color(0xffffff), dt * 1.5);
+    if (isNight) {
+      isNight = false;
+      if (currentMapId === "lava") {
+        ambientLight.color.setHex(0xffaa88); ambientLight.intensity = 0.5;
+        sun.color.setHex(0xff4400); sun.intensity = 0.8;
+      } else if (currentMapId === "maze") {
+        ambientLight.color.setHex(0x99e6b3); ambientLight.intensity = 0.85;
+        sun.color.setHex(0xffe299); sun.intensity = 0.8;
+      } else {
+        ambientLight.color.setHex(0xffffff); ambientLight.intensity = AMB_BASE;
+        sun.color.setHex(0xffe0b8); sun.intensity = SUN_BASE;
+      }
+    }
     return;
   }
   
@@ -8426,6 +8846,20 @@ function updateDayNightCycle(dt) {
 }
 
 function updateZombieLogic(dt) {
+  if (!isZombieMode()) {
+    if (cureSpawns && cureSpawns.length > 0) {
+      cureSpawns.forEach(item => {
+        if (item.mesh) {
+          scene.remove(item.mesh);
+          if (item.mesh.parent) item.mesh.parent.remove(item.mesh);
+        }
+      });
+      cureSpawns = [];
+      cureSpawnTimer = 0;
+    }
+    return;
+  }
+
   const time = performance.now() / 1000;
   cureSpawns.forEach(item => {
     if (item.mesh) {
@@ -8436,8 +8870,6 @@ function updateZombieLogic(dt) {
       }
     }
   });
-
-  if (!isZombieMode()) return;
   
   // 1) 감염 전파 검사 (로컬 인간이 리모트 좀비와 만남)
   if (G.zombieState === 0 && G.screen === "GAME" && G.role === "hider" && !G.found && !G.spectating) {
@@ -8528,11 +8960,16 @@ function updateZombieLogic(dt) {
     }
   }
   
-  // 치료제 스피닝/둥실 오르내림 애니메이션
-  cureSpawns.forEach(item => {
-    item.mesh.rotation.y += dt * 1.5;
-    item.mesh.position.y = 1.0 + Math.sin(time * 3.5) * 0.15;
-  });
+  if (Net.mode === "practice" && G.phase === "SEEK" && G.screen === "GAME") {
+    let humans = (G.zombieState === 0) ? 1 : 0;
+    practiceAIList.forEach(b => { if ((b.zombieState || 0) === 0) humans++; });
+    if (practiceAIList.length > 0 && humans === 0) {
+      G.phase = "RESULT";
+      showRoleCard("🧟 좀비 군단 승리!", "모든 인간을 좀비로 감염시켰습니다!");
+      Audio2.sfxFound();
+      setTimeout(() => { if (G.screen === "GAME") enterResult("seeker"); }, 1200);
+    }
+  }
 }
 
 function initZombieGame() {
@@ -8576,8 +9013,9 @@ function doArrestAction() {
       const pRole = pData.role || (r && r.info && r.info.role) || "hider";
       const isImp = !!(pData.imprisoned || (r && r.target?.imprisoned));
       const isEsc = !!(pData.escortedBy || (r && r.target?.escortedBy));
+      const isInv = (pData.invincibleTimer || 0) > 0;
 
-      if ((pRole === "hider" || pRole === "fairy") && !isImp && !isEsc) {
+      if ((pRole === "hider" || pRole === "fairy") && !isImp && !isEsc && !isInv) {
         let rPos;
         if (r && r.fairy && r.fairy.group) {
           rPos = r.fairy.group.position.clone();
@@ -8630,7 +9068,7 @@ function doRescueAction() {
   if (!isCopsMode() || G.screen !== "GAME") return;
   if ((G.role !== "hider" && G.role !== "fairy") || G.imprisoned || G.escortedBy) return;
 
-  const mapId = practiceMapId || activeMapId || "classroom";
+  const mapId = typeof currentMapId !== "undefined" ? currentMapId : "classroom";
   const pZone = getPrisonZone(mapId);
   const distToPrison = G.pos.distanceTo(pZone.center);
 
@@ -8771,18 +9209,44 @@ function buildFeatherMesh() {
   return group;
 }
 
+function spawnFeatherPoint() {
+  if (hiderSpawns && hiderSpawns.length > 0) {
+    const sp = hiderSpawns[Math.floor(Math.random() * hiderSpawns.length)];
+    return { x: sp.x + (Math.random() - 0.5) * 6, y: (sp.y || 0) + 1.5 + Math.random() * 3.5, z: sp.z + (Math.random() - 0.5) * 6 };
+  }
+  return { x: (Math.random() - 0.5) * 38, y: 1.5 + Math.random() * 5.0, z: (Math.random() - 0.5) * 38 };
+}
+
 function spawnFeatherOnFirebase() {
   const id = "feather_" + Math.floor(Math.random() * 1000000);
-  // 맵 전체 범위 X: -19 ~ 19, Z: -19 ~ 19 무작위 난수
-  const rx = (Math.random() - 0.5) * 38;
-  const rz = (Math.random() - 0.5) * 38;
-  // 공중 스폰 지원: Y 좌표 1.5m ~ 6.5m 사이 랜덤
-  const yVal = 1.5 + Math.random() * 5.0;
-  const featherData = { id, x: rx, y: yVal, z: rz };
+  const pt = spawnFeatherPoint();
+  const featherData = { id, x: pt.x, y: pt.y, z: pt.z };
   Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/feathers/${id}`), featherData).catch(()=>{});
 }
 
+function spawnFeatherLocally() {
+  const id = "local_feather_" + Math.floor(Math.random() * 1000000);
+  const pt = spawnFeatherPoint();
+  const mesh = buildFeatherMesh();
+  mesh.position.set(pt.x, pt.y, pt.z);
+  scene.add(mesh);
+  featherSpawns.push({ id, x: pt.x, y: pt.y, z: pt.z, mesh });
+}
+
 function updateFlyGaugeAndFeathers(dt) {
+  const gm = typeof getActiveGameMode === "function" ? getActiveGameMode() : "hide";
+  if (gm !== "hide" && gm !== "cops") {
+    if (featherSpawns && featherSpawns.length > 0) {
+      featherSpawns.forEach(item => {
+        if (item.mesh) {
+          scene.remove(item.mesh);
+          if (item.mesh.parent) item.mesh.parent.remove(item.mesh);
+        }
+      });
+      featherSpawns = [];
+      featherSpawnTimer = 0;
+    }
+  }
   if (G.screen !== "GAME") {
     const box = $("flyGaugeBox");
     if(box && !box.classList.contains("hidden")) box.classList.add("hidden");
@@ -8800,7 +9264,7 @@ function updateFlyGaugeAndFeathers(dt) {
     const box = $("flyGaugeBox");
     if (G.flying) {
       if(box) box.classList.remove("hidden");
-      if (isInkMode() && G.infiniteFlightTimer > 0) {
+      if (G.infiniteFlightTimer > 0) {
         flyEnergy = 100;
       } else {
         flyEnergy -= dt * 17.5; // 약 5.7초 비행 가능
@@ -8839,9 +9303,13 @@ function updateFlyGaugeAndFeathers(dt) {
       if (dist < 1.5 && Math.abs(G.pos.y - item.y) < 1.6) {
         Audio2.sfxRefill();
         burst(new THREE.Vector3(item.x, item.y, item.z), "#ffd700", 12, 3.5, 0.7, true, 0.7);
-        toast("🕊️ 황금 깃털 획득! 비행 에너지가 충전되었습니다!");
-        
         flyEnergy = Math.min(100, flyEnergy + 45.0);
+        if (isCopsMode()) {
+          G.infiniteFlightTimer = 8.0;
+          toast("🕊️ 황금 깃털 획득! 8초간 자유 비행이 가능합니다!");
+        } else {
+          toast("🕊️ 황금 깃털 획득! 비행 에너지가 충전되었습니다!");
+        }
         
         if(Net.mode === "online") {
           Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/feathers/${item.id}`), null).catch(()=>{});
@@ -8853,13 +9321,21 @@ function updateFlyGaugeAndFeathers(dt) {
     }
   }
   
-  // 3) 방장 전용 깃털 스폰 트리거
-  if (G.isHost) {
+  // 3) 방장 또는 연습모드 깃털 스폰 트리거
+  if (G.isHost && Net.mode === "online") {
     featherSpawnTimer += dt;
     if (featherSpawnTimer >= 11.0) {
       featherSpawnTimer = 0;
       if (featherSpawns.length < 4) {
         spawnFeatherOnFirebase();
+      }
+    }
+  } else if (Net.mode === "practice") {
+    featherSpawnTimer += dt;
+    if (featherSpawnTimer >= 11.0) {
+      featherSpawnTimer = 0;
+      if (featherSpawns.length < 4) {
+        spawnFeatherLocally();
       }
     }
   }
@@ -9550,7 +10026,7 @@ function initGameItems() {
 let copsCampTimer = 0;
 
 function getPrisonZone(mapId) {
-  const mId = mapId || (typeof practiceMapId !== "undefined" ? practiceMapId : null) || (typeof currentMapId !== "undefined" ? currentMapId : "classroom");
+  const mId = mapId || (typeof currentMapId !== "undefined" ? currentMapId : "classroom");
   if (mId === "science") {
     return {
       center: new THREE.Vector3(-18, 0.1, 14),
@@ -9565,9 +10041,21 @@ function getPrisonZone(mapId) {
     };
   } else if (mId === "library") {
     return {
-      center: new THREE.Vector3(-18, 0.1, -14),
+      center: new THREE.Vector3(0, 0.1, 0),
       radius: 4.5,
-      box: new THREE.Box3(new THREE.Vector3(-22.5, -0.5, -18.5), new THREE.Vector3(-13.5, 5, -9.5))
+      box: new THREE.Box3(new THREE.Vector3(-4.5, -0.5, -4.5), new THREE.Vector3(4.5, 5, 4.5))
+    };
+  } else if (mId === "lava") {
+    return {
+      center: new THREE.Vector3(-40, 10.1, 0),
+      radius: 4.5,
+      box: new THREE.Box3(new THREE.Vector3(-44.5, 9.5, -4.5), new THREE.Vector3(-35.5, 15.5, 4.5))
+    };
+  } else if (mId === "maze") {
+    return {
+      center: new THREE.Vector3(0, 0.1, -10),
+      radius: 4.0,
+      box: new THREE.Box3(new THREE.Vector3(-4.0, -0.5, -14.0), new THREE.Vector3(4.0, 5, -6.0))
     };
   } else {
     return {
@@ -9878,7 +10366,7 @@ function updateCopsGame(dt) {
           G.imprisoned = true;
           const rx = pZone.center.x + (Math.random() - 0.5) * (pZone.radius * 0.8);
           const rz = pZone.center.z + (Math.random() - 0.5) * (pZone.radius * 0.8);
-          G.pos.set(rx, 0.1, rz);
+          G.pos.set(rx, pZone.center.y, rz);
           Audio2.sfxFound();
           toast("🔒 감옥 수감! 경찰에게 잡혀 감옥에 갇혔습니다!");
         }
@@ -9889,7 +10377,7 @@ function updateCopsGame(dt) {
             b.imprisoned = true;
             const rx = pZone.center.x + (Math.random() - 0.5) * (pZone.radius * 0.8);
             const rz = pZone.center.z + (Math.random() - 0.5) * (pZone.radius * 0.8);
-            b.pos.set(rx, 0.1, rz);
+            b.pos.set(rx, pZone.center.y, rz);
             if (b.fairy && b.fairy.group) b.fairy.group.position.copy(b.pos);
             imprisonedBotsCount++;
           }
@@ -9901,13 +10389,23 @@ function updateCopsGame(dt) {
       } else {
         if (copId === Net.uid) {
           let count = 0;
-          remotes.forEach((r, uid) => {
-            if (r.info && r.info.escortedBy === Net.uid && !r.info.imprisoned) {
-              Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/players/${uid}/escortedBy`), null).catch(()=>{});
-              Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/players/${uid}/imprisoned`), true).catch(()=>{});
+          Object.keys(Net.players || {}).forEach(uid => {
+            if (uid === Net.uid) return;
+            const pData = Net.players[uid] || {};
+            const r = remotes.get(uid);
+            const isEscByMe = (pData.escortedBy === Net.uid) || (r && r.info && r.info.escortedBy === Net.uid) || (r && r.target && r.target.escortedBy === Net.uid);
+            const isImp = !!(pData.imprisoned || (r && r.info && r.info.imprisoned) || (r && r.target && r.target.imprisoned));
+            if (isEscByMe && !isImp) {
+              pData.escortedBy = null;
+              pData.imprisoned = true;
+              if (r) {
+                if (r.info) { r.info.escortedBy = null; r.info.imprisoned = true; }
+                if (r.target) { r.target.escortedBy = null; r.target.imprisoned = true; }
+              }
+              Net.fb.update(Net.fb.ref(Net.db, `rooms/${Net.code}/players/${uid}`), { escortedBy: null, imprisoned: true }).catch(()=>{});
               const rx = pZone.center.x + (Math.random() - 0.5) * (pZone.radius * 0.8);
               const rz = pZone.center.z + (Math.random() - 0.5) * (pZone.radius * 0.8);
-              Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/pos/${uid}`), `${rx},0.1,${rz},0,0,0,0,3,,1`).catch(()=>{});
+              Net.fb.set(Net.fb.ref(Net.db, `rooms/${Net.code}/pos/${uid}`), `${rx},${pZone.center.y},${rz},0,0,0,0,3,,1,0`).catch(()=>{});
               count++;
             }
           });
@@ -10060,7 +10558,8 @@ function updateFairyWeaponVisual(fairyObj, role, weaponType) {
   if (!fairyObj.weaponHolder) return;
   
   let targetWeapon = null;
-  if (role === "seeker") {
+  const gm = typeof getActiveGameMode === "function" ? getActiveGameMode() : "hide";
+  if (role === "seeker" && gm === "hide") {
     targetWeapon = "seeker_pencil";
   } else if (isInkMode()) {
     targetWeapon = weaponType || "rifle";
@@ -10278,7 +10777,7 @@ function sendSplatOutEvent() {
 }
 
 function updateSplatAndInvincible(dt) {
-  if (!isInkMode() || G.screen !== "GAME") {
+  if (G.screen !== "GAME") {
     G.splatTimer = 0;
     G.invincibleTimer = 0;
     G.speedBoostTimer = 0;
@@ -10407,7 +10906,7 @@ function calculateInkRatio() {
 
 let embedTime=0;
 function checkEmbedded(dt){
-  const active=(Net.mode==="online"&&G.role==="hider"&&!G.found&&!G.spectating&&!G.lobbyPractice
+  const active=(Net.mode==="online"&&G.role==="hider"&&!G.found&&!G.spectating&&!G.lobbyPractice&&!G.wallStuck
                 &&(G.phase==="PAINT"||G.phase==="SEEK"));
   if(!active){ embedTime=0; return; }
   const {H}=playerDims(); const px=G.pos.x, py=G.pos.y, pz=G.pos.z;
@@ -10421,7 +10920,7 @@ function checkEmbedded(dt){
     if(embedTime>1.2){
       embedTime=0;
       const sp=hiderSpawns.length?hiderSpawns[Math.floor(Math.random()*hiderSpawns.length)]:null;
-      if(sp){ G.pos.set(sp.x,0,sp.z); G.vy=0; G.flying=false; G.flyUp=false; G.flyDown=false; }
+      if(sp){ G.pos.copy(sp); G.vy=0; G.flying=false; G.flyUp=false; G.flyDown=false; }
       toast("🚫 물건 안엔 숨을 수 없어요! 다시 나왔어요");
     }
   }else embedTime=0;
@@ -10446,6 +10945,7 @@ function loop(){
     }
   }
   updateFlyGaugeAndFeathers(dt);
+  updateSplatAndInvincible(dt);
   
   if (isInkMode()) {
     updateInkProjectiles(dt);
@@ -10543,18 +11043,30 @@ function initOfflinePracticeObjects() {
   
   const gm = G.practiceGameMode || "hide";
   if (gm === "zombie") {
-    // 인간 봇 2마리, 좀비 봇 1마리 스폰
-    spawnPracticeAI("hider", 0, "team1", "none");
-    spawnPracticeAI("hider", 0, "team1", "none");
-    spawnPracticeAI("hider", 2, "team1", "none");
+    if (G.zombieState === 2) {
+      spawnPracticeAI("hider", 0, "team1", "none");
+      spawnPracticeAI("hider", 0, "team1", "none");
+      spawnPracticeAI("hider", 0, "team1", "none");
+      spawnPracticeAI("hider", 0, "team1", "none");
+    } else {
+      spawnPracticeAI("hider", 0, "team1", "none");
+      spawnPracticeAI("hider", 0, "team1", "none");
+      spawnPracticeAI("hider", 2, "team1", "none");
+    }
     spawnCureLocally();
   } else if (gm === "cops") {
     initCopsGame();
-    // 경찰 봇 1마리, 도둑 봇 3마리 스폰
-    spawnPracticeAI("seeker", 0, "team2", "none");
-    spawnPracticeAI("hider", 0, "team1", "none");
-    spawnPracticeAI("hider", 0, "team1", "none");
-    spawnPracticeAI("hider", 0, "team1", "none");
+    if (G.role === "seeker") {
+      spawnPracticeAI("hider", 0, "team1", "none");
+      spawnPracticeAI("hider", 0, "team1", "none");
+      spawnPracticeAI("hider", 0, "team1", "none");
+      spawnPracticeAI("hider", 0, "team1", "none");
+    } else {
+      spawnPracticeAI("seeker", 0, "team2", "none");
+      spawnPracticeAI("hider", 0, "team1", "none");
+      spawnPracticeAI("hider", 0, "team1", "none");
+      spawnPracticeAI("hider", 0, "team1", "none");
+    }
   } else if (gm === "ice") {
     // 얼음땡 봇 스폰 (플레이어가 술래면 도망자 4명, 플레이어가 도망자면 술래 1명 + 동료 도망자 3명)
     if (G.role === "seeker") {
@@ -10568,6 +11080,11 @@ function initOfflinePracticeObjects() {
       spawnPracticeAI("hider", 0, "team1", "none");
       spawnPracticeAI("hider", 0, "team1", "none");
     }
+  } else if (gm === "hide" && G.role === "seeker") {
+    spawnPracticeAI("hider", 0, "team1", "none");
+    spawnPracticeAI("hider", 0, "team1", "none");
+    spawnPracticeAI("hider", 0, "team1", "none");
+    spawnPracticeAI("hider", 0, "team1", "none");
   }
 }
 
@@ -10576,13 +11093,14 @@ function spawnCureLocally() {
   if (typeof hiderSpawns !== "undefined" && hiderSpawns.length > 0) {
     sp = hiderSpawns[Math.floor(Math.random() * hiderSpawns.length)];
   } else {
-    sp = { x: (Math.random() - 0.5) * 58, z: (Math.random() - 0.5) * 42 };
+    sp = { x: (Math.random() - 0.5) * 58, y: 0, z: (Math.random() - 0.5) * 42 };
   }
+  const cy = (sp.y || 0) + 1.0;
   const id = "local_cure_" + Math.floor(Math.random() * 1000000);
   const mesh = buildCureMesh();
-  mesh.position.set(sp.x, 1.0, sp.z);
+  mesh.position.set(sp.x, cy, sp.z);
   scene.add(mesh);
-  cureSpawns.push({ id, x: sp.x, y: 1.0, z: sp.z, mesh });
+  cureSpawns.push({ id, x: sp.x, y: cy, z: sp.z, mesh });
 }
 
 function spawnWeaponBoxLocally() {
@@ -10590,34 +11108,49 @@ function spawnWeaponBoxLocally() {
   if (typeof hiderSpawns !== "undefined" && hiderSpawns.length > 0) {
     sp = hiderSpawns[Math.floor(Math.random() * hiderSpawns.length)];
   } else {
-    sp = { x: (Math.random() - 0.5) * 58, z: (Math.random() - 0.5) * 42 };
+    sp = { x: (Math.random() - 0.5) * 58, y: 0, z: (Math.random() - 0.5) * 42 };
   }
   const id = "local_weaponbox_" + Math.floor(Math.random() * 10000000);
   const types = ["rifle", "grenade", "cannon", "shotgun", "roller"];
   const rType = types[Math.floor(Math.random() * types.length)];
   
   const buildResult = buildWeaponBoxMesh(rType);
-  buildResult.group.position.set(sp.x, 0.5, sp.z);
+  buildResult.group.position.set(sp.x, (sp.y || 0) + 0.5, sp.z);
   scene.add(buildResult.group);
-  weaponBoxSpawns.push({ id, x: sp.x, y: 0.5, z: sp.z, weaponType: rType, group: buildResult.group, topMark: buildResult.topMark });
+  weaponBoxSpawns.push({ id, x: sp.x, y: (sp.y || 0) + 0.5, z: sp.z, weaponType: rType, group: buildResult.group, topMark: buildResult.topMark });
 }
 
 function spawnPracticeAI(role, zombieState, teamId, inkWeapon) {
-  const rx = (Math.random() - 0.5) * 60;
-  const rz = (Math.random() - 0.5) * 44;
-  const ry = 0.5;
+  let rx = (Math.random() - 0.5) * 60;
+  let rz = (Math.random() - 0.5) * 44;
+  let ry = 0;
+  const pool = (role === "seeker" && seekerSpawns && seekerSpawns.length) ? seekerSpawns : hiderSpawns;
+  if (pool && pool.length > 0) {
+    const sp = pool[(practiceAIList.length + 1) % pool.length];
+    rx = sp.x + (Math.random() - 0.5) * 2.5;
+    ry = sp.y || 0;
+    rz = sp.z + (Math.random() - 0.5) * 2.5;
+  }
   
-  const isPencil = (role === "seeker" || zombieState === 2);
-  const isRobber = typeof isCopsMode === "function" && isCopsMode() && (role === "hider" || role === "fairy");
+  const gm = typeof getActiveGameMode === "function" ? getActiveGameMode() : "hide";
+  const isCop = (gm === "cops");
+  const isIce = (gm === "ice");
+  const isHide = (gm === "hide");
+  const isSeeker = (role === "seeker");
+  const isHideSeeker = isHide && isSeeker;
+  const isCopSeeker = isCop && isSeeker;
+  const isIceSeeker = isIce && isSeeker;
+  const isCustomSeekerMesh = isHideSeeker || isCopSeeker || isIceSeeker;
+  const isRobber = isCop && (role === "hider" || role === "fairy");
   let bgColor = "#FFFFFF";
   if (isInkMode()) {
     bgColor = TEAM_COLORS[teamId || "team1"]?.color || "#FF3B30";
   }
   let canvas;
-  if (isPencil) canvas = makePencilCanvas();
+  if (isHideSeeker) canvas = makePencilCanvas();
   else if (isRobber) canvas = makeRobberCanvas();
   else canvas = makeEraserCanvas(bgColor);
-  const fairy = buildFairy(canvas, isPencil);
+  const fairy = buildFairy(canvas, isCustomSeekerMesh);
   fairy.group.position.set(rx, ry, rz);
   fairy.group.visible = true;
   scene.add(fairy.group);
@@ -10691,6 +11224,10 @@ function updatePracticeAI(dt) {
       if (bot.infiniteFlightTimer < 0) bot.infiniteFlightTimer = 0;
     }
 
+    if (gm === "hide") {
+      bot.fairy.group.position.copy(bot.pos);
+      return;
+    }
     if (gm === "cops" && (bot.imprisoned || bot.escortedBy)) {
       return;
     }
@@ -10727,7 +11264,7 @@ function updatePracticeAI(dt) {
           }
         }
       } else if (gm === "cops") {
-        const pZone = getPrisonZone(practiceMapId || activeMapId || "classroom");
+        const pZone = getPrisonZone(currentMapId || "classroom");
         if (bot.role === "seeker") {
           const holdingBots = practiceAIList.filter(b => b.escortedBy === bot.id);
           if (holdingBots.length > 0) {
@@ -10894,7 +11431,7 @@ function updatePracticeAI(dt) {
     animateFairyMovement(bot.fairy, dt, speedVal, "stand", !bot.flying, bot.flying, bot.zombieState);
     
     if (gm === "cops") {
-      const pZone = getPrisonZone(practiceMapId || activeMapId || "classroom");
+      const pZone = getPrisonZone(currentMapId || "classroom");
       if (bot.role === "seeker") {
         practiceAIList.forEach(b => {
           if (b.role === "hider" && !b.imprisoned && !b.escortedBy && b.invincibleTimer <= 0) {
@@ -11047,6 +11584,7 @@ function doIceSelfAction() {
         toast("🧊 이미 얼음 상태입니다!");
         return;
     }
+    if (G.wallStuck) detachFromWall(false);
     G.zombieState = 1;
     G.flying = false;
     G.flyUp = false;
@@ -11513,6 +12051,7 @@ function updateLavaGimmick(dt) {
   if (G.screen === "GAME" && G.role !== "ghost" && !G.spectating) {
     // 플레이어의 Y좌표가 현재 용암 수위보다 낮으면 용암에 빠진 것!
     if (G.pos.y < currentLavaLevel + 0.1) {
+      if (G.wallStuck) detachFromWall(false);
       G.vy = 22; // 하늘로 강하게 튀어 오름!
       G.grounded = false;
       G.pos.y = currentLavaLevel + 0.2; // 끼임 방지
@@ -11520,8 +12059,8 @@ function updateLavaGimmick(dt) {
       burst(G.pos.clone().add(new THREE.Vector3(0,1,0)), "#ff4400", 15, 4.0, 0.5); // 용암 이펙트
       toast("🔥 앗 뜨거! 용암에 빠졌습니다!");
 
-      // 체력이 있는 모드라면 화상 데미지
-      if (typeof G.hp !== 'undefined' && (!G.invincibleTimer || G.invincibleTimer <= 0)) {
+      // 체력이 있는 잉크 모드라면 화상 데미지
+      if (isInkMode() && typeof G.hp !== 'undefined' && (!G.invincibleTimer || G.invincibleTimer <= 0)) {
         G.hp = Math.max(0, G.hp - 1);
         G.invincibleTimer = 1.5;
         if(G.hp <= 0 && typeof splatOutPlayer === "function") {
@@ -11606,6 +12145,8 @@ function lavaCleanup() {
    🌿 맵 6. 화사하고 신비로운 마법 미로 (Bright Magical Labyrinth)
    ================================================================ */
 function buildMazeMap() {
+  ROOM_W = 180;
+  ROOM_D = 180;
   WALL_H = 30;
   MAZE_SHIFTING_WALLS = [];
   MAZE_PORTALS = [];
@@ -12035,6 +12576,7 @@ function updateMazeGimmick(dt) {
       
       // 포털 중심 반경 2.5m 내에 들어가고, 지상에 있을 때 발동
       if (Math.hypot(dx, dz) < 2.5 && Math.abs(G.pos.y) < 1.0) {
+        if (G.wallStuck) detachFromWall(false);
         const target = MAZE_PORTALS[p.targetIndex];
         
         // 도착 지점으로 플레이어 위치 덮어쓰기
@@ -12065,6 +12607,7 @@ function updateMazeGimmick(dt) {
       const dx = G.pos.x - m.x;
       const dz = G.pos.z - m.z;
       if (Math.hypot(dx, dz) < m.radius && Math.abs(G.pos.y - 1.0) < 1.8) {
+        if (G.wallStuck) detachFromWall(false);
         G.vy = 24.0; // 벽 위 발코니로 슈퍼 점프!
         G.grounded = false;
         Audio2.sfxJump();
