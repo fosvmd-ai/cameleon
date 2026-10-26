@@ -1294,6 +1294,43 @@ function buildTextures(){
     for(let i=0;i<=h;i+=checkSize){g.beginPath();g.moveTo(0,i);g.lineTo(w,i);g.stroke();}
   },4,4);
 
+  // 자연 계곡 암벽 및 이끼 지층 텍스처 (Valley Cliff & Moss Texture)
+  TEX.valleyCliff=canvasTex(256,256,(g,w,h)=>{
+    // 따뜻한 흙빛 암갈색 베이스
+    g.fillStyle="#5c4a38"; g.fillRect(0,0,w,h);
+    // 암석 지층 스트라이프
+    for(let i=0;i<8;i++){
+      g.fillStyle=(i%2===0)?"#4a3c2c":"#6b5843";
+      g.fillRect(0,i*32,w,32);
+    }
+    // 자연스러운 바위 질감 점묘
+    for(let i=0;i<500;i++){
+      g.fillStyle=Math.random()>0.5?"rgba(35,28,20,0.55)":"rgba(140,120,95,0.45)";
+      g.fillRect(Math.random()*w,Math.random()*h,3,3);
+    }
+    // 초록색 이끼 & 덩굴 식생 밴드
+    for(let i=0;i<12;i++){
+      g.fillStyle="rgba(56,128,60,0.65)";
+      const my=Math.random()*h;
+      g.fillRect(0,my,w,6+Math.random()*12);
+      for(let k=0;k<30;k++){
+        g.fillStyle=Math.random()>0.5?"#2e7d32":"#4caf50";
+        g.beginPath();
+        g.arc(Math.random()*w,my+Math.random()*8,3+Math.random()*4,0,Math.PI*2);
+        g.fill();
+      }
+    }
+    // 바위 단층 균열선
+    g.strokeStyle="rgba(30,22,15,0.5)"; g.lineWidth=2;
+    for(let i=0;i<6;i++){
+      g.beginPath();
+      let cx=Math.random()*w, cy=0;
+      g.moveTo(cx,cy);
+      while(cy<h){ cx+=(Math.random()-0.5)*20; cy+=24; g.lineTo(cx,cy); }
+      g.stroke();
+    }
+  },4,4);
+
   Object.values(TEX).forEach(t => {
     if (t && t.isTexture) t.needsUpdate = true;
   });
@@ -1345,6 +1382,8 @@ let GYM_RINGS=[];
 let GYM_BOUNCING_VOLLEY=null;
 let VALLEY_PADS=[];
 let VALLEY_TUBES=[];
+let VALLEY_STONES=[];
+let VALLEY_FALLS=[];
 let valleyWaterMesh=null;
 let valleyShowerActive=false;
 let valleyShowerLocalStart=0;
@@ -13592,58 +13631,152 @@ function buildValley() {
   buildTextures();
   valleyCleanup();
 
-  // 1) 기본 외피: 바닥 모래/자갈 질감, 천장 푸른 하늘
+  // 1) 기본 바닥 및 천장
   const groundMat = lambert({map: TEX.sand || TEX.floor, side: THREE.DoubleSide});
   const floorMesh = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W, ROOM_D), groundMat);
   floorMesh.rotation.x = -Math.PI / 2;
   mapRoot.add(floorMesh);
   samplables.push(floorMesh);
 
-  // 천장 (맑은 여름 하늘 0x8fd4ff)
-  const ceilMesh = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W, ROOM_D), lambert({color: 0x8fd4ff, side: THREE.DoubleSide}));
+  // 맑고 화사한 여름 하늘 천장 (0x7ec8f8)
+  const ceilMesh = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W, ROOM_D), lambert({color: 0x7ec8f8, side: THREE.DoubleSide}));
   ceilMesh.rotation.x = Math.PI / 2;
   ceilMesh.position.y = WALL_H;
   mapRoot.add(ceilMesh);
 
-  // 외곽 보이지 않는 AABB 경계 벽 4면 (안전 이탈 방지)
+  // 보이지 않는 외곽 AABB 경계 벽 4면
   addAABBCollider(0, WALL_H / 2, -ROOM_D / 2 - 1, ROOM_W + 10, WALL_H, 2);
   addAABBCollider(0, WALL_H / 2, ROOM_D / 2 + 1, ROOM_W + 10, WALL_H, 2);
   addAABBCollider(-ROOM_W / 2 - 1, WALL_H / 2, 0, 2, WALL_H, ROOM_D + 10);
   addAABBCollider(ROOM_W / 2 + 1, WALL_H / 2, 0, 2, WALL_H, ROOM_D + 10);
 
-  // 외곽 자연 바위 절벽 배경 & 푸른 숲나무 마감
-  const bgRockMat = lambert({map: TEX.rock});
-  addBox(ROOM_W + 4, WALL_H, 4, bgRockMat, 0, WALL_H / 2, -ROOM_D / 2 - 1.5, {collide: true, sample: true});
-  addBox(ROOM_W + 4, WALL_H, 4, bgRockMat, 0, WALL_H / 2, ROOM_D / 2 + 1.5, {collide: true, sample: true});
-  addBox(4, WALL_H, ROOM_D + 4, bgRockMat, -ROOM_W / 2 - 1.5, WALL_H / 2, 0, {collide: true, sample: true});
-  addBox(4, WALL_H, ROOM_D + 4, bgRockMat, ROOM_W / 2 + 1.5, WALL_H / 2, 0, {collide: true, sample: true});
+  // 2) 회색 시멘트 벽 완전 제거 -> 울창한 자연 계곡 협곡 암벽 (TEX.valleyCliff)
+  const cliffMat = lambert({map: TEX.valleyCliff || TEX.rock});
+  addBox(ROOM_W + 4, WALL_H, 4, cliffMat, 0, WALL_H / 2, -ROOM_D / 2 - 1.5, {collide: true, sample: true});
+  addBox(ROOM_W + 4, WALL_H, 4, cliffMat, 0, WALL_H / 2, ROOM_D / 2 + 1.5, {collide: true, sample: true});
+  addBox(4, WALL_H, ROOM_D + 4, cliffMat, -ROOM_W / 2 - 1.5, WALL_H / 2, 0, {collide: true, sample: true});
+  addBox(4, WALL_H, ROOM_D + 4, cliffMat, ROOM_W / 2 + 1.5, WALL_H / 2, 0, {collide: true, sample: true});
 
-  // 외곽 푸른 나무들 (Valleyside Trees)
-  const treeTrunkMat = lambert({color: 0x6e4726});
-  const treeLeafMat = lambert({color: 0x2e7d32});
-  const treeLeafLightMat = lambert({color: 0x4caf50});
+  // 3) 풍성하고 다채로운 5종 나무 식재 (Various Valley Trees & Forest)
+  const trunkWoodMat = lambert({color: 0x5a3d28});
+  const trunkBirchMat = lambert({color: 0xe8e4dc}); // 흰색 자작나무 줄기
+  const pineDarkMat = lambert({color: 0x1b4d24});
+  const pineMidMat = lambert({color: 0x2e7d32});
+  const broadOakMat = lambert({color: 0x388e3c});
+  const broadLimeMat = lambert({color: 0x66bb6a});
+  const bushMat = lambert({color: 0x2e6b30});
+  const flowerBushMat = lambert({color: 0xff7eb0}); // 산철쭉/꽃덤불
 
-  const plantTree = (tx, tz, scale = 1.0) => {
-    addCyl(0.45 * scale, 4.5 * scale, treeTrunkMat, tx, 2.25 * scale, tz, {collide: true, sample: true});
-    const c1 = new THREE.Mesh(new THREE.ConeGeometry(2.8 * scale, 4.2 * scale, 8), treeLeafMat);
-    c1.position.set(tx, 5.0 * scale, tz);
+  // (A) 상록 전나무 (Pine Tree - 다단 원뿔)
+  const plantPine = (tx, tz, scale = 1.0) => {
+    addCyl(0.4 * scale, 4.0 * scale, trunkWoodMat, tx, 2.0 * scale, tz, {collide: true, sample: true});
+    const c1 = new THREE.Mesh(new THREE.ConeGeometry(3.0 * scale, 3.8 * scale, 8), pineDarkMat);
+    c1.position.set(tx, 4.2 * scale, tz);
     mapRoot.add(c1); samplables.push(c1);
-    const c2 = new THREE.Mesh(new THREE.ConeGeometry(2.2 * scale, 3.6 * scale, 8), treeLeafLightMat);
-    c2.position.set(tx, 7.2 * scale, tz);
+    const c2 = new THREE.Mesh(new THREE.ConeGeometry(2.3 * scale, 3.2 * scale, 8), pineMidMat);
+    c2.position.set(tx, 6.2 * scale, tz);
     mapRoot.add(c2); samplables.push(c2);
+    const c3 = new THREE.Mesh(new THREE.ConeGeometry(1.5 * scale, 2.6 * scale, 8), broadLimeMat);
+    c3.position.set(tx, 8.0 * scale, tz);
+    mapRoot.add(c3); samplables.push(c3);
   };
 
-  // 외곽 경계선 주변 나무 식재
-  [-50, -35, -20, 20, 35, 50].forEach(tx => {
-    plantTree(tx, -ROOM_D / 2 + 6, 1.1 + Math.random() * 0.3);
-    plantTree(tx, ROOM_D / 2 - 6, 1.1 + Math.random() * 0.3);
-  });
-  [-30, -10, 10, 30].forEach(tz => {
-    plantTree(ROOM_W / 2 - 6, tz, 1.2);
-    plantTree(-ROOM_W / 2 + 6, tz, 1.2);
-  });
+  // (B) 풍성한 활엽수 / 참나무 (Broadleaf Oak Tree - 둥근 엽륜 구체 클러스터)
+  const plantOak = (tx, tz, scale = 1.0) => {
+    addCyl(0.6 * scale, 5.0 * scale, trunkWoodMat, tx, 2.5 * scale, tz, {collide: true, sample: true});
+    const mainCanopy = new THREE.Mesh(new THREE.SphereGeometry(3.2 * scale, 12, 10), broadOakMat);
+    mainCanopy.position.set(tx, 6.5 * scale, tz);
+    mapRoot.add(mainCanopy); samplables.push(mainCanopy);
+    addMeshCollider(mainCanopy, 0.05);
 
-  // 조명 분위기 (화사하고 맑은 여름 햇살)
+    // 곁가지 풍성 엽륜
+    const subOffsets = [[-1.5, 6.0, 0], [1.5, 6.2, 0], [0, 6.0, -1.4], [0, 7.8, 0]];
+    subOffsets.forEach(([ox, oy, oz]) => {
+      const sub = new THREE.Mesh(new THREE.SphereGeometry(2.0 * scale, 10, 8), broadLimeMat);
+      sub.position.set(tx + ox * scale, oy * scale, tz + oz * scale);
+      mapRoot.add(sub); samplables.push(sub);
+    });
+  };
+
+  // (C) 흰색 자작나무 (White Birch Tree - 가늘고 키가 큼)
+  const plantBirch = (tx, tz, scale = 1.0) => {
+    addCyl(0.28 * scale, 7.5 * scale, trunkBirchMat, tx, 3.75 * scale, tz, {collide: true, sample: true});
+    // 가지 점묘 무늬
+    for (let b = 0; b < 3; b++) {
+      const cy = (4.5 + b * 1.5) * scale;
+      const bCanopy = new THREE.Mesh(new THREE.SphereGeometry(1.6 * scale, 8, 8), broadLimeMat);
+      bCanopy.position.set(tx + (b % 2 === 0 ? 0.8 : -0.8) * scale, cy, tz);
+      mapRoot.add(bCanopy); samplables.push(bCanopy);
+    }
+  };
+
+  // (D) 수양버들 (Willow Tree - 계곡 물가에 드리워진 긴 수형)
+  const plantWillow = (tx, tz, scale = 1.0) => {
+    addCyl(0.55 * scale, 4.8 * scale, trunkWoodMat, tx, 2.4 * scale, tz, {collide: true, sample: true});
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(2.8 * scale, 3.8 * scale, 3.5 * scale, 10), pineMidMat);
+    cap.position.set(tx, 5.5 * scale, tz);
+    mapRoot.add(cap); samplables.push(cap);
+    addMeshCollider(cap, 0.05);
+    // 늘어진 가지
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      const strand = new THREE.Mesh(new THREE.CylinderGeometry(0.08 * scale, 0.15 * scale, 3.2 * scale, 6), broadLimeMat);
+      strand.position.set(tx + Math.cos(a) * 2.8 * scale, 3.8 * scale, tz + Math.sin(a) * 2.8 * scale);
+      mapRoot.add(strand);
+    }
+  };
+
+  // (E) 꽃덤불 & 둥근 관목 (Berry / Flower Bush)
+  const plantBush = (tx, tz, scale = 1.0, isFlower = false) => {
+    const bMesh = new THREE.Mesh(new THREE.SphereGeometry(1.8 * scale, 10, 8), isFlower ? flowerBushMat : bushMat);
+    bMesh.position.set(tx, 1.0 * scale, tz);
+    mapRoot.add(bMesh); samplables.push(bMesh);
+    addMeshCollider(bMesh, 0.05);
+  };
+
+  // 숲과 계곡 전체에 다양한 나무들 배치
+  // 북쪽 절벽가 숲 (-Z 방향)
+  plantPine(-50, -36, 1.3);
+  plantOak(-36, -38, 1.2);
+  plantBirch(-22, -37, 1.1);
+  plantPine(-12, -38, 1.2);
+  plantWillow(12, -37, 1.15);
+  plantOak(24, -38, 1.25);
+  plantPine(38, -36, 1.3);
+  plantBirch(48, -38, 1.1);
+
+  // 남쪽 절벽가 숲 (+Z 방향)
+  plantOak(-48, 36, 1.25);
+  plantPine(-34, 38, 1.3);
+  plantBirch(-18, 36, 1.15);
+  plantWillow(-12, 37, 1.1);
+  plantWillow(12, 37, 1.15);
+  plantOak(22, 38, 1.2);
+  plantPine(36, 36, 1.35);
+  plantOak(48, 37, 1.15);
+
+  // 좌서측 바위 절벽 틈새 식재
+  plantPine(-54, -14, 1.0);
+  plantPine(-52, 12, 1.05);
+  plantBirch(-53, 0, 0.95);
+  plantBush(-45, -8, 1.2, true);
+  plantBush(-42, 14, 1.1, false);
+
+  // 우동측 캠핑장 잔디밭/절벽 경계 식재
+  plantOak(52, -18, 1.2);
+  plantPine(54, 8, 1.15);
+  plantBirch(52, 22, 1.1);
+  plantBush(32, -30, 1.2, true);
+  plantBush(48, -4, 1.0, false);
+  plantBush(22, 32, 1.1, true);
+
+  // 물가 주변 수양버들과 관목
+  plantWillow(-15, -2, 0.95);
+  plantWillow(15, -6, 0.95);
+  plantBush(-15, 10, 1.0, true);
+  plantBush(15, 26, 1.0, false);
+
+  // 4) 조명 분위기 세팅 (맑고 투명한 여름 협곡)
   if (typeof ambientLight !== "undefined" && ambientLight && ambientLight.color) {
     ambientLight.color.setHex(0xe8f4f8);
     ambientLight.intensity = 0.85;
@@ -13653,7 +13786,7 @@ function buildValley() {
     sun.intensity = 0.8;
   }
 
-  // 2) 중앙 급류 물길 (x: -14 ~ 14, z: -45 ~ 45)
+  // 5) 중앙 급류 물길 (x: -14 ~ 14, z: -45 ~ 45)
   const waterGeo = new THREE.PlaneGeometry(28, ROOM_D);
   const waterMat = lambert({
     map: TEX.water,
@@ -13683,6 +13816,8 @@ function buildValley() {
   stonePositions.forEach(([sx, sz], i) => {
     const r = 2.0 + (i % 3) * 0.3;
     addCyl(r, 0.9, stepMat, sx, 0.45, sz, {rt: r - 0.2, collide: true, sample: true});
+    // 물살 밀림 면제 판정용 돌 좌표 등록
+    VALLEY_STONES.push({x: sx, z: sz, radius: r + 0.3});
   });
 
   // 물길 위 분홍색 플라밍고 튜브 2개 (Flamingo Tubes)
@@ -13695,12 +13830,10 @@ function buildValley() {
     tubeGroup.position.set(tx, 0.6, tz);
     tubeGroup.rotation.y = ry;
 
-    // 도넛형 튜브 본체
     const ringMesh = new THREE.Mesh(new THREE.TorusGeometry(2.4, 0.65, 12, 24), flamingoPinkMat);
     ringMesh.rotation.x = Math.PI / 2;
     tubeGroup.add(ringMesh);
 
-    // 플라밍고 목과 머리
     const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.35, 2.8, 8), flamingoPinkMat);
     neck.position.set(0, 1.4, 2.2);
     neck.rotation.x = 0.35;
@@ -13710,7 +13843,6 @@ function buildValley() {
     head.position.set(0, 2.7, 2.7);
     tubeGroup.add(head);
 
-    // 부리
     const beak = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.8, 8), flamingoBeakMat);
     beak.position.set(0, 2.6, 3.2);
     beak.rotation.x = Math.PI / 2;
@@ -13725,17 +13857,17 @@ function buildValley() {
 
     // 위에 올라타는 충돌 발판
     const tubeBox = new THREE.Box3(
-      new THREE.Vector3(tx - 2.2, 0, tz - 2.2),
-      new THREE.Vector3(tx + 2.2, 1.3, tz + 2.2)
+      new THREE.Vector3(tx - 2.4, 0, tz - 2.4),
+      new THREE.Vector3(tx + 2.4, 1.35, tz + 2.4)
     );
     colliders.push(tubeBox);
-    VALLEY_TUBES.push({group: tubeGroup, baseY: 0.6, x: tx, z: tz});
+    VALLEY_TUBES.push({group: tubeGroup, baseY: 0.6, x: tx, z: tz, radius: 2.7});
   };
 
   spawnFlamingoTube(-4, -8, 0.4);
   spawnFlamingoTube(4, 18, -0.6);
 
-  // 3) 좌측 바위 절벽과 폭포 (x: -58 ~ -16)
+  // 6) 좌측 바위 절벽과 상단 폭포 (x: -58 ~ -16)
   const rockMat = lambert({map: TEX.rock});
 
   // 계단식 대형 바위 테라스 (높이 2m ~ 22m)
@@ -13744,13 +13876,13 @@ function buildValley() {
   addBox(22, 18, 26, rockMat, -42, 9, -24, {collide: true, sample: true});   // 북서 상단 (Y=18)
   addBox(14, 22, 16, rockMat, -48, 11, -26, {collide: true, sample: true});  // 최고봉 망루 (Y=22)
 
-  // 절벽 중간 징검 바위 섬들 (등반 및 점프용 계단 디딤돌)
+  // 절벽 중간 디딤돌
   addCyl(3.2, 4.0, rockMat, -22, 2.0, 18, {collide: true, sample: true});
   addCyl(2.8, 8.0, rockMat, -26, 4.0, 6, {collide: true, sample: true});
   addCyl(3.5, 14.0, rockMat, -24, 7.0, -10, {collide: true, sample: true});
   addCyl(2.5, 17.0, rockMat, -28, 8.5, -22, {collide: true, sample: true});
 
-  // 조약돌 층층이 쌓은 돌탑 계단 (Stone Cairns Stairs)
+  // 돌탑 계단
   const buildCairn = (cx, cz, totalH, steps = 5) => {
     let curY = 0;
     for (let s = 0; s < steps; s++) {
@@ -13764,28 +13896,36 @@ function buildValley() {
   buildCairn(-20, 32, 6.0, 4);
   buildCairn(-22, -32, 9.0, 5);
 
-  // 수직 폭포수 메쉬 (Vertical Waterfall: x=-32, z=-24 부근)
-  const waterfallMat = lambert({
+  // 7) 위에서 힘차게 떨어지는 폭포 2개소 (Cascading Waterfalls)
+  const waterfallMat1 = lambert({
     map: TEX.water,
     emissive: 0x66ccff,
-    emissiveIntensity: 0.45,
+    emissiveIntensity: 0.5,
     transparent: true,
     opacity: 0.85
   });
-  const waterfallMesh = new THREE.Mesh(new THREE.PlaneGeometry(10, 18), waterfallMat);
-  waterfallMesh.position.set(-30, 9.0, -22);
-  waterfallMesh.rotation.y = Math.PI / 2;
-  mapRoot.add(waterfallMesh);
-  samplables.push(waterfallMesh);
+  const waterfallMat2 = lambert({
+    map: TEX.water,
+    emissive: 0x88ddff,
+    emissiveIntensity: 0.55,
+    transparent: true,
+    opacity: 0.85
+  });
 
-  // 폭포수 뒤편 동굴 은신처 (Cave Hideout Behind Waterfall)
-  // 폭포 바로 뒤 x: -38 ~ -32, z: -27 ~ -17 공간을 비우고 양옆과 천장 바위로 감싸 동굴 형성
-  addBox(6, 12, 1.2, rockMat, -35, 6, -28, {collide: true, sample: true}); // 동굴 뒤쪽 벽
-  addBox(1.2, 12, 12, rockMat, -39, 6, -22, {collide: true, sample: true}); // 동굴 안쪽 옆벽
-  addBox(1.2, 12, 4, rockMat, -31, 6, -26, {collide: true, sample: true});  // 동굴 입구 우측 기둥
-  addBox(1.2, 12, 4, rockMat, -31, 6, -18, {collide: true, sample: true});  // 동굴 입구 좌측 기둥
-  addBox(9, 1.5, 12, rockMat, -35, 12.5, -22, {collide: true, sample: true}); // 동굴 천장 바위
-  // 동굴 내부 빛나는 신비로운 수정 (동굴 식별용)
+  // (A) 좌측 메인 폭포 (x=-30, z=-22): 절벽 상단(Y=18)에서 지면 웅덩이로 쏟아짐
+  const fallMesh1 = new THREE.Mesh(new THREE.PlaneGeometry(10, 18), waterfallMat1);
+  fallMesh1.position.set(-30, 9.0, -22);
+  fallMesh1.rotation.y = Math.PI / 2;
+  mapRoot.add(fallMesh1);
+  samplables.push(fallMesh1);
+  VALLEY_FALLS.push({mesh: fallMesh1, x: -30, z: -22, tex: TEX.water});
+
+  // 폭포 뒤편 동굴 은신처 (Cave Hideout Behind Waterfall)
+  addBox(6, 12, 1.2, rockMat, -35, 6, -28, {collide: true, sample: true});
+  addBox(1.2, 12, 12, rockMat, -39, 6, -22, {collide: true, sample: true});
+  addBox(1.2, 12, 4, rockMat, -31, 6, -26, {collide: true, sample: true});
+  addBox(1.2, 12, 4, rockMat, -31, 6, -18, {collide: true, sample: true});
+  addBox(9, 1.5, 12, rockMat, -35, 12.5, -22, {collide: true, sample: true});
   const caveCrystal = new THREE.Mesh(
     new THREE.ConeGeometry(0.8, 2.4, 6),
     lambert({color: 0x66ffff, emissive: 0x33ccff, emissiveIntensity: 0.9})
@@ -13793,17 +13933,25 @@ function buildValley() {
   caveCrystal.position.set(-36, 1.2, -22);
   mapRoot.add(caveCrystal); samplables.push(caveCrystal);
 
-  // 4) 우측 피크닉 캠핑장 (x: 16 ~ 58)
-  // 바닥 넓은 피크닉 돗자리 (TEX.mat)
+  // (B) 북쪽 상류 협곡 유입 폭포 (x=0, z=-44): 높은 암벽(Y=20)에서 중앙 계곡물로 쏟아지는 거대 폭포
+  const fallMesh2 = new THREE.Mesh(new THREE.PlaneGeometry(24, 20), waterfallMat2);
+  fallMesh2.position.set(0, 10.0, -43.5);
+  mapRoot.add(fallMesh2);
+  samplables.push(fallMesh2);
+  VALLEY_FALLS.push({mesh: fallMesh2, x: 0, z: -43.5, tex: TEX.water});
+
+  // 북쪽 폭포 상단 수원지 암석 턱
+  addBox(26, 2.0, 4.0, cliffMat, 0, 20.0, -44.5, {collide: true, sample: true});
+
+  // 8) 우측 피크닉 캠핑장 (x: 16 ~ 58)
   const matMesh = new THREE.Mesh(new THREE.PlaneGeometry(24, 24), lambert({map: TEX.mat}));
   matMesh.rotation.x = -Math.PI / 2;
   matMesh.position.set(36, 0.05, 0);
   mapRoot.add(matMesh);
   samplables.push(matMesh);
 
-  // 캠핑용 삼각 텐트 (A-Frame Camping Tent: x=42, z=-16)
-  // 지우개가 쏙 들어가 숨을 수 있도록 옆면 2개 경사 판넬만 충돌체를 두고 앞뒤 입구는 오픈
-  const tentMat = lambert({color: 0x3182ce}); // 시원한 블루 텐트
+  // 캠핑용 삼각 텐트 (A-Frame Tent)
+  const tentMat = lambert({color: 0x3182ce});
   const tentLeft = new THREE.Mesh(new THREE.BoxGeometry(0.3, 7.0, 9.0), tentMat);
   tentLeft.position.set(39.5, 3.2, -16);
   tentLeft.rotation.z = -0.55;
@@ -13816,14 +13964,12 @@ function buildValley() {
   mapRoot.add(tentRight); samplables.push(tentRight);
   addMeshCollider(tentRight, 0.05);
 
-  // 텐트 지붕 용마루 바
   addCyl(0.12, 9.2, lambert({color: 0xdddddd}), 42, 6.0, -16, {rx: Math.PI / 2, collide: true});
 
-  // 반으로 쪼개진 거대 수박 (Giant Sliced Watermelon: x=28, z=16)
-  const watermelonRindMat = lambert({color: 0x2e7d32}); // 짙은 초록 껍질
-  const watermelonFleshMat = lambert({map: TEX.watermelon}); // 빨간 과육
+  // 반으로 쪼개진 거대 수박
+  const watermelonRindMat = lambert({color: 0x2e7d32});
+  const watermelonFleshMat = lambert({map: TEX.watermelon});
 
-  // 거대 반원 수박 덩어리
   const wmGroup = new THREE.Group();
   wmGroup.position.set(28, 0, 16);
   const wmRind = new THREE.Mesh(new THREE.CylinderGeometry(5.5, 5.5, 7.0, 16, 1, false, 0, Math.PI), watermelonRindMat);
@@ -13837,11 +13983,9 @@ function buildValley() {
   wmGroup.add(wmFlesh);
   mapRoot.add(wmGroup);
   samplables.push(wmRind); samplables.push(wmFlesh);
-
-  // 수박 충돌체
   addBox(11.0, 4.5, 7.0, watermelonRindMat, 28, 2.25, 16, {collide: true, sample: false});
 
-  // 주변 잘린 삼각 수박 조각 3개 (디딤돌 및 엄폐물)
+  // 수박 조각 3개
   const spawnMelonSlice = (mx, mz, ry = 0) => {
     const slGroup = new THREE.Group();
     slGroup.position.set(mx, 1.2, mz);
@@ -13860,62 +14004,54 @@ function buildValley() {
   spawnMelonSlice(36, 12, -0.4);
   spawnMelonSlice(25, 23, 0.8);
 
-  // 피크닉 바구니 & 아이스박스 (Picnic Basket & Ice Cooler)
-  // 피크닉 바구니
+  // 피크닉 바구니 & 아이스박스
   const basketMat = lambert({color: 0xc8965a});
   addBox(3.2, 2.2, 2.4, basketMat, 45, 1.1, 4, {collide: true, sample: true});
   addCyl(0.1, 3.4, basketMat, 45, 2.6, 4, {rz: Math.PI / 2, collide: false});
 
-  // 아이스박스 (열려있는 시원한 음료수 보관함 = 리필존 2)
   const coolerBodyMat = lambert({color: 0x2b6cb0});
   const coolerInsideMat = lambert({color: 0xedf2f7});
   const coolerLidMat = lambert({color: 0x3182ce});
   addBox(4.6, 2.4, 3.2, coolerBodyMat, 44, 1.2, -6, {collide: true, sample: true});
   addBox(4.0, 0.2, 2.6, coolerInsideMat, 44, 2.3, -6, {collide: false, sample: true});
-  // 열린 뚜껑 (비스듬히 세워둠)
   const coolerLid = addBox(4.6, 0.4, 3.2, coolerLidMat, 44, 3.2, -7.5, {collide: true, sample: true});
   coolerLid.rotation.x = 0.65;
 
-  // 피크닉 음료수 캔과 컵들 (은신 및 스포이트용 소품)
   [0xe53e3e, 0x38a169, 0xd69e2e].forEach((cc, idx) => {
     addCyl(0.35, 1.2, lambert({color: cc}), 38 + idx * 1.5, 0.6, -2, {collide: true, sample: true});
   });
 
-  // 5) 리필존 2곳 설정
-  // 리필존 1: 폭포수 아래 물웅덩이 (x: -30, z: -22)
+  // 9) 리필존 2곳
   refillZones.push({x: -30, z: -22, r: 7.0, yMin: 0, yMax: 6, label: "폭포수"});
-  // 리필존 2: 피크닉 구역 열린 아이스박스 (x: 44, z: -6)
   refillZones.push({x: 44, z: -6, r: 5.5, yMin: 0, yMax: 5, label: "아이스박스"});
 
-  // 6) 탄성 연잎 점프패드 4개 배치 (VALLEY_PADS)
+  // 10) 탄성 연잎 점프패드 4개
   const lilyPadMat = lambert({color: 0x3f9d5a});
   const padPositions = [
-    {x: -16, z: -15}, // 폭포 앞 물가 (절벽 점프용)
-    {x: -16, z: 20},  // 남서 절벽 입구
-    {x: 16, z: -20},  // 텐트 앞 물가
-    {x: 16, z: 15}    // 수박 앞 물가
+    {x: -16, z: -15},
+    {x: -16, z: 20},
+    {x: 16, z: -20},
+    {x: 16, z: 15}
   ];
   padPositions.forEach(p => {
     const padMesh = addCyl(2.2, 0.2, lilyPadMat, p.x, 0.35, p.z, {collide: true, sample: true});
     VALLEY_PADS.push({mesh: padMesh, x: p.x, z: p.z, radius: 2.2, top: 0.45});
   });
 
-  // 7) 스폰 지점 (Spawns - 넉넉하고 쾌적한 100% 개활지 배치)
-  // seekerSpawns: 징검다리 근처 중앙 물가 3곳
+  // 11) 스폰 지점
   seekerSpawns.push(
     new THREE.Vector3(0, 0.6, -25),
     new THREE.Vector3(0, 0.6, 0),
     new THREE.Vector3(0, 0.6, 25)
   );
 
-  // hiderSpawns: 절벽 위, 폭포 뒤, 텐트 근처, 수박 옆 등 맵 전역 18곳
   hiderSpawns = [
-    [-42, 6.1, 24], [-44, 12.1, 0], [-42, 18.1, -24], [-48, 22.1, -26], // 절벽 위 4곳
-    [-35, 0.5, -22], [-36, 0.5, -25],                                    // 폭포 뒤 동굴 2곳
-    [-22, 4.1, 18], [-26, 8.1, 6], [-24, 14.1, -10],                     // 징검 바위 위 3곳
-    [42, 0.1, -16], [42, 0.1, -12],                                      // 텐트 안/근처 2곳
-    [28, 4.6, 16], [23, 0.1, 8], [36, 0.1, 12], [25, 0.1, 23],           // 거대 수박 위/조각 옆 4곳
-    [44, 0.1, -2], [36, 0.1, 2], [35, 0.1, 28]                           // 피크닉 돗자리/쿨러 주변 3곳
+    [-42, 6.1, 24], [-44, 12.1, 0], [-42, 18.1, -24], [-48, 22.1, -26],
+    [-35, 0.5, -22], [-36, 0.5, -25],
+    [-22, 4.1, 18], [-26, 8.1, 6], [-24, 14.1, -10],
+    [42, 0.1, -16], [42, 0.1, -12],
+    [28, 4.6, 16], [23, 0.1, 8], [36, 0.1, 12], [25, 0.1, 23],
+    [44, 0.1, -2], [36, 0.1, 2], [35, 0.1, 28]
   ].map(p => new THREE.Vector3(p[0], p[1], p[2]));
 }
 
@@ -13923,32 +14059,63 @@ function updateValleyGimmick(dt) {
   if (currentMapId !== "valley") return;
   const t = (Net.now ? Net.now() : Date.now()) / 1000;
 
-  // 물결 텍스처 흐름 애니메이션
+  // 1. 물결 텍스처 및 위에서 떨어지는 폭포 UV 스크롤
   if (valleyWaterMesh && valleyWaterMesh.material && valleyWaterMesh.material.map) {
     valleyWaterMesh.material.map.offset.y -= dt * 0.45;
     valleyWaterMesh.material.map.offset.x += dt * 0.08;
   }
+  VALLEY_FALLS.forEach(wf => {
+    if (wf.tex) {
+      wf.tex.offset.y -= dt * 0.75;
+    }
+    // 폭포 하단 물보라 스플래시 연출
+    if (Math.random() < 0.2) {
+      burst(new THREE.Vector3(wf.x + (Math.random() - 0.5) * 8, 0.5, wf.z + 1.0), "#ffffff", 2, 2.5, 0.35);
+    }
+  });
 
-  // 튜브 물결 찰랑임 (Floating Tube Bobbing)
+  // 2. 튜브 찰랑임 애니메이션
   VALLEY_TUBES.forEach((tb, i) => {
     const bob = Math.sin(t * 2.5 + i * Math.PI) * 0.12;
     tb.group.position.y = tb.baseY + bob;
     tb.group.rotation.z = Math.sin(t * 1.8 + i) * 0.05;
   });
 
-  // 1. 흐르는 계곡물 (유속 밀림)
-  // 플레이어가 물길 범위(Math.abs(x) < 13 && y < 1.2) 안에 있을 때 +z(하류)로 밀림
+  // 3. 흐르는 계곡물 (유속 밀림)
+  // [밀림 버그 완벽 해결]: 플레이어가 징검다리 위나 플라밍고 튜브, 연잎 등 발판 오브젝트 위에 서 있으면 밀리지 않음!
   if (G.screen === "GAME" && G.role !== "ghost" && !G.spectating) {
-    if (Math.abs(G.pos.x) < 13.0 && G.pos.y < 1.2) {
-      if (G.wallStuck) detachFromWall(false);
-      moveHorizontalAxis("z", 5.5 * dt);
-      if (Math.random() < 0.12) {
-        burst(new THREE.Vector3(G.pos.x, G.pos.y + 0.2, G.pos.z), "#ffffff", 2, 1.8, 0.35);
+    if (Math.abs(G.pos.x) < 13.0) {
+      // (1) Y좌표 검사: 징검다리 윗면(Y=0.9)이나 튜브(Y=1.2) 위에 서 있으면 수면(Y=0.25)보다 충분히 높음
+      const isSubmergedInWater = (G.pos.y < 0.55);
+
+      // (2) 징검다리 원통 반경 내에 있는지 검사
+      let onStone = false;
+      for (const st of VALLEY_STONES) {
+        if (Math.hypot(G.pos.x - st.x, G.pos.z - st.z) < st.radius) {
+          onStone = true; break;
+        }
+      }
+
+      // (3) 플라밍고 튜브 발판 내에 있는지 검사
+      let onTube = false;
+      for (const tb of VALLEY_TUBES) {
+        if (Math.hypot(G.pos.x - tb.x, G.pos.z - tb.z) < tb.radius) {
+          onTube = true; break;
+        }
+      }
+
+      // 순수하게 물속에 발을 담그고 있을 때만 유속 밀림 발생
+      if (isSubmergedInWater && !onStone && !onTube) {
+        if (G.wallStuck) detachFromWall(false);
+        moveHorizontalAxis("z", 5.5 * dt);
+        if (Math.random() < 0.12) {
+          burst(new THREE.Vector3(G.pos.x, G.pos.y + 0.2, G.pos.z), "#ffffff", 2, 1.8, 0.35);
+        }
       }
     }
   }
 
-  // 2. 탄성 연잎 점프패드 (VALLEY_PADS)
+  // 4. 탄성 연잎 점프패드 (VALLEY_PADS)
   if (G.screen === "GAME" && G.role !== "ghost" && !G.spectating) {
     VALLEY_PADS.forEach(pad => {
       const dx = G.pos.x - pad.x;
@@ -13965,8 +14132,7 @@ function updateValleyGimmick(dt) {
     });
   }
 
-  // 3. 갑작스러운 소나기와 물안개 (시야 제한)
-  // 본게임 찾는 시간(G.phase === "SEEK") 중 60초 주기로 마지막 20초 동안 소나기 발동
+  // 5. 갑작스러운 소나기와 물안개
   const inSeek = (G.phase === "SEEK" && G.screen === "GAME");
   let seekStart = 0;
   if (inSeek) {
@@ -14004,7 +14170,6 @@ function updateValleyGimmick(dt) {
     if (alertDiv && alertDiv.textContent.includes("소나기")) alertDiv.classList.add("hidden");
   }
 
-  // 물안개(Fog) 및 빗방울 파티클 적용
   if (isShower) {
     if (!scene.fog) scene.fog = new THREE.Fog(0xd8e8f0, 8, 48);
     if (Math.random() < 0.35 && G.screen === "GAME") {
@@ -14024,6 +14189,8 @@ function updateValleyGimmick(dt) {
 function valleyCleanup() {
   VALLEY_PADS = [];
   VALLEY_TUBES = [];
+  VALLEY_STONES = [];
+  VALLEY_FALLS = [];
   valleyWaterMesh = null;
   valleyShowerActive = false;
   valleyShowerLocalStart = 0;
