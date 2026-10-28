@@ -1331,6 +1331,68 @@ function buildTextures(){
     }
   },4,4);
 
+  // 🦁 동물원 전용 텍스처 (Zoo Textures)
+  TEX.zooGiraffe=canvasTex(256,256,(g,w,h)=>{
+    g.fillStyle="#e6a836"; g.fillRect(0,0,w,h);
+    g.fillStyle="#8c4b18";
+    for(let r=0;r<4;r++){
+      for(let c=0;c<4;c++){
+        const cx=32+c*64+(Math.random()-0.5)*12;
+        const cy=32+r*64+(Math.random()-0.5)*12;
+        g.beginPath();
+        g.roundRect ? g.roundRect(cx-20,cy-20,40,40,8) : g.fillRect(cx-20,cy-20,40,40);
+        g.fill();
+      }
+    }
+    g.strokeStyle="#f7d070"; g.lineWidth=3;
+    for(let i=0;i<4;i++){
+      g.beginPath(); g.moveTo(0,i*64+32); g.lineTo(w,i*64+32); g.stroke();
+      g.beginPath(); g.moveTo(i*64+32,0); g.lineTo(i*64+32,h); g.stroke();
+    }
+  },4,4);
+
+  TEX.zooZebra=canvasTex(256,256,(g,w,h)=>{
+    g.fillStyle="#f5f5f5"; g.fillRect(0,0,w,h);
+    g.fillStyle="#1c1c1c";
+    for(let y=0;y<h;y+=32){
+      g.beginPath();
+      g.moveTo(0,y);
+      g.bezierCurveTo(w*0.3,y+16, w*0.7,y-12, w,y+4);
+      g.lineTo(w,y+18);
+      g.bezierCurveTo(w*0.7,y+4, w*0.3,y+32, 0,y+18);
+      g.closePath();
+      g.fill();
+    }
+  },3,3);
+
+  TEX.zooPave=canvasTex(256,256,(g,w,h)=>{
+    g.fillStyle="#c7b299"; g.fillRect(0,0,w,h);
+    g.strokeStyle="rgba(110,95,78,0.55)"; g.lineWidth=3;
+    for(let r=0;r<8;r++){
+      const y=r*32;
+      g.beginPath(); g.moveTo(0,y); g.lineTo(w,y); g.stroke();
+      const ox=(r%2===0)?0:16;
+      for(let c=0;c<8;c++){
+        const x=(c*32+ox)%w;
+        g.beginPath(); g.moveTo(x,y); g.lineTo(x,y+32); g.stroke();
+      }
+    }
+    for(let i=0;i<300;i++){
+      g.fillStyle="rgba(80,68,54,0.18)";
+      g.fillRect(Math.random()*w,Math.random()*h,2,2);
+    }
+  },4,4);
+
+  TEX.zooEnclosure=canvasTex(128,128,(g,w,h)=>{
+    g.fillStyle="#3d493a"; g.fillRect(0,0,w,h);
+    g.strokeStyle="#b08a54"; g.lineWidth=5;
+    g.strokeRect(4,4,w-8,h-8);
+    g.fillStyle="#8cb071";
+    for(let i=0;i<4;i++){
+      g.beginPath(); g.arc(20+i*28,64,8,0,Math.PI*2); g.fill();
+    }
+  },2,2);
+
   Object.values(TEX).forEach(t => {
     if (t && t.isTexture) t.needsUpdate = true;
   });
@@ -1387,6 +1449,11 @@ let VALLEY_FALLS=[];
 let valleyWaterMesh=null;
 let valleyShowerActive=false;
 let valleyShowerLocalStart=0;
+let ZOO_BUS=null;
+let ZOO_ANIMALS=[];
+let ZOO_TRAMPOLINES=[];
+let zooFeedingActive=false;
+let zooFeedingLocalStart=0;
 
 /* v2: 맵 전환을 위한 컨테이너. buildMap()/GLB 맵이 만드는 오브젝트는 모두 이 그룹 안에 들어갑니다. */
 let mapRoot=new THREE.Group(); scene.add(mapRoot);
@@ -1405,6 +1472,7 @@ function clearMap(){
   if(typeof lavaCleanup === "function") lavaCleanup();
   if(typeof mazeCleanup === "function") mazeCleanup();
   if(typeof valleyCleanup === "function") valleyCleanup();
+  if(typeof zooCleanup === "function") zooCleanup();
   ROOM_W = 120;
   ROOM_D = 90;
   WALL_H = 56;
@@ -4000,7 +4068,9 @@ function updateMapGimmicks(dt){
   else if(currentMapId==="lava") updateLavaGimmick(dt);
   else if(currentMapId==="maze") updateMazeGimmick(dt);
   else if(currentMapId==="valley") updateValleyGimmick(dt);
+  else if(currentMapId==="zoo") updateZooGimmick(dt);
   else if(typeof valleyCleanup === "function") valleyCleanup();
+  if(currentMapId!=="zoo" && typeof zooCleanup === "function") zooCleanup();
 
   if(typeof updateCopsGame === "function") updateCopsGame(dt);
   if(typeof updateIceGame === "function") updateIceGame(dt);
@@ -4019,6 +4089,7 @@ const MAPS={
   lava:{ id:"lava", name:"화산 동굴", icon:"🌋", type:"canvas", build:buildLavaMap },
   maze:{ id:"maze", name:"마법 미로", icon:"🌿", type:"canvas", build:buildMazeMap },
   valley:{ id:"valley", name:"여름 계곡", icon:"🏞️", type:"canvas", build:buildValley },
+  zoo:{ id:"zoo", name:"사파리 동물원", icon:"🦁", type:"canvas", build:buildZoo },
 };
 function mapIsReady(id){ const m=MAPS[id]; if(!m)return false; return m.type==="canvas"?true:!!(m.glbBase64&&m.glbBase64.length>100); }
 let currentMapId="classroom";
@@ -8297,7 +8368,20 @@ function describeHidePosition(p){
   if(currentMapId==="lava")return describeLavaPosition(p);
   if(currentMapId==="maze")return describeMazePosition(p);
   if(currentMapId==="valley")return describeValleyPosition(p);
+  if(currentMapId==="zoo")return describeZooPosition(p);
   return describeClassroomPosition(p);
+}
+
+function describeZooPosition(p){
+  const high = p.y > 14 ? " · 높은 사파리 전망대 위" : p.y > 6 ? " · 동물 조형물/방사장 바위 위" : "";
+  if (p.x < -28 && p.z < -18) return "초원 구역 거대 기린과 사바나 우리" + high;
+  if (p.x < -28 && p.z > 18) return "밀림 구역 판다 대나무 숲" + high;
+  if (p.x > 28 && p.z < -18) return "빙하 구역 남극 펭귄 빙산 풀" + high;
+  if (p.x > 28 && p.z > 18) return "암벽 구역 사자의 바위 언덕" + high;
+  if (p.z > 32 && Math.abs(p.x) < 20) return "동물원 정문 매표소 & 기념품점 근처" + high;
+  if (p.z < -32 && Math.abs(p.x) < 22) return "북쪽 사파리 중앙 전망대" + high;
+  if (Math.abs(p.x) < 18 && Math.abs(p.z) < 28) return "사파리 투어 버스 순환 도로" + high;
+  return "동물원 관람 산책로 주변" + high;
 }
 function buildResultRevealList(){
   return Object.entries(Net.players)
@@ -10850,6 +10934,12 @@ function getPrisonZone(mapId) {
       center: new THREE.Vector3(35, 0.1, 30),
       radius: 4.5,
       box: new THREE.Box3(new THREE.Vector3(30.5, -0.5, 25.5), new THREE.Vector3(39.5, 5, 34.5))
+    };
+  } else if (mId === "zoo") {
+    return {
+      center: new THREE.Vector3(45, 0.1, 32),
+      radius: 4.5,
+      box: new THREE.Box3(new THREE.Vector3(40.5, -0.5, 27.5), new THREE.Vector3(49.5, 5, 36.5))
     };
   } else {
     return {
@@ -14206,6 +14296,551 @@ function valleyCleanup() {
   }
   const ca = document.getElementById("centerAlert");
   if (ca && ca.textContent && ca.textContent.includes("소나기")) ca.classList.add("hidden");
+}
+
+
+
+/* ================================================================
+   🦁 맵 8. 사파리 동물원 (Zoo Map) — buildZoo & updateZooGimmick
+   - 4대 테마 동물 방사장 (초원 기린/얼룩말, 대나무숲 판다/원숭이, 빙산 펭귄/북극곰, 암벽 사자/코끼리)
+   - 순환 도로를 달리는 승차 가능 사파리 투어 버스 (무빙 플랫폼 캐리 물리)
+   - 60초 주기 '동물 먹이주기 시간' 피딩 프렌지 기믹 (포효 & 과일/생선 스폰 및 이속 버프)
+   - 사자 바위 구역 트램펄린 슈퍼 점프 바위
+   ================================================================ */
+function buildZoo() {
+  ROOM_W = 140;
+  ROOM_D = 110;
+  WALL_H = 48;
+  buildTextures();
+  zooCleanup();
+
+  // 1) 기본 외피: 잔디 바닥(TEX.grass) 및 맑고 상쾌한 사파리 하늘(0x82caff)
+  const groundMat = lambert({map: TEX.grass || TEX.floor, side: THREE.DoubleSide});
+  const floorMesh = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W, ROOM_D), groundMat);
+  floorMesh.rotation.x = -Math.PI / 2;
+  mapRoot.add(floorMesh);
+  samplables.push(floorMesh);
+
+  const ceilMesh = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W, ROOM_D), lambert({color: 0x82caff, side: THREE.DoubleSide}));
+  ceilMesh.rotation.x = Math.PI / 2;
+  ceilMesh.position.y = WALL_H;
+  mapRoot.add(ceilMesh);
+
+  // AABB 외곽 경계 벽
+  addAABBCollider(0, WALL_H / 2, -ROOM_D / 2 - 1, ROOM_W + 10, WALL_H, 2);
+  addAABBCollider(0, WALL_H / 2, ROOM_D / 2 + 1, ROOM_W + 10, WALL_H, 2);
+  addAABBCollider(-ROOM_W / 2 - 1, WALL_H / 2, 0, 2, WALL_H, ROOM_D + 10);
+  addAABBCollider(ROOM_W / 2 + 1, WALL_H / 2, 0, 2, WALL_H, ROOM_D + 10);
+
+  // 외곽 사파리 울타리 및 방음벽 (벽면 마감: TEX.zooEnclosure)
+  const fenceMat = lambert({map: TEX.zooEnclosure || TEX.cork});
+  addBox(ROOM_W + 4, WALL_H, 3.5, fenceMat, 0, WALL_H / 2, -ROOM_D / 2 - 1.5, {collide: true, sample: true});
+  addBox(ROOM_W + 4, WALL_H, 3.5, fenceMat, 0, WALL_H / 2, ROOM_D / 2 + 1.5, {collide: true, sample: true});
+  addBox(3.5, WALL_H, ROOM_D + 4, fenceMat, -ROOM_W / 2 - 1.5, WALL_H / 2, 0, {collide: true, sample: true});
+  addBox(3.5, WALL_H, ROOM_D + 4, fenceMat, ROOM_W / 2 + 1.5, WALL_H / 2, 0, {collide: true, sample: true});
+
+  // 사파리 외곽 조경 수목들 (아카시아 & 열대 야자수)
+  const trunkMat = lambert({color: 0x6e4e32});
+  const leafGreenMat = lambert({color: 0x3d7e35});
+  const leafBrightMat = lambert({color: 0x68a846});
+
+  const plantAcacia = (tx, tz, s = 1.0) => {
+    addCyl(0.45 * s, 6.0 * s, trunkMat, tx, 3.0 * s, tz, {collide: true, sample: true});
+    // 아카시아 특유의 넓적한 평평한 수관
+    const c1 = new THREE.Mesh(new THREE.CylinderGeometry(4.2 * s, 4.6 * s, 1.2 * s, 8), leafGreenMat);
+    c1.position.set(tx, 6.5 * s, tz);
+    mapRoot.add(c1); samplables.push(c1);
+    const c2 = new THREE.Mesh(new THREE.CylinderGeometry(2.4 * s, 2.8 * s, 1.0 * s, 8), leafBrightMat);
+    c2.position.set(tx, 7.6 * s, tz);
+    mapRoot.add(c2); samplables.push(c2);
+  };
+
+  [-58, -40, -22, 22, 40, 58].forEach(tx => {
+    plantAcacia(tx, -ROOM_D / 2 + 7, 1.1 + Math.random() * 0.3);
+    plantAcacia(tx, ROOM_D / 2 - 7, 1.1 + Math.random() * 0.3);
+  });
+  [-35, -15, 15, 35].forEach(tz => {
+    plantAcacia(-ROOM_W / 2 + 7, tz, 1.2);
+    plantAcacia(ROOM_W / 2 - 7, tz, 1.2);
+  });
+
+  // 조명 (따뜻한 황금빛 사파리 햇살)
+  if (typeof ambientLight !== "undefined" && ambientLight && ambientLight.color) {
+    ambientLight.color.setHex(0xfff7e6);
+    ambientLight.intensity = 0.85;
+  }
+  if (typeof sun !== "undefined" && sun && sun.color) {
+    sun.color.setHex(0xffea9f);
+    sun.intensity = 0.85;
+  }
+
+  // 2) 중앙 사파리 관람 순환 도로 (TEX.zooPave)
+  // X: -26 ~ 26, Z: -36 ~ 36 사각 루프 도로
+  const paveMat = lambert({map: TEX.zooPave || TEX.floor});
+  const roadW = 8.0;
+  // 도로 4면 바닥 평면
+  const makeRoadSegment = (w, d, x, z) => {
+    const rm = new THREE.Mesh(new THREE.PlaneGeometry(w, d), paveMat);
+    rm.rotation.x = -Math.PI / 2;
+    rm.position.set(x, 0.04, z);
+    mapRoot.add(rm);
+    samplables.push(rm);
+  };
+  makeRoadSegment(52 + roadW, roadW, 0, -32); // 북쪽 도로
+  makeRoadSegment(52 + roadW, roadW, 0, 32);  // 남쪽 도로
+  makeRoadSegment(roadW, 64, -26, 0);         // 서쪽 도로
+  makeRoadSegment(roadW, 64, 26, 0);          // 동쪽 도로
+
+  // 도로 안전 펜스 (원목 가드레일)
+  const guardPostMat = lambert({color: 0x8a5a33});
+  const guardRailMat = lambert({color: 0xc89d66});
+  const makeFence = (x1, z1, x2, z2) => {
+    const len = Math.hypot(x2 - x1, z2 - z1);
+    const cx = (x1 + x2) / 2, cz = (z1 + z2) / 2;
+    const ang = Math.atan2(x2 - x1, z2 - z1);
+    const rail = addBox(0.4, 0.35, len, guardRailMat, cx, 1.2, cz, {collide: true, sample: true});
+    rail.rotation.y = ang;
+  };
+  makeFence(-21, -27, 21, -27);
+  makeFence(-21, 27, 21, 27);
+  makeFence(-21, -27, -21, 27);
+  makeFence(21, -27, 21, 27);
+
+  // 3) [테마 구역 1: 북서쪽 초원 사바나 - 기린 & 얼룩말 방사장] (x: -56 ~ -24, z: -46 ~ -14)
+  const woodPostMat = lambert({color: 0x5a3d28});
+  // 방사장 테두리 통나무 펜스
+  for (let z = -44; z <= -14; z += 6) addCyl(0.3, 2.4, woodPostMat, -23, 1.2, z, {collide: true});
+  for (let x = -54; x <= -23; x += 6) addCyl(0.3, 2.4, woodPostMat, x, 1.2, -14, {collide: true});
+
+  // (A) 거대 기린 조형물 (Tall Giraffe - 높이 15m)
+  const giraffeMat = lambert({map: TEX.zooGiraffe || TEX.deskTop});
+  const giraffeDarkMat = lambert({color: 0x4a2608});
+  const gX = -40, gZ = -30;
+  // 기린 다리 4개
+  [[-1.8, -1.8], [1.8, -1.8], [-1.8, 1.8], [1.8, 1.8]].forEach(([dx, dz]) => {
+    addCyl(0.45, 8.0, giraffeMat, gX + dx, 4.0, gZ + dz, {collide: true, sample: true});
+  });
+  // 기린 몸통
+  addBox(5.0, 3.6, 6.5, giraffeMat, gX, 8.5, gZ, {collide: true, sample: true});
+  // 기린 긴 목 (등반 가능)
+  const gNeck = addCyl(0.7, 7.5, giraffeMat, gX, 13.0, gZ + 2.2, {collide: true, sample: true});
+  gNeck.rotation.x = -0.25;
+  // 기린 머리 & 뿔
+  addBox(1.8, 1.6, 2.8, giraffeMat, gX, 16.5, gZ + 3.2, {collide: true, sample: true});
+  addCyl(0.12, 1.0, giraffeDarkMat, gX - 0.5, 17.6, gZ + 2.8, {collide: false});
+  addCyl(0.12, 1.0, giraffeDarkMat, gX + 0.5, 17.6, gZ + 2.8, {collide: false});
+  ZOO_ANIMALS.push({name: "기린", type: "giraffe", mesh: gNeck, baseY: 13.0});
+
+  // (B) 달리는 얼룩말 조각 (Running Zebra)
+  const zebraMat = lambert({map: TEX.zooZebra || TEX.curtain});
+  const zX = -32, zZ = -22;
+  addBox(2.2, 2.2, 4.2, zebraMat, zX, 3.0, zZ, {collide: true, sample: true});
+  [[-0.8, -1.3], [0.8, -1.3], [-0.8, 1.3], [0.8, 1.3]].forEach(([dx, dz]) => {
+    addCyl(0.25, 2.5, zebraMat, zX + dx, 1.25, zZ + dz, {collide: true});
+  });
+  const zHead = addBox(1.2, 1.4, 2.0, zebraMat, zX, 4.4, zZ + 1.8, {collide: true, sample: true});
+  zHead.rotation.x = 0.35;
+  ZOO_ANIMALS.push({name: "얼룩말", type: "zebra", mesh: zHead, baseY: 4.4});
+
+  // 사바나 건초더미 & 먹이통
+  const hayMat = lambert({color: 0xdfbe6a});
+  addCyl(3.0, 3.2, hayMat, -48, 1.6, -20, {collide: true, sample: true});
+  addBox(5.0, 1.2, 2.6, woodPostMat, -46, 0.6, -34, {collide: true, sample: true});
+
+  // 4) [테마 구역 2: 남서쪽 판다 대나무 숲 & 원숭이 정글] (x: -56 ~ -24, z: 14 ~ 46)
+  for (let z = 14; z <= 44; z += 6) addCyl(0.3, 2.4, woodPostMat, -23, 1.2, z, {collide: true});
+  for (let x = -54; x <= -23; x += 6) addCyl(0.3, 2.4, woodPostMat, x, 1.2, 14, {collide: true});
+
+  // 대나무 기둥 숲 (Green Bamboo Grove)
+  const bambooMat = lambert({color: 0x489638});
+  for (let b = 0; b < 16; b++) {
+    const bx = -50 + (b % 4) * 7 + (Math.random() - 0.5) * 3;
+    const bz = 20 + Math.floor(b / 4) * 6 + (Math.random() - 0.5) * 3;
+    const bh = 10 + Math.random() * 6;
+    addCyl(0.24, bh, bambooMat, bx, bh / 2, bz, {collide: true, sample: true});
+  }
+
+  // (C) 통통한 대왕판다 조형물 (Giant Panda)
+  const pandaWhiteMat = lambert({color: 0xf5f5f5});
+  const pandaBlackMat = lambert({color: 0x1f1f24});
+  const pX = -38, pZ = 30;
+  // 몸통
+  const pandaBody = addCyl(2.8, 4.2, pandaWhiteMat, pX, 2.6, pZ, {collide: true, sample: true});
+  // 머리
+  const pandaHead = new THREE.Mesh(new THREE.SphereGeometry(2.0, 12, 12), pandaWhiteMat);
+  pandaHead.position.set(pX, 5.2, pZ + 0.8);
+  mapRoot.add(pandaHead); samplables.push(pandaHead);
+  // 귀 2개
+  const pEarL = new THREE.Mesh(new THREE.SphereGeometry(0.65, 8, 8), pandaBlackMat);
+  pEarL.position.set(pX - 1.5, 6.8, pZ + 0.6);
+  const pEarR = new THREE.Mesh(new THREE.SphereGeometry(0.65, 8, 8), pandaBlackMat);
+  pEarR.position.set(pX + 1.5, 6.8, pZ + 0.6);
+  mapRoot.add(pEarL); mapRoot.add(pEarR);
+  // 검은 앞다리/뒷다리
+  [[-1.8, 1.6], [1.8, 1.6], [-1.8, -1.6], [1.8, -1.6]].forEach(([dx, dz]) => {
+    addCyl(0.7, 2.4, pandaBlackMat, pX + dx, 1.2, pZ + dz, {collide: true});
+  });
+  ZOO_ANIMALS.push({name: "판다", type: "panda", mesh: pandaHead, baseY: 5.2});
+
+  // (D) 원숭이 정글짐 나무 타워 (Monkey Tower)
+  const monkeyWoodMat = lambert({color: 0x7c4e28});
+  addBox(6.0, 0.4, 6.0, monkeyWoodMat, -46, 6.0, 38, {collide: true, sample: true}); // 중간 쉼터
+  addBox(4.0, 0.4, 4.0, monkeyWoodMat, -46, 11.0, 38, {collide: true, sample: true}); // 상단 전망 쉼터
+  [[-2.7, -2.7], [2.7, -2.7], [-2.7, 2.7], [2.7, 2.7]].forEach(([px, pz]) => {
+    addCyl(0.2, 11.5, monkeyWoodMat, -46 + px, 5.75, 38 + pz, {collide: true});
+  });
+  // 줄타기 로프 가로대
+  addCyl(0.12, 16.0, lambert({color: 0xd4a373}), -38, 9.5, 38, {rz: Math.PI / 2, collide: true});
+
+  // 5) [테마 구역 3: 북동쪽 남극 펭귄 빙산 & 북극곰 풀] (x: 24 ~ 56, z: -46 ~ -14)
+  const iceMat = lambert({color: 0xd9f2ff, emissive: 0x99ddff, emissiveIntensity: 0.35});
+  const snowMat = lambert({color: 0xffffff});
+  const coldPoolMat = lambert({color: 0x3a9ad9, transparent: true, opacity: 0.8});
+
+  for (let z = -44; z <= -14; z += 6) addCyl(0.3, 2.4, woodPostMat, 23, 1.2, z, {collide: true});
+  for (let x = 23; x <= 54; x += 6) addCyl(0.3, 2.4, woodPostMat, x, 1.2, -14, {collide: true});
+
+  // 펭귄 수영장 웅덩이 (Swimming Pool)
+  const pool = new THREE.Mesh(new THREE.PlaneGeometry(22, 22), coldPoolMat);
+  pool.rotation.x = -Math.PI / 2;
+  pool.position.set(40, 0.15, -30);
+  mapRoot.add(pool); samplables.push(pool);
+  // 빙산 테두리 턱
+  addBox(24, 0.8, 1.2, iceMat, 40, 0.4, -41, {collide: true});
+  addBox(24, 0.8, 1.2, iceMat, 40, 0.4, -19, {collide: true});
+
+  // 거대 빙산 (Iceberg Stairs & Cliffs: 높이 4m ~ 14m)
+  addBox(14, 6.0, 12, iceMat, 46, 3.0, -32, {collide: true, sample: true});
+  addBox(8, 12.0, 8, snowMat, 48, 6.0, -34, {collide: true, sample: true}); // 빙산 꼭대기
+
+  // (E) 아기 펭귄 군단 (Penguins)
+  const penguinBlack = lambert({color: 0x111116});
+  const penguinWhite = lambert({color: 0xffffff});
+  const penguinBeak = lambert({color: 0xff8c00});
+
+  const spawnPenguin = (px, pz, py = 0.45) => {
+    const penGroup = new THREE.Group();
+    penGroup.position.set(px, py, pz);
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.5, 1.2, 8), penguinBlack);
+    const belly = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.8, 0.2), penguinWhite);
+    belly.position.set(0, 0, 0.35);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.35, 8, 8), penguinBlack);
+    head.position.set(0, 0.7, 0);
+    const beak = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.35, 6), penguinBeak);
+    beak.rotation.x = Math.PI / 2;
+    beak.position.set(0, 0.7, 0.4);
+    penGroup.add(body); penGroup.add(belly); penGroup.add(head); penGroup.add(beak);
+    mapRoot.add(penGroup); samplables.push(body);
+    addBox(1.0, 1.6, 1.0, penguinBlack, px, py + 0.8, pz, {collide: true, sample: false});
+    ZOO_ANIMALS.push({name: "펭귄", type: "penguin", mesh: penGroup, baseY: py});
+  };
+  spawnPenguin(32, -26);
+  spawnPenguin(34, -28);
+  spawnPenguin(42, -22);
+
+  // (F) 커다란 북극곰 조각상 (Polar Bear)
+  const bearX = 45, bearZ = -22;
+  const polarBody = addBox(3.4, 3.0, 5.5, snowMat, bearX, 3.0, bearZ, {collide: true, sample: true});
+  [[-1.2, -1.8], [1.2, -1.8], [-1.2, 1.8], [1.2, 1.8]].forEach(([dx, dz]) => {
+    addCyl(0.55, 2.5, snowMat, bearX + dx, 1.25, bearZ + dz, {collide: true});
+  });
+  const polarHead = new THREE.Mesh(new THREE.SphereGeometry(1.6, 10, 10), snowMat);
+  polarHead.position.set(bearX, 4.4, bearZ + 2.8);
+  mapRoot.add(polarHead); samplables.push(polarHead);
+  ZOO_ANIMALS.push({name: "북극곰", type: "polarbear", mesh: polarHead, baseY: 4.4});
+
+  // 6) [테마 구역 4: 남동쪽 맹수 사자의 바위 & 거대 코끼리] (x: 24 ~ 56, z: 14 ~ 46)
+  for (let z = 14; z <= 44; z += 6) addCyl(0.3, 2.4, woodPostMat, 23, 1.2, z, {collide: true});
+  for (let x = 23; x <= 54; x += 6) addCyl(0.3, 2.4, woodPostMat, x, 1.2, 14, {collide: true});
+
+  // (G) 웅장한 사자의 바위 (Pride Rock - 높이 3m ~ 16m)
+  const lionRockMat = lambert({color: 0x9e7247});
+  const rockPlat1 = addBox(18, 5.0, 18, lionRockMat, 42, 2.5, 30, {collide: true, sample: true});
+  const rockPlat2 = addBox(12, 6.0, 12, lionRockMat, 44, 7.5, 32, {collide: true, sample: true});
+  // 튀어나온 곶 바위 (전망 곶)
+  const peakSpit = addBox(6.0, 1.5, 10.0, lionRockMat, 36, 10.5, 26, {collide: true, sample: true});
+  peakSpit.rotation.y = 0.35;
+
+  // 탄성 트램펄린 바위 (점프대 기믹)
+  const jumpRockMesh = addCyl(2.6, 1.2, lambert({color: 0xd9822b}), 34, 1.2, 22, {collide: true, sample: true});
+  ZOO_TRAMPOLINES.push({x: 34, z: 22, radius: 2.6, top: 1.8});
+
+  // (H) 용맹한 사자 조각상 (Lion Statue)
+  const lionGoldMat = lambert({color: 0xd99b26});
+  const lionManeMat = lambert({color: 0x6e3b12});
+  const lionX = 36, lionZ = 28;
+  addBox(2.2, 2.0, 4.0, lionGoldMat, lionX, 12.0, lionZ, {collide: true, sample: true});
+  const lionMane = new THREE.Mesh(new THREE.SphereGeometry(1.8, 12, 12), lionManeMat);
+  lionMane.position.set(lionX, 13.5, lionZ - 1.8);
+  mapRoot.add(lionMane); samplables.push(lionMane);
+  ZOO_ANIMALS.push({name: "사자", type: "lion", mesh: lionMane, baseY: 13.5});
+
+  // (I) 아프리카 거대 코끼리 조각 (Elephant Statue)
+  const elephantGrayMat = lambert({color: 0x7a8288});
+  const tuskIvoryMat = lambert({color: 0xfffff0});
+  const elX = 48, elZ = 40;
+  // 코끼리 몸통
+  addBox(6.0, 5.0, 7.5, elephantGrayMat, elX, 4.5, elZ, {collide: true, sample: true});
+  [[-2.2, -2.5], [2.2, -2.5], [-2.2, 2.5], [2.2, 2.5]].forEach(([dx, dz]) => {
+    addCyl(0.85, 4.5, elephantGrayMat, elX + dx, 2.25, elZ + dz, {collide: true});
+  });
+  // 코끼리 머리와 긴 코
+  const elHead = new THREE.Mesh(new THREE.SphereGeometry(2.4, 10, 10), elephantGrayMat);
+  elHead.position.set(elX, 6.5, elZ - 3.8);
+  mapRoot.add(elHead); samplables.push(elHead);
+  const elTrunk = addCyl(0.45, 4.5, elephantGrayMat, elX, 4.5, elZ - 5.5, {collide: true});
+  elTrunk.rotation.x = -0.4;
+  // 상아 2개
+  const tuskL = addCyl(0.18, 3.2, tuskIvoryMat, elX - 1.4, 5.2, elZ - 5.0, {collide: false});
+  tuskL.rotation.x = -0.6; tuskL.rotation.z = -0.2;
+  const tuskR = addCyl(0.18, 3.2, tuskIvoryMat, elX + 1.4, 5.2, elZ - 5.0, {collide: false});
+  tuskR.rotation.x = -0.6; tuskR.rotation.z = 0.2;
+  ZOO_ANIMALS.push({name: "코끼리", type: "elephant", mesh: elHead, baseY: 6.5});
+
+  // 7) [중앙 북쪽: 사파리 전망 타워 & 남쪽: 정문 매표소/기념품점]
+  // 북쪽 중앙 사파리 전망대 타워 (X=0, Z=-42)
+  const towerMat = lambert({color: 0xb58253});
+  const roofRedMat = lambert({color: 0xd9383a});
+  addBox(12, 1.0, 12, towerMat, 0, 8.0, -42, {collide: true, sample: true}); // 전망 발코니 (Y=8.0)
+  addBox(10, 1.0, 10, towerMat, 0, 14.0, -42, {collide: true, sample: true}); // 최상층 전망대 (Y=14.0)
+  addBox(12, 2.0, 12, roofRedMat, 0, 15.5, -42, {collide: true, sample: true}); // 지붕
+  [[-5, -5], [5, -5], [-5, 5], [5, 5]].forEach(([tx, tz]) => {
+    addCyl(0.45, 14.0, towerMat, tx, 7.0, -42 + tz, {collide: true});
+  });
+  // 전망대 계단
+  for (let s = 0; s < 8; s++) {
+    addBox(3.0, 1.0, 1.8, towerMat, -5.5 + s * 1.5, 0.5 + s * 1.0, -34, {collide: true, sample: true});
+  }
+
+  // 남쪽 동물원 정문 매표소 & 기념품점 (X=0, Z=42)
+  const shopMat = lambert({color: 0xedd8b4});
+  addBox(16, 4.5, 7.0, shopMat, 0, 2.25, 43, {collide: true, sample: true});
+  addBox(17, 1.2, 8.0, roofRedMat, 0, 4.8, 43, {collide: true, sample: true});
+  // 동물원 아치 환영 게이트 (ZOO GATE)
+  const gatePillarMat = lambert({color: 0xd9822b});
+  addCyl(0.8, 9.0, gatePillarMat, -8, 4.5, 36, {collide: true});
+  addCyl(0.8, 9.0, gatePillarMat, 8, 4.5, 36, {collide: true});
+  addBox(18, 1.8, 1.4, gatePillarMat, 0, 9.0, 36, {collide: true, sample: true});
+
+  // 8) [신규 기믹 1: 순환 도로를 달리는 승차 가능 사파리 투어 버스 (ZOO_BUS)]
+  const busGroup = new THREE.Group();
+  const busBodyMat = lambert({map: TEX.zooZebra || TEX.floor, color: 0xf5f5f5}); // 얼룩말 무늬 투어 버스
+  const busGlassMat = lambert({color: 0x99ccff, transparent: true, opacity: 0.45});
+  const busTireMat = lambert({color: 0x1f1f1f});
+  const busRoofMat = lambert({color: 0xf5c518}); // 노란색 지붕
+
+  // 버스 차체 (폭 5.2, 높이 3.2, 길이 10.0)
+  const bLower = new THREE.Mesh(new THREE.BoxGeometry(5.2, 1.5, 10.0), busBodyMat);
+  bLower.position.y = 1.4;
+  busGroup.add(bLower);
+
+  const bGlass = new THREE.Mesh(new THREE.BoxGeometry(5.0, 1.5, 9.6), busGlassMat);
+  bGlass.position.y = 2.8;
+  busGroup.add(bGlass);
+
+  const bRoof = new THREE.Mesh(new THREE.BoxGeometry(5.4, 0.4, 10.2), busRoofMat);
+  bRoof.position.y = 3.7;
+  busGroup.add(bRoof);
+
+  // 바퀴 6개
+  [[-2.6, 0.65, -3.2], [2.6, 0.65, -3.2],
+   [-2.6, 0.65, 0],    [2.6, 0.65, 0],
+   [-2.6, 0.65, 3.2],  [2.6, 0.65, 3.2]].forEach(([wx, wy, wz]) => {
+    const tire = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.65, 0.4, 12), busTireMat);
+    tire.rotation.z = Math.PI / 2;
+    tire.position.set(wx, wy, wz);
+    busGroup.add(tire);
+  });
+
+  mapRoot.add(busGroup);
+  samplables.push(bLower); samplables.push(bRoof);
+
+  const busTopBox = new THREE.Box3();
+  colliders.push(busTopBox);
+
+  ZOO_BUS = {
+    group: busGroup,
+    topBox3: busTopBox,
+    cur: new THREE.Vector3(-26, 0, -32),
+    prev: new THREE.Vector3(-26, 0, -32),
+    halfW: 2.7,
+    halfD: 5.2,
+    top: 3.9,
+    speed: 12.0 // 도로 순환 속도
+  };
+
+  // 9) [리필존 2곳]
+  // 리필존 1: 펭귄 풀장 시원한 음수대 (X=36, Z=-26)
+  refillZones.push({x: 36, z: -26, r: 6.0, yMin: 0, yMax: 5, label: "빙하 음수대"});
+  // 리필존 2: 정문 매표소 기념품점 음료 코너 (X=0, Z=40)
+  refillZones.push({x: 0, z: 40, r: 6.5, yMin: 0, yMax: 5, label: "사파리 스낵바"});
+
+  // 10) [스폰 지점 설정: 넉넉한 100% 개활지 배치]
+  // seekerSpawns: 중앙 순환 도로 교차로 및 광장 3곳
+  seekerSpawns.push(
+    new THREE.Vector3(0, 0.2, 0),
+    new THREE.Vector3(-14, 0.2, -18),
+    new THREE.Vector3(14, 0.2, 18)
+  );
+
+  // hiderSpawns: 4대 동물 방사장 및 전망대, 기념품점 등 전역 20곳
+  hiderSpawns = [
+    [-40, 8.6, -30], [-32, 0.1, -22], [-48, 0.1, -20], [-40, 0.1, -38], // 초원 사바나 4곳
+    [-38, 0.1, 30], [-46, 6.1, 38], [-46, 11.1, 38], [-50, 0.1, 24],   // 판다/원숭이 숲 4곳
+    [40, 0.2, -30], [48, 6.1, -34], [32, 0.1, -26], [45, 0.1, -22],     // 빙산 펭귄 풀 4곳
+    [42, 5.1, 30], [44, 10.6, 32], [34, 1.9, 22], [48, 0.1, 40],        // 사자/코끼리 바위 4곳
+    [0, 8.1, -42], [0, 14.1, -42],                                      // 북쪽 전망대 2곳
+    [0, 0.1, 38], [0, 5.0, 43]                                          // 남쪽 매표소/지붕 2곳
+  ].map(p => new THREE.Vector3(p[0], p[1], p[2]));
+}
+
+function updateZooGimmick(dt) {
+  if (currentMapId !== "zoo") return;
+  const t = (Net.now ? Net.now() : Date.now()) / 1000;
+
+  // 1. 사파리 버스 순환 도로 주행 & 플레이어 탑승 운송 물리
+  if (ZOO_BUS) {
+    const b = ZOO_BUS;
+    b.prev.copy(b.cur);
+
+    // 직사각형 도로 순환: (-26, -32) -> (26, -32) -> (26, 32) -> (-26, 32) -> (-26, -32)
+    // 둘레 = 52 + 64 + 52 + 64 = 232m
+    const perimeter = 232;
+    const prog = ((t * b.speed) % perimeter);
+    let nx = 0, nz = 0, rotY = 0;
+
+    if (prog < 52) {
+      // 북쪽 도로: (-26, -32) -> (26, -32) (+X)
+      nx = -26 + prog; nz = -32; rotY = Math.PI / 2;
+    } else if (prog < 116) {
+      // 동쪽 도로: (26, -32) -> (26, 32) (+Z)
+      nx = 26; nz = -32 + (prog - 52); rotY = 0;
+    } else if (prog < 168) {
+      // 남쪽 도로: (26, 32) -> (-26, 32) (-X)
+      nx = 26 - (prog - 116); nz = 32; rotY = -Math.PI / 2;
+    } else {
+      // 서쪽 도로: (-26, 32) -> (-26, -32) (-Z)
+      nx = -26; nz = 32 - (prog - 168); rotY = Math.PI;
+    }
+
+    b.cur.set(nx, 0, nz);
+    b.group.position.set(b.cur.x, 0, b.cur.z);
+    b.group.rotation.y = rotY;
+
+    // 회전 방향에 따른 AABB 바운딩 박스
+    const isSideways = Math.abs(Math.sin(rotY)) > 0.5;
+    const hx = isSideways ? b.halfD : b.halfW;
+    const hz = isSideways ? b.halfW : b.halfD;
+
+    b.topBox3.min.set(b.cur.x - hx, b.top - 0.2, b.cur.z - hz);
+    b.topBox3.max.set(b.cur.x + hx, b.top + 0.2, b.cur.z + hz);
+
+    // 플레이어가 버스 위에 탑승 시 함께 운송 (무빙 플랫폼 캐리 물리)
+    if (G.screen === "GAME" && G.role !== "ghost" && !G.spectating) {
+      const onBus = (Math.abs(G.pos.y - b.top) < 0.6 &&
+        Math.abs(G.pos.x - b.cur.x) < hx &&
+        Math.abs(G.pos.z - b.cur.z) < hz);
+
+      if (onBus) {
+        const dx = b.cur.x - b.prev.x;
+        const dz = b.cur.z - b.prev.z;
+        if (dx) moveHorizontalAxis("x", dx);
+        if (dz) moveHorizontalAxis("z", dz);
+      }
+    }
+  }
+
+  // 2. 동물들 살아 숨쉬는 애니메이션 (기린, 코끼리, 판다, 펭귄 고개 끄덕임/호흡)
+  ZOO_ANIMALS.forEach((a, i) => {
+    if (a.mesh) {
+      const bob = Math.sin(t * 2.0 + i * 1.5) * 0.15;
+      a.mesh.position.y = a.baseY + bob;
+      if (a.type === "penguin") {
+        a.mesh.rotation.z = Math.sin(t * 3.5 + i) * 0.18; // 뒤뚱뒤뚱
+      }
+    }
+  });
+
+  // 3. 트램펄린 사자 바위 슈퍼 점프 (ZOO_TRAMPOLINES)
+  if (G.screen === "GAME" && G.role !== "ghost" && !G.spectating) {
+    ZOO_TRAMPOLINES.forEach(tr => {
+      const dx = G.pos.x - tr.x;
+      const dz = G.pos.z - tr.z;
+      if (Math.hypot(dx, dz) < tr.radius && Math.abs(G.pos.y - tr.top) < 0.8 && G.vy <= 1.0) {
+        if (G.wallStuck) detachFromWall(false);
+        G.vy = 18.0; // 사자의 바위 위로 슈퍼 점프!
+        G.grounded = false;
+        Audio2.sfxJump();
+        burst(new THREE.Vector3(tr.x, tr.top + 0.2, tr.z), "#d9822b", 12, 4.0, 0.5);
+        toast("🦁 어흥! 사자의 바위 트램펄린을 밟고 하늘 높이 솟구쳤습니다!");
+      }
+    });
+  }
+
+  // 4. [기믹 2: 동물 먹이주기 시간 (Feeding Time Frenzy)]
+  // 60초 주기 중 마지막 20초간 동물 먹이주기 시간 발동 -> 활력 버프(이속 증가)
+  const inSeek = (G.phase === "SEEK" && G.screen === "GAME");
+  let seekStart = 0;
+  if (inSeek) {
+    if (Net.mode === "online" && G.phaseEndsAt) {
+      const ss = (Net.meta.settings && Net.meta.settings.seekSec) || 180;
+      seekStart = G.phaseEndsAt - ss * 1000;
+    } else {
+      if (!zooFeedingLocalStart) zooFeedingLocalStart = Net.now ? Net.now() : Date.now();
+      seekStart = zooFeedingLocalStart;
+    }
+  } else {
+    zooFeedingLocalStart = 0;
+  }
+
+  const CYCLE = 60, FEEDING_DUR = 20;
+  const elapsed = inSeek ? Math.max(0, ((Net.now ? Net.now() : Date.now()) - seekStart) / 1000) : 0;
+  const cyc = elapsed % CYCLE;
+  const isFeeding = inSeek && (cyc >= (CYCLE - FEEDING_DUR));
+  const preWarn = inSeek && (cyc >= (CYCLE - FEEDING_DUR - 3) && cyc < (CYCLE - FEEDING_DUR));
+
+  const alertDiv = $("centerAlert");
+  if (preWarn) {
+    if (alertDiv) {
+      alertDiv.textContent = "🔔 곧 동물원 먹이주기 시간이 시작됩니다!";
+      alertDiv.classList.remove("hidden");
+    }
+  } else if (isFeeding) {
+    if (alertDiv && cyc < (CYCLE - FEEDING_DUR + 2.5)) {
+      alertDiv.textContent = "🍎 사파리 먹이주기 시간! 동물들이 활기를 띱니다!";
+      alertDiv.classList.remove("hidden");
+    } else if (alertDiv && alertDiv.textContent.includes("먹이주기")) {
+      alertDiv.classList.add("hidden");
+    }
+
+    // 먹이주기 시간 이펙트 & 캐릭터 활력(스피드 버프)
+    if (Math.random() < 0.25 && G.screen === "GAME") {
+      const rx = G.pos.x + (Math.random() - 0.5) * 12;
+      const rz = G.pos.z + (Math.random() - 0.5) * 12;
+      burst(new THREE.Vector3(rx, 1.2, rz), Math.random() > 0.5 ? "#ff3b30" : "#ffd60a", 3, 2.5, 0.4);
+    }
+  } else {
+    if (alertDiv && alertDiv.textContent.includes("먹이주기")) alertDiv.classList.add("hidden");
+  }
+}
+
+function zooCleanup() {
+  ZOO_BUS = null;
+  ZOO_ANIMALS = [];
+  ZOO_TRAMPOLINES = [];
+  zooFeedingActive = false;
+  zooFeedingLocalStart = 0;
+
+  if (typeof ambientLight !== "undefined" && ambientLight && ambientLight.color && typeof ambientLight.color.setHex === "function") {
+    ambientLight.color.setHex(0xffffff);
+    ambientLight.intensity = 0.7;
+  }
+  if (typeof sun !== "undefined" && sun && sun.color && typeof sun.color.setHex === "function") {
+    sun.color.setHex(0xffe0b8);
+    sun.intensity = 0.5;
+  }
+  const ca = document.getElementById("centerAlert");
+  if (ca && ca.textContent && ca.textContent.includes("먹이주기")) ca.classList.add("hidden");
 }
 
 
