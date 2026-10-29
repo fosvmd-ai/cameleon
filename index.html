@@ -1451,6 +1451,7 @@ let valleyShowerActive=false;
 let valleyShowerLocalStart=0;
 let ZOO_BUS=null;
 let ZOO_ANIMALS=[];
+let ZOO_SMALL_ANIMALS=[];
 let ZOO_TRAMPOLINES=[];
 let zooFeedingActive=false;
 let zooFeedingLocalStart=0;
@@ -8373,6 +8374,12 @@ function describeHidePosition(p){
 }
 
 function describeZooPosition(p){
+  const distCenter = Math.hypot(p.x, p.z);
+  if (distCenter < 10 && p.y > 17) return "중앙 거대 바오밥나무 최상층 전망대";
+  if (distCenter < 8 && p.y > 11) return "중앙 거대 바오밥나무 상층 새들의 둥지";
+  if (distCenter < 8 && p.y > 4.5) return "중앙 거대 바오밥나무 나선형 나뭇가지 틈";
+  if (distCenter < 16) return "중앙 거대 바오밥나무와 아기 동물들의 잔디광장";
+
   const high = p.y > 14 ? " · 높은 사파리 전망대 위" : p.y > 6 ? " · 동물 조형물/방사장 바위 위" : "";
   if (p.x < -28 && p.z < -18) return "초원 구역 거대 기린과 사바나 우리" + high;
   if (p.x < -28 && p.z > 18) return "밀림 구역 판다 대나무 숲" + high;
@@ -14669,6 +14676,236 @@ function buildZoo() {
     speed: 12.0 // 도로 순환 속도
   };
 
+  // 8.5) [중앙 거대 바오밥나무 (Giant Baobab Tree) & 새 둥지 & 나선형 등반 틈]
+  const baobabBarkMat = lambert({map: TEX.wood || TEX.deskTop, color: 0x8a5b3a});
+  const baobabWoodMat = lambert({color: 0x6e472a});
+  const baobabLeafMat1 = lambert({color: 0x487d2b});
+  const baobabLeafMat2 = lambert({color: 0x5a9a35});
+  const nestStrawMat = lambert({color: 0xd4b06a});
+  const eggMat = lambert({color: 0xfbf8ee});
+  const birdCyanMat = lambert({color: 0x29b6f6});
+  const birdOrangeMat = lambert({color: 0xff9800});
+  const birdBeakMat = lambert({color: 0xff6d00});
+
+  // (A) 바오밥나무 거대 줄기 (Swollen Trunk & Buttress Roots)
+  // 바닥 지지 뿌리 4방향
+  [[-4.5, 0], [4.5, 0], [0, -4.5], [0, 4.5]].forEach(([rx, rz]) => {
+    addBox(3.4, 2.2, 3.4, baobabBarkMat, rx, 1.1, rz, {collide: true, sample: true});
+  });
+  // 3단 점진적 두꺼운 원통 기둥
+  addCyl(5.8, 6.0, baobabBarkMat, 0, 3.0, 0, {collide: true, sample: true}); // 하단 (0~6m)
+  addCyl(5.1, 7.0, baobabBarkMat, 0, 9.5, 0, {collide: true, sample: true}); // 중단 (6~13m)
+  addCyl(4.3, 6.0, baobabBarkMat, 0, 16.0, 0, {collide: true, sample: true}); // 상단 (13~19m)
+
+  // (B) 올라탈 수 있는 나선형 나뭇가지 디딤판 & 틈 (Spiral Climbing Platforms & Bark Crevices)
+  // 줄기를 빙 둘러싸며 1.6m 높이에서 19m까지 연속으로 올라갈 수 있는 11개 나뭇가지 발판
+  for (let i = 0; i <= 10; i++) {
+    const angle = i * 0.58; // 약 33도씩 회전
+    const radius = 5.2 - (i * 0.08);
+    const px = Math.cos(angle) * radius;
+    const pz = Math.sin(angle) * radius;
+    const py = 1.6 + i * 1.65;
+
+    // 디딤판 메쉬 (올라탈 수 있는 판자)
+    const step = addBox(3.4, 0.45, 2.0, baobabWoodMat, px, py, pz, {collide: true, sample: true});
+    step.rotation.y = -angle;
+
+    // 나무 틈새/옹이 껍질 턱 (은신 가능한 틈 디테일)
+    if (i % 2 === 1) {
+      const knot = addBox(1.2, 1.4, 0.5, baobabBarkMat, px * 0.88, py + 0.7, pz * 0.88, {collide: false});
+      knot.rotation.y = -angle;
+    }
+  }
+
+  // (C) 중간에 새들이 들어갈 수 있는 둥지 2곳 (Bird Nests with Hollow Interior)
+  // 둥지 1: 하층 바오밥 나무 구멍 둥지 (Lower Tree Hollow Nest, X=0, Z=5.0, Y=7.8)
+  // 안으로 쏙 들어가 앉을 수 있는 아늑한 바닥
+  addBox(3.4, 0.4, 3.0, baobabWoodMat, 0, 7.8, 5.0, {collide: true, sample: true});
+  // 둥지 벽면 (지우개가 안으로 들어갈 수 있도록 입구만 뚫려있음)
+  addBox(3.4, 2.6, 0.4, baobabBarkMat, 0, 9.1, 3.5, {collide: true}); // 안쪽 벽
+  addBox(0.4, 2.6, 3.0, baobabBarkMat, -1.7, 9.1, 4.9, {collide: true}); // 왼쪽 벽
+  addBox(0.4, 2.6, 3.0, baobabBarkMat, 1.7, 9.1, 4.9, {collide: true});  // 오른쪽 벽
+  addBox(3.6, 0.4, 3.2, baobabBarkMat, 0, 10.4, 4.9, {collide: true, sample: true}); // 천장 지붕
+  addBox(3.4, 0.5, 0.3, nestStrawMat, 0, 8.05, 6.4, {collide: true}); // 입구 지푸라기 턱
+
+  // 둥지 1 내부 장식 (지푸라기 보금자리 & 알 3개 & 귀여운 파랑새)
+  addBox(2.8, 0.15, 2.4, nestStrawMat, 0, 8.0, 5.0, {collide: false});
+  [[-0.5, 4.8], [0.4, 4.7], [-0.1, 5.3]].forEach(([ex, ez]) => {
+    addCyl(0.2, 0.35, eggMat, ex, 8.2, ez, {collide: false});
+  });
+  // 둥지 입구에 앉아있는 어미 파랑새 조각
+  const bird1Group = new THREE.Group();
+  const b1Body = new THREE.Mesh(new THREE.SphereGeometry(0.35, 8, 8), birdCyanMat);
+  b1Body.position.y = 0.35; bird1Group.add(b1Body);
+  const b1Beak = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.3, 6), birdBeakMat);
+  b1Beak.rotation.x = Math.PI / 2; b1Beak.position.set(0, 0.4, 0.4); bird1Group.add(b1Beak);
+  bird1Group.position.set(1.2, 8.1, 6.1);
+  mapRoot.add(bird1Group);
+
+  // 둥지 2: 상층 거대 가지 위 나뭇가지 둥지 (Upper Branch Nest, X=-4.8, Z=-2.2, Y=14.4)
+  addBox(4.2, 0.5, 4.2, baobabWoodMat, -4.8, 14.4, -2.2, {collide: true, sample: true});
+  // 둥지 테두리 4면 나뭇가지 가드레일 (새 둥지 바구니 형태)
+  addBox(4.4, 0.7, 0.4, nestStrawMat, -4.8, 14.8, -4.2, {collide: true});
+  addBox(4.4, 0.7, 0.4, nestStrawMat, -4.8, 14.8, -0.2, {collide: true});
+  addBox(0.4, 0.7, 4.0, nestStrawMat, -6.8, 14.8, -2.2, {collide: true});
+  addBox(0.4, 0.7, 4.0, nestStrawMat, -2.8, 14.8, -2.2, {collide: true});
+  // 둥지 2 안쪽 포근한 짚풀 & 주황새 2마리
+  addBox(3.6, 0.2, 3.6, nestStrawMat, -4.8, 14.6, -2.2, {collide: false});
+  [[-5.4, -2.6, 0.8], [-4.2, -1.8, -0.6]].forEach(([bx, bz, rot]) => {
+    const bg = new THREE.Group();
+    const bb = new THREE.Mesh(new THREE.SphereGeometry(0.38, 8, 8), birdOrangeMat);
+    bb.position.y = 0.38; bg.add(bb);
+    const bk = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.3, 6), birdBeakMat);
+    bk.rotation.x = Math.PI / 2; bk.position.set(0, 0.4, 0.42); bg.add(bk);
+    bg.position.set(bx, 14.7, bz); bg.rotation.y = rot;
+    mapRoot.add(bg);
+  });
+
+  // (D) 바오밥나무 상층 캐노피 & 최상층 전망 발코니 (Top Canopy & Crow's Nest Lookout, Y=19~23)
+  // 바오밥 특유의 수평으로 길게 뻗은 거대 가지 6개
+  for (let k = 0; k < 6; k++) {
+    const brAng = (k * Math.PI) / 3;
+    const bx = Math.cos(brAng) * 7.5;
+    const bz = Math.sin(brAng) * 7.5;
+    const branch = addBox(1.4, 1.2, 8.5, baobabBarkMat, bx, 19.2, bz, {collide: true, sample: true});
+    branch.rotation.y = -brAng + Math.PI / 2;
+
+    // 가지 끝 풍성한 우산형 잎 덩어리
+    const foliage = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 5.4, 2.4, 8), k % 2 === 0 ? baobabLeafMat1 : baobabLeafMat2);
+    foliage.position.set(Math.cos(brAng) * 11.0, 21.0, Math.sin(brAng) * 11.0);
+    mapRoot.add(foliage);
+    samplables.push(foliage);
+  }
+  // 최상층 전망대 원형 데크 (Y=20.0, 플레이어가 올라설 수 있음)
+  addCyl(4.4, 0.6, baobabWoodMat, 0, 20.0, 0, {collide: true, sample: true});
+  // 중앙 우듬지 잎
+  const topCrown = new THREE.Mesh(new THREE.CylinderGeometry(3.5, 5.0, 2.8, 8), baobabLeafMat1);
+  topCrown.position.set(0, 22.2, 0);
+  mapRoot.add(topCrown);
+  samplables.push(topCrown);
+
+  // 8.6) [자유롭게 돌아다니는 작은 동물들 (토끼, 병아리, 강아지, 고양이 13마리)]
+  const rabbitMat = lambert({color: 0xfbfbf8});
+  const rabbitPinkMat = lambert({color: 0xffb8c6});
+  const chickMat = lambert({color: 0xffd800});
+  const chickOrangeMat = lambert({color: 0xff8800});
+  const puppyMat = lambert({color: 0xc88344});
+  const puppyDarkMat = lambert({color: 0x5a3418});
+  const catMat = lambert({color: 0xee7722});
+  const catWhiteMat = lambert({color: 0xfffcf7});
+
+  const createZooSmallAnimal = (type, sx, sz) => {
+    const g = new THREE.Group();
+    const parts = {};
+
+    if (type === "rabbit") {
+      // 🐇 토끼: 흰 몸통, 귀여운 분홍 귀, 꼬리
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.55, 0.9), rabbitMat);
+      body.position.y = 0.35; g.add(body);
+      const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.45, 0.5), rabbitMat);
+      head.position.set(0, 0.65, 0.38); g.add(head);
+      const nose = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.1, 0.1), rabbitPinkMat);
+      nose.position.set(0, 0.62, 0.65); g.add(nose);
+      // 긴 귀 2개
+      const earL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.65, 0.18), rabbitMat);
+      earL.position.set(-0.16, 1.05, 0.32); earL.rotation.x = -0.2; g.add(earL);
+      const earR = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.65, 0.18), rabbitMat);
+      earR.position.set(0.16, 1.05, 0.32); earR.rotation.x = -0.2; g.add(earR);
+      const innerL = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.5, 0.05), rabbitPinkMat);
+      innerL.position.set(-0.16, 1.05, 0.41); innerL.rotation.x = -0.2; g.add(innerL);
+      const innerR = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.5, 0.05), rabbitPinkMat);
+      innerR.position.set(0.16, 1.05, 0.41); innerR.rotation.x = -0.2; g.add(innerR);
+      // 폭신한 둥근 꼬리
+      const tail = new THREE.Mesh(new THREE.SphereGeometry(0.16, 6, 6), rabbitMat);
+      tail.position.set(0, 0.38, -0.48); g.add(tail);
+      parts.earL = earL; parts.earR = earR;
+    } else if (type === "chick") {
+      // 🐥 병아리: 샛노란 둥근 몸, 주황 부리, 퍼덕이는 작은 날개
+      const body = new THREE.Mesh(new THREE.SphereGeometry(0.35, 8, 8), chickMat);
+      body.position.y = 0.35; g.add(body);
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 8, 8), chickMat);
+      head.position.set(0, 0.62, 0.15); g.add(head);
+      const beak = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.22, 5), chickOrangeMat);
+      beak.rotation.x = Math.PI / 2; beak.position.set(0, 0.62, 0.38); g.add(beak);
+      // 날개 2개
+      const wingL = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.22, 0.3), chickOrangeMat);
+      wingL.position.set(-0.36, 0.38, 0); g.add(wingL);
+      const wingR = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.22, 0.3), chickOrangeMat);
+      wingR.position.set(0.36, 0.38, 0); g.add(wingR);
+      parts.head = head; parts.wingL = wingL; parts.wingR = wingR;
+    } else if (type === "puppy") {
+      // 🐶 강아지: 갈색 강아지, 늘어진 귀, 흔들리는 꼬리
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.55, 1.1), puppyMat);
+      body.position.y = 0.42; g.add(body);
+      const head = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.5, 0.6), puppyMat);
+      head.position.set(0, 0.75, 0.48); g.add(head);
+      const snout = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.25, 0.35), puppyDarkMat);
+      snout.position.set(0, 0.65, 0.85); g.add(snout);
+      // 늘어진 귀 2개
+      const earL = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.45, 0.22), puppyDarkMat);
+      earL.position.set(-0.34, 0.75, 0.45); earL.rotation.z = 0.3; g.add(earL);
+      const earR = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.45, 0.22), puppyDarkMat);
+      earR.position.set(0.34, 0.75, 0.45); earR.rotation.z = -0.3; g.add(earR);
+      // 살랑살랑 흔들리는 꼬리
+      const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.05, 0.55, 6), puppyDarkMat);
+      tail.position.set(0, 0.65, -0.65); tail.rotation.x = -0.6; g.add(tail);
+      parts.tail = tail;
+    } else {
+      // 🐱 고양이: 치즈태비 고양이, 쫑긋한 귀, 길게 휜 꼬리
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 1.0), catMat);
+      body.position.y = 0.38; g.add(body);
+      const belly = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.3, 0.7), catWhiteMat);
+      belly.position.set(0, 0.25, 0); g.add(belly);
+      const head = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.42, 0.5), catMat);
+      head.position.set(0, 0.68, 0.45); g.add(head);
+      // 쫑긋 귀 2개
+      const earL = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.28, 4), catMat);
+      earL.position.set(-0.18, 0.98, 0.45); g.add(earL);
+      const earR = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.28, 4), catMat);
+      earR.position.set(0.18, 0.98, 0.45); g.add(earR);
+      // 위로 솟은 우아한 꼬리
+      const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.04, 0.7, 6), catMat);
+      tail.position.set(0, 0.72, -0.62); tail.rotation.x = -0.8; g.add(tail);
+      parts.tail = tail;
+    }
+
+    g.position.set(sx, 0, sz);
+    mapRoot.add(g);
+
+    return {
+      type, group: g, parts,
+      pos: new THREE.Vector2(sx, sz),
+      angle: Math.random() * Math.PI * 2,
+      targetAngle: Math.random() * Math.PI * 2,
+      speed: type === "puppy" ? 3.6 : type === "rabbit" ? 3.2 : type === "cat" ? 2.8 : 2.2,
+      baseSpeed: type === "puppy" ? 3.6 : type === "rabbit" ? 3.2 : type === "cat" ? 2.8 : 2.2,
+      state: "walk",
+      stateTimer: 2.5 + Math.random() * 3.5,
+      hopPhase: Math.random() * Math.PI * 2
+    };
+  };
+
+  // 13마리 작은 동물 스폰 (바오밥나무 주변 잔디광장 및 산책로)
+  ZOO_SMALL_ANIMALS = [
+    // 토끼 3마리
+    createZooSmallAnimal("rabbit", -9, -7),
+    createZooSmallAnimal("rabbit", 8, -9),
+    createZooSmallAnimal("rabbit", -6, 11),
+    // 병아리 4마리
+    createZooSmallAnimal("chick", 4, 6),
+    createZooSmallAnimal("chick", 6, 5),
+    createZooSmallAnimal("chick", -11, -3),
+    createZooSmallAnimal("chick", 3, -12),
+    // 강아지 3마리
+    createZooSmallAnimal("puppy", -13, 13),
+    createZooSmallAnimal("puppy", 13, -11),
+    createZooSmallAnimal("puppy", 0, 15),
+    // 고양이 3마리
+    createZooSmallAnimal("cat", -14, -13),
+    createZooSmallAnimal("cat", 14, 11),
+    createZooSmallAnimal("cat", -2, -15)
+  ];
+
   // 9) [리필존 2곳]
   // 리필존 1: 펭귄 풀장 시원한 음수대 (X=36, Z=-26)
   refillZones.push({x: 36, z: -26, r: 6.0, yMin: 0, yMax: 5, label: "빙하 음수대"});
@@ -14676,15 +14913,16 @@ function buildZoo() {
   refillZones.push({x: 0, z: 40, r: 6.5, yMin: 0, yMax: 5, label: "사파리 스낵바"});
 
   // 10) [스폰 지점 설정: 넉넉한 100% 개활지 배치]
-  // seekerSpawns: 중앙 순환 도로 교차로 및 광장 3곳
+  // seekerSpawns: 바오밥 나무 앞 광장 및 순환 도로 3곳
   seekerSpawns.push(
-    new THREE.Vector3(0, 0.2, 0),
+    new THREE.Vector3(0, 0.2, 14),
     new THREE.Vector3(-14, 0.2, -18),
     new THREE.Vector3(14, 0.2, 18)
   );
 
-  // hiderSpawns: 4대 동물 방사장 및 전망대, 기념품점 등 전역 20곳
+  // hiderSpawns: 바오밥나무 둥지와 틈, 4대 동물 방사장, 전망대 전역 24곳
   hiderSpawns = [
+    [0, 8.2, 5.0], [-4.8, 14.8, -2.2], [0, 11.5, -5.0], [0, 20.4, 0],   // 바오밥나무 둥지 2곳, 나뭇가지 틈, 최상층 4곳
     [-40, 8.6, -30], [-32, 0.1, -22], [-48, 0.1, -20], [-40, 0.1, -38], // 초원 사바나 4곳
     [-38, 0.1, 30], [-46, 6.1, 38], [-46, 11.1, 38], [-50, 0.1, 24],   // 판다/원숭이 숲 4곳
     [40, 0.2, -30], [48, 6.1, -34], [32, 0.1, -26], [45, 0.1, -22],     // 빙산 펭귄 풀 4곳
@@ -14822,11 +15060,110 @@ function updateZooGimmick(dt) {
   } else {
     if (alertDiv && alertDiv.textContent.includes("먹이주기")) alertDiv.classList.add("hidden");
   }
+
+  // 4. 자유롭게 배회하는 작은 동물들 AI 및 생동감 있는 애니메이션
+  if (Array.isArray(ZOO_SMALL_ANIMALS) && ZOO_SMALL_ANIMALS.length > 0) {
+    const hasPlayer = G.screen === "GAME" && G.role !== "ghost" && G.pos;
+    for (let i = 0; i < ZOO_SMALL_ANIMALS.length; i++) {
+      const a = ZOO_SMALL_ANIMALS[i];
+      if (!a || !a.group) continue;
+
+      // 플레이어 접근 반응 (가까이 다가가면 놀라서 방향을 틀고 빠르게 도망침)
+      if (hasPlayer) {
+        const dpx = a.pos.x - G.pos.x;
+        const dpz = a.pos.y - G.pos.z;
+        const pDist = Math.hypot(dpx, dpz);
+        if (pDist < 2.8) {
+          a.targetAngle = Math.atan2(dpx, dpz);
+          a.speed = a.baseSpeed * 1.6;
+          a.state = "walk";
+          a.stateTimer = 2.0;
+        }
+      }
+
+      // 상태 전환 (배회 걷기 <-> 제자리 두리번거리기/휴식)
+      a.stateTimer -= dt;
+      if (a.stateTimer <= 0) {
+        if (a.state === "walk") {
+          a.state = "idle";
+          a.stateTimer = 1.2 + Math.random() * 2.5;
+          a.speed = a.baseSpeed;
+        } else {
+          a.state = "walk";
+          a.stateTimer = 3.0 + Math.random() * 4.0;
+          a.targetAngle = Math.random() * Math.PI * 2;
+          a.speed = a.baseSpeed;
+        }
+      }
+
+      // 방사장 및 바오밥나무 중심 충돌 회피 (영역 유지)
+      // 동물원 외곽 펜스 내부 유지 (|x| < 52, |z| < 42)
+      if (Math.abs(a.pos.x) > 50 || Math.abs(a.pos.y) > 40) {
+        a.targetAngle = Math.atan2(-a.pos.x, -a.pos.y);
+      }
+      // 중앙 바오밥나무 줄기 반경(6.5m) 회피
+      const centerDist = Math.hypot(a.pos.x, a.pos.y);
+      if (centerDist < 6.8) {
+        a.targetAngle = Math.atan2(a.pos.x, a.pos.y);
+      }
+
+      // 부드러운 각도 보간 (Smooth Steering)
+      let diff = a.targetAngle - a.angle;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      a.angle += diff * Math.min(1, dt * 4.5);
+
+      // 이동 물리 적용
+      let yOffset = 0;
+      if (a.state === "walk") {
+        a.pos.x += Math.sin(a.angle) * a.speed * dt;
+        a.pos.y += Math.cos(a.angle) * a.speed * dt;
+        a.hopPhase += dt * (a.speed * 2.8);
+      }
+
+      // 동물별 특유의 점프/뒤뚱거림/꼬리 애니메이션
+      if (a.type === "rabbit") {
+        // 깡충깡충 뛰는 뜀박질
+        yOffset = (a.state === "walk") ? Math.abs(Math.sin(a.hopPhase)) * 0.42 : 0;
+        if (a.parts.earL && a.parts.earR) {
+          a.parts.earL.rotation.z = 0.15 + Math.sin(t * 8 + i) * 0.12;
+          a.parts.earR.rotation.z = -0.15 - Math.sin(t * 8 + i) * 0.12;
+        }
+      } else if (a.type === "chick") {
+        // 종종걸음과 빠른 날개 퍼덕임
+        yOffset = (a.state === "walk") ? Math.abs(Math.sin(a.hopPhase * 1.8)) * 0.22 : 0;
+        if (a.parts.wingL && a.parts.wingR) {
+          const flap = Math.sin(t * 18 + i) * 0.45;
+          a.parts.wingL.rotation.z = flap;
+          a.parts.wingR.rotation.z = -flap;
+        }
+        if (a.parts.head && a.state === "idle") {
+          a.parts.head.rotation.x = Math.sin(t * 6 + i) > 0.4 ? 0.4 : 0; // 모이 쪼기
+        }
+      } else if (a.type === "puppy") {
+        // 경쾌한 트롯 걸음과 꼬리 살랑살랑
+        yOffset = (a.state === "walk") ? Math.abs(Math.sin(t * 7 + i)) * 0.14 : 0;
+        if (a.parts.tail) {
+          a.parts.tail.rotation.y = Math.sin(t * 13 + i) * 0.55;
+        }
+      } else if (a.type === "cat") {
+        // 유연한 걸음과 위로 솟은 꼬리 흔들림
+        yOffset = (a.state === "walk") ? Math.abs(Math.sin(t * 5 + i)) * 0.08 : 0;
+        if (a.parts.tail) {
+          a.parts.tail.rotation.z = Math.sin(t * 3.5 + i) * 0.35;
+        }
+      }
+
+      a.group.position.set(a.pos.x, yOffset, a.pos.y);
+      a.group.rotation.y = a.angle;
+    }
+  }
 }
 
 function zooCleanup() {
   ZOO_BUS = null;
   ZOO_ANIMALS = [];
+  ZOO_SMALL_ANIMALS = [];
   ZOO_TRAMPOLINES = [];
   zooFeedingActive = false;
   zooFeedingLocalStart = 0;
