@@ -1393,6 +1393,38 @@ function buildTextures(){
     }
   },2,2);
 
+  // 🎡 놀이동산 전용 화려한 카니발 텍스처
+  TEX.circusStripe=canvasTex(256,256,(g,w,h)=>{
+    const stripeW=32;
+    for(let x=0;x<w;x+=stripeW*2){
+      g.fillStyle="#e63946"; g.fillRect(x,0,stripeW,h);
+      g.fillStyle="#fffbf0"; g.fillRect(x+stripeW,0,stripeW,h);
+    }
+    g.strokeStyle="rgba(0,0,0,0.15)"; g.lineWidth=2;
+    for(let x=0;x<w;x+=stripeW){ g.beginPath(); g.moveTo(x,0); g.lineTo(x,h); g.stroke(); }
+  },4,4);
+
+  TEX.carnivalTile=canvasTex(256,256,(g,w,h)=>{
+    g.fillStyle="#f8e8d8"; g.fillRect(0,0,w,h);
+    const sz=32;
+    for(let r=0;r<h/sz;r++){
+      for(let c=0;c<w/sz;c++){
+        g.fillStyle=((r+c)%2===0)?"#f3a683":"#70a1ff";
+        g.fillRect(c*sz,r*sz,sz,sz);
+      }
+    }
+    g.strokeStyle="rgba(255,255,255,0.7)"; g.lineWidth=2;
+    for(let i=0;i<=w;i+=sz){ g.beginPath(); g.moveTo(i,0); g.lineTo(i,h); g.stroke(); }
+    for(let i=0;i<=h;i+=sz){ g.beginPath(); g.moveTo(0,i); g.lineTo(w,i); g.stroke(); }
+  },4,4);
+
+  TEX.coasterTrack=canvasTex(128,128,(g,w,h)=>{
+    g.fillStyle="#2f3542"; g.fillRect(0,0,w,h);
+    g.fillStyle="#ffa502"; g.fillRect(14,0,14,h); g.fillRect(w-28,0,14,h);
+    g.fillStyle="#ced6e0";
+    for(let y=0;y<h;y+=24){ g.fillRect(6,y,w-12,8); }
+  },2,4);
+
   Object.values(TEX).forEach(t => {
     if (t && t.isTexture) t.needsUpdate = true;
   });
@@ -1452,6 +1484,14 @@ let valleyShowerLocalStart=0;
 let ZOO_BUS=null;
 let ZOO_ANIMALS=[];
 let ZOO_SMALL_ANIMALS=[];
+let AMUSEMENT_RIDES={
+  ferris:null,
+  viking:null,
+  carousel:null,
+  gyro:null,
+  coaster:null,
+  teacups:[]
+};
 let ZOO_TRAMPOLINES=[];
 let zooFeedingActive=false;
 let zooFeedingLocalStart=0;
@@ -1474,6 +1514,7 @@ function clearMap(){
   if(typeof mazeCleanup === "function") mazeCleanup();
   if(typeof valleyCleanup === "function") valleyCleanup();
   if(typeof zooCleanup === "function") zooCleanup();
+  if(typeof amusementCleanup === "function") amusementCleanup();
   ROOM_W = 120;
   ROOM_D = 90;
   WALL_H = 56;
@@ -4071,8 +4112,10 @@ function updateMapGimmicks(dt){
   else if(currentMapId==="maze") updateMazeGimmick(dt);
   else if(currentMapId==="valley") updateValleyGimmick(dt);
   else if(currentMapId==="zoo") updateZooGimmick(dt);
+  else if(currentMapId==="amusement") updateAmusementGimmick(dt);
   else if(typeof valleyCleanup === "function") valleyCleanup();
   if(currentMapId!=="zoo" && typeof zooCleanup === "function") zooCleanup();
+  if(currentMapId!=="amusement" && typeof amusementCleanup === "function") amusementCleanup();
 
   if(typeof updateCopsGame === "function") updateCopsGame(dt);
   if(typeof updateIceGame === "function") updateIceGame(dt);
@@ -4092,6 +4135,7 @@ const MAPS={
   maze:{ id:"maze", name:"마법 미로", icon:"🌿", type:"canvas", build:buildMazeMap },
   valley:{ id:"valley", name:"여름 계곡", icon:"🏞️", type:"canvas", build:buildValley },
   zoo:{ id:"zoo", name:"사파리 동물원", icon:"🦁", type:"canvas", build:buildZoo },
+  amusement:{ id:"amusement", name:"원더 놀이동산", icon:"🎡", type:"canvas", build:buildAmusement },
 };
 function mapIsReady(id){ const m=MAPS[id]; if(!m)return false; return m.type==="canvas"?true:!!(m.glbBase64&&m.glbBase64.length>100); }
 let currentMapId="classroom";
@@ -8371,6 +8415,7 @@ function describeHidePosition(p){
   if(currentMapId==="maze")return describeMazePosition(p);
   if(currentMapId==="valley")return describeValleyPosition(p);
   if(currentMapId==="zoo")return describeZooPosition(p);
+  if(currentMapId==="amusement")return describeAmusementPosition(p);
   return describeClassroomPosition(p);
 }
 
@@ -15187,6 +15232,807 @@ function zooCleanup() {
   if (ca && ca.textContent && ca.textContent.includes("먹이주기")) ca.classList.add("hidden");
 }
 
+
+
+/* ================= 🎡 11번째 신규 맵: 원더 놀이동산 (Wonder Amusement Park) ================= */
+function buildAmusement() {
+  ROOM_W = 140;
+  ROOM_D = 120;
+  WALL_H = 52;
+  buildTextures();
+  amusementCleanup();
+
+  // 1) 기본 외피: 카니발 체크 타일 바닥 & 로맨틱한 트와일라잇 밤하늘
+  const groundMat = lambert({map: TEX.carnivalTile || TEX.floor, side: THREE.DoubleSide});
+  const floorMesh = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W, ROOM_D), groundMat);
+  floorMesh.rotation.x = -Math.PI / 2;
+  mapRoot.add(floorMesh);
+  samplables.push(floorMesh);
+
+  // 밤하늘 천장 (환상적인 딥 인디고 트와일라잇 하늘)
+  const ceilMesh = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W, ROOM_D), lambert({color: 0x241b3d, side: THREE.DoubleSide}));
+  ceilMesh.rotation.x = Math.PI / 2;
+  ceilMesh.position.y = WALL_H;
+  mapRoot.add(ceilMesh);
+
+  // 외곽 AABB 보이지 않는 충돌 경계벽
+  addAABBCollider(0, WALL_H / 2, -ROOM_D / 2 - 1, ROOM_W + 10, WALL_H, 2);
+  addAABBCollider(0, WALL_H / 2, ROOM_D / 2 + 1, ROOM_W + 10, WALL_H, 2);
+  addAABBCollider(-ROOM_W / 2 - 1, WALL_H / 2, 0, 2, WALL_H, ROOM_D + 10);
+  addAABBCollider(ROOM_W / 2 + 1, WALL_H / 2, 0, 2, WALL_H, ROOM_D + 10);
+
+  // 외곽 카니발 방호벽 (스트라이프 펜스 및 네온 캡)
+  const fenceMat = lambert({map: TEX.circusStripe || TEX.cork});
+  const fenceCapMat = lambert({color: 0xf1c40f});
+  addBox(ROOM_W + 4, WALL_H, 3.0, fenceMat, 0, WALL_H / 2, -ROOM_D / 2 - 1.5, {collide: true, sample: true});
+  addBox(ROOM_W + 4, WALL_H, 3.0, fenceMat, 0, WALL_H / 2, ROOM_D / 2 + 1.5, {collide: true, sample: true});
+  addBox(3.0, WALL_H, ROOM_D + 4, fenceMat, -ROOM_W / 2 - 1.5, WALL_H / 2, 0, {collide: true, sample: true});
+  addBox(3.0, WALL_H, ROOM_D + 4, fenceMat, ROOM_W / 2 + 1.5, WALL_H / 2, 0, {collide: true, sample: true});
+
+  // 카니발 조명 (따뜻한 골든 오렌지 페스티벌 조명)
+  if (typeof ambientLight !== "undefined" && ambientLight && ambientLight.color) {
+    ambientLight.color.setHex(0xffeedd);
+    ambientLight.intensity = 0.82;
+  }
+  if (typeof sun !== "undefined" && sun && sun.color) {
+    sun.color.setHex(0xffdfba);
+    sun.intensity = 0.65;
+  }
+
+  // -------------------------------------------------------------
+  // 2) 🎡 [실제 가동 놀이기구 1: 거대 회전관람차 (Giant Ferris Wheel)]
+  // 중심 좌표: (-40, 22.0, -22), 반경 14.5m, 최상단 높이 36.5m
+  // -------------------------------------------------------------
+  const ferrisSteelMat = lambert({color: 0x34495e});
+  const ferrisRedMat = lambert({color: 0xe74c3c});
+  const ferrisGoldMat = lambert({color: 0xf1c40f});
+  const fX = -40, fY = 22.0, fZ = -22;
+
+  // 좌우 튼튼한 A자형 철골 지지대 타워 (지상 0m -> 회전축 22m)
+  addCyl(0.5, 23.5, ferrisSteelMat, fX - 3.2, 11.0, fZ - 7.0, {collide: true, rx: 0.32});
+  addCyl(0.5, 23.5, ferrisSteelMat, fX - 3.2, 11.0, fZ + 7.0, {collide: true, rx: -0.32});
+  addCyl(0.5, 23.5, ferrisSteelMat, fX + 3.2, 11.0, fZ - 7.0, {collide: true, rx: 0.32});
+  addCyl(0.5, 23.5, ferrisSteelMat, fX + 3.2, 11.0, fZ + 7.0, {collide: true, rx: -0.32});
+  // 중심 회전축 굵은 원통
+  addCyl(1.0, 7.5, ferrisGoldMat, fX, fY, fZ, {collide: true, rz: Math.PI / 2});
+
+  // 회전하는 휠 본체 그룹 (Wheel Frame Group)
+  const wheelGroup = new THREE.Group();
+  wheelGroup.position.set(fX, fY, fZ);
+
+  // 2개의 평행한 외곽 원형 림 프레임
+  [-1.6, 1.6].forEach(offsetZ => {
+    for (let s = 0; s < 16; s++) {
+      const a1 = (s * Math.PI) / 8;
+      const a2 = ((s + 1) * Math.PI) / 8;
+      const rx1 = Math.cos(a1) * 14.2, ry1 = Math.sin(a1) * 14.2;
+      const rx2 = Math.cos(a2) * 14.2, ry2 = Math.sin(a2) * 14.2;
+      const segLen = Math.hypot(rx2 - rx1, ry2 - ry1);
+      const segAng = Math.atan2(ry2 - ry1, rx2 - rx1);
+      const rim = new THREE.Mesh(new THREE.BoxGeometry(segLen, 0.45, 0.45), ferrisRedMat);
+      rim.position.set((rx1 + rx2) / 2, (ry1 + ry2) / 2, offsetZ);
+      rim.rotation.z = segAng;
+      wheelGroup.add(rim);
+    }
+  });
+
+  // 8개의 방사형 살 (Spokes)
+  for (let s = 0; s < 8; s++) {
+    const spAng = (s * Math.PI) / 4;
+    const spoke = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 28.4, 8), ferrisGoldMat);
+    spoke.rotation.z = spAng;
+    wheelGroup.add(spoke);
+  }
+
+  // 중심 장식용 카니발 별 (Center Star)
+  const starMesh = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.4, 3.6, 8), ferrisGoldMat);
+  starMesh.rotation.x = Math.PI / 2;
+  wheelGroup.add(starMesh);
+
+  mapRoot.add(wheelGroup);
+
+  // 8개의 곤돌라 승차용 객실 (Gondolas)
+  const gondolaColors = [0xe74c3c, 0xf39c12, 0xf1c40f, 0x2ecc71, 0x1abc9c, 0x3498db, 0x9b59b6, 0xe84393];
+  const gondolas = [];
+
+  for (let g = 0; g < 8; g++) {
+    const gGroup = new THREE.Group();
+    const gMat = lambert({color: gondolaColors[g]});
+    const gRoofMat = lambert({color: 0xfdfdfd});
+
+    // 곤돌라 바닥 승차 발판 (폭 2.6m, 깊이 2.4m, 두께 0.4m)
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.4, 2.4), gMat);
+    floor.position.y = 0.2;
+    gGroup.add(floor);
+
+    // 곤돌라 지붕
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(2.0, 1.2, 6), gRoofMat);
+    roof.position.y = 2.8;
+    gGroup.add(roof);
+
+    // 4개 모서리 기둥 및 난간
+    [[-1.1, -1.0], [1.1, -1.0], [-1.1, 1.0], [1.1, 1.0]].forEach(([cx, cz]) => {
+      const p = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 2.2, 6), ferrisSteelMat);
+      p.position.set(cx, 1.3, cz);
+      gGroup.add(p);
+    });
+
+    mapRoot.add(gGroup);
+    samplables.push(floor);
+
+    const gBox3 = new THREE.Box3();
+    colliders.push(gBox3);
+
+    gondolas.push({
+      group: gGroup,
+      box3: gBox3,
+      index: g,
+      curPos: new THREE.Vector3(fX, fY, fZ),
+      prevPos: new THREE.Vector3(fX, fY, fZ)
+    });
+  }
+
+  AMUSEMENT_RIDES.ferris = {
+    center: new THREE.Vector3(fX, fY, fZ),
+    radius: 14.2,
+    angle: 0,
+    speed: 0.16,
+    wheelGroup: wheelGroup,
+    gondolas: gondolas
+  };
+
+  // -------------------------------------------------------------
+  // 3) ⛵ [실제 가동 놀이기구 2: 스윙 바이킹 (Giant Viking Pirate Ship)]
+  // 피벗 축 좌표: (40, 21.0, -22), 진자 운동 스윙
+  // -------------------------------------------------------------
+  const vX = 40, vPivotY = 21.0, vZ = -22;
+  const shipWoodMat = lambert({color: 0x5a381e, map: TEX.wood || TEX.deskTop});
+  const shipDeckMat = lambert({color: 0x8a552e});
+  const shipGoldMat = lambert({color: 0xf1c40f});
+  const shipSupportMat = lambert({color: 0x2c3e50});
+
+  // A자형 좌우 지지대 타워
+  addCyl(0.6, 23.0, shipSupportMat, vX - 5.5, 10.5, vZ - 3.0, {collide: true, rx: 0.15, rz: 0.26});
+  addCyl(0.6, 23.0, shipSupportMat, vX - 5.5, 10.5, vZ + 3.0, {collide: true, rx: -0.15, rz: 0.26});
+  addCyl(0.6, 23.0, shipSupportMat, vX + 5.5, 10.5, vZ - 3.0, {collide: true, rx: 0.15, rz: -0.26});
+  addCyl(0.6, 23.0, shipSupportMat, vX + 5.5, 10.5, vZ + 3.0, {collide: true, rx: -0.15, rz: -0.26});
+  addCyl(0.8, 8.5, shipGoldMat, vX, vPivotY, vZ, {collide: true, rx: Math.PI / 2});
+
+  // 바이킹 진자 피벗 그룹 (Viking Pivot Group)
+  const vikingGroup = new THREE.Group();
+  vikingGroup.position.set(vX, vPivotY, vZ);
+
+  // 4가닥 매달림 철골 암 (피벗에서 선체 바닥까지 연결, 길이 약 14.5m)
+  [[-2.2, -1.8], [2.2, -1.8], [-2.2, 1.8], [2.2, 1.8]].forEach(([ax, az]) => {
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 14.5, 6), shipSupportMat);
+    arm.position.set(ax, -7.2, az);
+    vikingGroup.add(arm);
+  });
+
+  // 해적선 본체 (Viking Ship Body)
+  // 선체 하단 (길이 15.0m, 폭 4.6m, 높이 2.8m)
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(15.0, 2.4, 4.6), shipWoodMat);
+  hull.position.y = -14.2;
+  vikingGroup.add(hull);
+
+  // 선수(Bow)와 선미(Stern) 위로 솟아오른 뱃머리 구조
+  const bow = new THREE.Mesh(new THREE.ConeGeometry(2.3, 4.5, 5), shipWoodMat);
+  bow.position.set(-8.2, -12.5, 0); bow.rotation.z = Math.PI / 2.8;
+  vikingGroup.add(bow);
+  const stern = new THREE.Mesh(new THREE.ConeGeometry(2.3, 4.5, 5), shipWoodMat);
+  stern.position.set(8.2, -12.5, 0); stern.rotation.z = -Math.PI / 2.8;
+  vikingGroup.add(stern);
+
+  // 선수 황금 용머리 장식
+  const dragon = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.6, 1.4), shipGoldMat);
+  dragon.position.set(-10.2, -11.0, 0);
+  vikingGroup.add(dragon);
+
+  // 갑판 위 좌석 5단 계단
+  for (let st = -2; st <= 2; st++) {
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.8, 4.0), shipDeckMat);
+    seat.position.set(st * 2.7, -13.2 + Math.abs(st) * 0.5, 0);
+    vikingGroup.add(seat);
+  }
+
+  // 중앙 돛대 및 해적 깃발
+  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, 7.5, 8), shipWoodMat);
+  mast.position.set(0, -9.8, 0);
+  vikingGroup.add(mast);
+  const pirateFlag = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.5, 0.1), lambert({color: 0x111111}));
+  pirateFlag.position.set(1.4, -7.5, 0);
+  vikingGroup.add(pirateFlag);
+
+  mapRoot.add(vikingGroup);
+  samplables.push(hull);
+
+  // 탑승용 동적 충돌 박스
+  const vDeckBox3 = new THREE.Box3();
+  colliders.push(vDeckBox3);
+
+  AMUSEMENT_RIDES.viking = {
+    pivot: new THREE.Vector3(vX, vPivotY, vZ),
+    group: vikingGroup,
+    deckBox3: vDeckBox3,
+    armLen: 14.2,
+    angle: 0,
+    prevPos: new THREE.Vector3(vX, vPivotY - 14.2, vZ),
+    curPos: new THREE.Vector3(vX, vPivotY - 14.2, vZ)
+  };
+
+  // -------------------------------------------------------------
+  // 4) 🎠 [실제 가동 놀이기구 3: 화려한 회전목마 (Royal Carousel)]
+  // 중심 좌표: (0, 0, 8), 반경 8.5m, 원형 회전 플랫홈 & 오르내리는 목마 6마리
+  // -------------------------------------------------------------
+  const cX = 0, cY = 0, cZ = 8;
+  const carouselWoodMat = lambert({color: 0xd2b48c, map: TEX.wood || TEX.deskTop});
+  const carouselGoldMat = lambert({color: 0xf1c40f});
+  const carouselRoofMat = lambert({map: TEX.circusStripe || TEX.cork});
+  const brassPoleMat = lambert({color: 0xf5cd79});
+
+  // 정지 기반 바닥 원형 계단턱 (반경 9.0m)
+  addCyl(9.0, 0.4, carouselGoldMat, cX, 0.2, cZ, {collide: true, sample: true});
+
+  // 회전하는 캐러셀 플랫홈 그룹 (Carousel Rotation Group)
+  const carouselGroup = new THREE.Group();
+  carouselGroup.position.set(cX, 0.4, cZ);
+
+  // 회전 턴테이블 바닥 (반경 8.5m, 두께 0.4m)
+  const cPlatform = new THREE.Mesh(new THREE.CylinderGeometry(8.5, 8.5, 0.4, 24), carouselWoodMat);
+  cPlatform.position.y = 0.2;
+  carouselGroup.add(cPlatform);
+
+  // 중앙 거울 & 황금 기둥 (Center Mirror Pillar)
+  const centerPillar = new THREE.Mesh(new THREE.CylinderGeometry(2.0, 2.2, 7.5, 12), carouselGoldMat);
+  centerPillar.position.y = 4.0;
+  carouselGroup.add(centerPillar);
+
+  // 웅장한 서커스 줄무늬 지붕 캐노피 (Canopy Roof, Y=7.5m ~ 11.5m)
+  const cRoof = new THREE.Mesh(new THREE.ConeGeometry(9.2, 4.0, 16), carouselRoofMat);
+  cRoof.position.y = 9.5;
+  carouselGroup.add(cRoof);
+  const cSpire = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.4, 2.5, 8), carouselGoldMat);
+  cSpire.position.y = 12.5;
+  carouselGroup.add(cSpire);
+
+  // 6마리의 화려한 회전목마 말 (Horses on Brass Poles)
+  const horseColors = [0xffffff, 0xffcccc, 0xfce38a, 0xe0f7fa, 0xf3e5f5, 0xfff0f5];
+  const horses = [];
+
+  for (let h = 0; h < 6; h++) {
+    const isOuter = (h % 2 === 0);
+    const r = isOuter ? 6.6 : 4.2;
+    const ang = (h * Math.PI) / 3;
+    const hx = Math.cos(ang) * r;
+    const hz = Math.sin(ang) * r;
+
+    // 수직 황동 기둥 (Brass Pole)
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 8.0, 8), brassPoleMat);
+    pole.position.set(hx, 4.2, hz);
+    carouselGroup.add(pole);
+
+    // 말 개별 메쉬 그룹 (오르내리는 대상)
+    const hMesh = new THREE.Group();
+    const horseMat = lambert({color: horseColors[h]});
+    const saddleMat = lambert({color: isOuter ? 0xe74c3c : 0x3498db});
+
+    // 말 몸통 (Box)
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.9, 0.7), horseMat);
+    body.position.y = 1.0;
+    hMesh.add(body);
+    // 안장
+    const saddle = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.2, 0.76), saddleMat);
+    saddle.position.y = 1.5;
+    hMesh.add(saddle);
+    // 목과 머리
+    const neck = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.0, 0.4), horseMat);
+    neck.position.set(0.7, 1.6, 0); neck.rotation.z = -0.3;
+    hMesh.add(neck);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.45, 0.38), horseMat);
+    head.position.set(1.0, 2.0, 0);
+    hMesh.add(head);
+
+    hMesh.position.set(hx, 1.0, hz);
+    hMesh.rotation.y = -ang + Math.PI / 2; // 회전 방향으로 전진하도록 정렬
+    carouselGroup.add(hMesh);
+    samplables.push(body);
+
+    horses.push({
+      mesh: hMesh,
+      baseY: 1.0,
+      phase: h * 1.05
+    });
+  }
+
+  mapRoot.add(carouselGroup);
+  samplables.push(cPlatform);
+
+  AMUSEMENT_RIDES.carousel = {
+    center: new THREE.Vector3(cX, 0, cZ),
+    radius: 8.5,
+    angle: 0,
+    speed: 0.52,
+    group: carouselGroup,
+    horses: horses
+  };
+
+  // -------------------------------------------------------------
+  // 5) 🚀 [실제 가동 놀이기구 4: 메가 자이로드롭 (Mega Gyro Drop Tower)]
+  // 중심 좌표: (42, 0, 28), 높이 40m 초고층 타워, 급속 수직 자유낙하
+  // -------------------------------------------------------------
+  const gX = 42, gZ = 28;
+  const towerMat = lambert({color: 0x95a5a6});
+  const towerTrussMat = lambert({color: 0x2c3e50});
+  const ringMat = lambert({color: 0xf39c12});
+  const seatMat = lambert({color: 0x34495e});
+
+  // 40m 초고층 중심 원형 타워 (R=1.8m)
+  addCyl(1.8, 40.0, towerMat, gX, 20.0, gZ, {collide: true, sample: true});
+  // 타워 기저부 안전 기단
+  addCyl(5.5, 1.2, towerTrussMat, gX, 0.6, gZ, {collide: true, sample: true});
+  // 타워 최정상 캡 & 스카이 전망 룸 (Y=39.5m)
+  addCyl(3.5, 2.5, towerTrussMat, gX, 39.5, gZ, {collide: true, sample: true});
+  // 최상단 경고 비콘 램프 (빨강)
+  const beacon = addCyl(0.4, 0.8, lambert({color: 0xff0000}), gX, 41.0, gZ, {collide: false});
+
+  // 승강하는 원형 곤돌라 링 그룹 (Gyro Drop Ring Group)
+  const gyroGroup = new THREE.Group();
+  gyroGroup.position.set(gX, 3.0, gZ);
+
+  // 원형 승차 링 데크 (외경 4.5m, 내경 2.0m, 두께 0.6m)
+  const gRing = new THREE.Mesh(new THREE.CylinderGeometry(4.5, 4.6, 0.6, 16), ringMat);
+  gRing.position.y = 0.3;
+  gyroGroup.add(gRing);
+
+  // 12개 승객 좌석
+  for (let s = 0; s < 12; s++) {
+    const sAng = (s * Math.PI) / 6;
+    const sx = Math.cos(sAng) * 3.3;
+    const sz = Math.sin(sAng) * 3.3;
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.2, 0.8), seatMat);
+    seat.position.set(sx, 1.0, sz);
+    seat.rotation.y = -sAng + Math.PI / 2;
+    gyroGroup.add(seat);
+  }
+
+  mapRoot.add(gyroGroup);
+  samplables.push(gRing);
+
+  const gyroBox3 = new THREE.Box3();
+  gyroBox3.min.set(gX - 4.5, 2.7, gZ - 4.5);
+  gyroBox3.max.set(gX + 4.5, 3.6, gZ + 4.5);
+  colliders.push(gyroBox3);
+
+  AMUSEMENT_RIDES.gyro = {
+    center: new THREE.Vector3(gX, 0, gZ),
+    group: gyroGroup,
+    box3: gyroBox3,
+    curY: 3.0,
+    prevY: 3.0,
+    rotAngle: 0
+  };
+
+  // -------------------------------------------------------------
+  // 6) 🎢 [실제 가동 놀이기구 5: 롤러코스터 트랙 & 주행 열차 (Wonder Coaster)]
+  // 북서쪽 상공 (X: -60 ~ -15, Z: -50 ~ -5), 3량 편성 롤러코스터 열차 질주
+  // -------------------------------------------------------------
+  const stationMat = lambert({color: 0x34495e});
+  const railMat = lambert({map: TEX.coasterTrack || TEX.floor, color: 0xffa502});
+  const cartRedMat = lambert({color: 0xe74c3c});
+  const cartBlueMat = lambert({color: 0x3498db});
+  const cartGreenMat = lambert({color: 0x2ecc71});
+
+  // 코스터 탑승 승강장 데크 (X: -18, Z: -42, 높이 8.0m)
+  addBox(12.0, 1.0, 8.0, stationMat, -18, 8.0, -42, {collide: true, sample: true});
+  // 승강장 지붕
+  addBox(13.0, 0.8, 9.0, lambert({color: 0xe74c3c}), -18, 12.5, -42, {collide: true, sample: true});
+  // 승강장 등반 계단 8단
+  for (let st = 0; st < 8; st++) {
+    addBox(3.0, 1.0, 1.6, stationMat, -18, 0.5 + st * 1.0, -34 + st * 1.5, {collide: true, sample: true});
+  }
+
+  // 롤러코스터 레일 지지대 기둥들 (트러스 타워)
+  [[-18, -42, 8], [-35, -48, 16], [-55, -48, 24], [-58, -25, 14], [-55, -5, 18], [-35, -5, 10]].forEach(([px, pz, ph]) => {
+    addCyl(0.6, ph, stationMat, px, ph / 2, pz, {collide: true});
+  });
+
+  // 고가 롤러코스터 레일 박스 세그먼트들 (높이 8m ~ 24m)
+  const trackWaypoints = [
+    new THREE.Vector3(-18, 8.6, -42),
+    new THREE.Vector3(-35, 16.6, -48),
+    new THREE.Vector3(-55, 24.6, -48),
+    new THREE.Vector3(-58, 14.6, -25),
+    new THREE.Vector3(-55, 18.6, -5),
+    new THREE.Vector3(-35, 10.6, -5),
+    new THREE.Vector3(-22, 9.0, -20),
+    new THREE.Vector3(-18, 8.6, -42)
+  ];
+
+  for (let w = 0; w < trackWaypoints.length - 1; w++) {
+    const p1 = trackWaypoints[w], p2 = trackWaypoints[w + 1];
+    const segLen = p1.distanceTo(p2);
+    const mid = new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5);
+    const railSeg = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.6, segLen), railMat);
+    railSeg.position.copy(mid);
+    railSeg.lookAt(p2);
+    mapRoot.add(railSeg);
+    samplables.push(railSeg);
+  }
+
+  // 질주하는 3량 코스터 열차 그룹
+  const trainGroup = new THREE.Group();
+  const carts = [];
+  [cartRedMat, cartBlueMat, cartGreenMat].forEach((cMat, ci) => {
+    const cMesh = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.4, 3.2), cMat);
+    cMesh.position.z = -ci * 3.6;
+    trainGroup.add(cMesh);
+    carts.push(cMesh);
+  });
+  trainGroup.position.copy(trackWaypoints[0]);
+  mapRoot.add(trainGroup);
+  samplables.push(carts[0]);
+
+  AMUSEMENT_RIDES.coaster = {
+    waypoints: trackWaypoints,
+    group: trainGroup,
+    prog: 0,
+    speed: 16.0
+  };
+
+  // -------------------------------------------------------------
+  // 7) ☕ [실제 가동 놀이기구 6: 회전 찻잔 (Spinning Crazy Teacups)]
+  // 중심 좌표: (-38, 0, 28), 반경 7.5m, 주 턴테이블 회전 + 3개 찻잔 고속 자전
+  // -------------------------------------------------------------
+  const tX = -38, tZ = 28;
+  const teacupFloorMat = lambert({color: 0x81ecec});
+  const teacupGoldMat = lambert({color: 0xf1c40f});
+  const cupColors = [0xff7675, 0x74b9ff, 0x55efc4];
+
+  // 메인 턴테이블 바닥 (반경 7.5m)
+  addCyl(7.5, 0.5, teacupFloorMat, tX, 0.25, tZ, {collide: true, sample: true});
+  // 중앙 대형 황금 주전자 조형물 (Giant Golden Teapot Monument)
+  addCyl(1.5, 3.2, teacupGoldMat, tX, 1.8, tZ, {collide: true, sample: true});
+  addBox(2.2, 0.8, 0.8, teacupGoldMat, tX, 2.8, tZ, {collide: false}); // 주전자 주둥이
+
+  const teacupList = [];
+  for (let c = 0; c < 3; c++) {
+    const cGroup = new THREE.Group();
+    const cMat = lambert({color: cupColors[c]});
+
+    // 찻잔 본체 (원통형이며 안으로 쏙 들어갈 수 있는 크기)
+    const cupOuter = new THREE.Mesh(new THREE.CylinderGeometry(2.0, 1.6, 1.8, 12), cMat);
+    cupOuter.position.y = 1.0;
+    cGroup.add(cupOuter);
+
+    // 찻잔 손잡이
+    const handle = new THREE.Mesh(new THREE.TorusGeometry(0.8, 0.2, 8, 12), cMat);
+    handle.position.set(2.0, 1.0, 0);
+    cGroup.add(handle);
+
+    // 찻잔 내부 좌석 바닥
+    const cupSeat = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 0.4, 8), lambert({color: 0xfdfdfd}));
+    cupSeat.position.y = 0.5;
+    cGroup.add(cupSeat);
+
+    mapRoot.add(cGroup);
+    samplables.push(cupOuter);
+
+    teacupList.push({
+      group: cGroup,
+      index: c,
+      subAngle: Math.random() * Math.PI * 2
+    });
+  }
+
+  AMUSEMENT_RIDES.teacups = teacupList;
+
+  // -------------------------------------------------------------
+  // 8) 🎪 [서커스 빅탑 대형 텐트 (Grand Circus Big Top Tent)]
+  // 좌표: (0, 0, -36), 직경 18m, 대형 줄무늬 텐트 & 내부 은신 구조
+  // -------------------------------------------------------------
+  const tentMat = lambert({map: TEX.circusStripe || TEX.cork, side: THREE.DoubleSide});
+  const tentRoof = new THREE.Mesh(new THREE.ConeGeometry(9.5, 9.0, 16), tentMat);
+  tentRoof.position.set(0, 10.5, -36);
+  mapRoot.add(tentRoof);
+  samplables.push(tentRoof);
+
+  // 텐트 측면 원형 기둥 벽면 (입구는 열려있어 안으로 들어갈 수 있음)
+  for (let p = 0; p < 12; p++) {
+    if (p === 3 || p === 4) continue; // 전면 입구 개방
+    const pAng = (p * Math.PI) / 6;
+    const px = Math.cos(pAng) * 9.0;
+    const pz = -36 + Math.sin(pAng) * 9.0;
+    addCyl(0.3, 6.0, ferrisSteelMat, px, 3.0, pz, {collide: true});
+  }
+  // 텐트 내부 트램펄린 & 공예 서커스 상자
+  addCyl(2.8, 0.8, lambert({color: 0x2ecc71}), 0, 0.4, -36, {collide: true, sample: true});
+  addBox(2.2, 2.2, 2.2, lambert({color: 0xe74c3c}), -4.0, 1.1, -38, {collide: true, sample: true});
+  addBox(2.2, 2.2, 2.2, lambert({color: 0xf1c40f}), 4.0, 1.1, -38, {collide: true, sample: true});
+
+  // -------------------------------------------------------------
+  // 9) 🏰 [원더 캐슬 성문 & 중앙 무지개 분수대 & 스낵 카트 2개]
+  // -------------------------------------------------------------
+  // (A) 남쪽 입구 놀이동산 성문 (Wonder Castle Gate, Z = 50)
+  const castleMat = lambert({color: 0x6c5ce7});
+  const castleConeMat = lambert({color: 0xfd79a8});
+  // 좌우 파스텔 망루 타워 (높이 14m)
+  addCyl(2.5, 14.0, castleMat, -12, 7.0, 48, {collide: true, sample: true});
+  addCyl(2.5, 14.0, castleMat, 12, 7.0, 48, {collide: true, sample: true});
+  const cConeL = new THREE.Mesh(new THREE.ConeGeometry(3.2, 5.0, 8), castleConeMat);
+  cConeL.position.set(-12, 16.5, 48); mapRoot.add(cConeL);
+  const cConeR = new THREE.Mesh(new THREE.ConeGeometry(3.2, 5.0, 8), castleConeMat);
+  cConeR.position.set(12, 16.5, 48); mapRoot.add(cConeR);
+  // 성문 아치 게이트 및 전광판
+  addBox(24.0, 3.0, 2.5, castleMat, 0, 11.5, 48, {collide: true, sample: true});
+
+  // (B) 중앙 무지개 분수대 (Rainbow Carnival Fountain, X=0, Z=-10)
+  const fountainStoneMat = lambert({color: 0xdfe6e9});
+  const fountainWaterMat = lambert({map: TEX.water || TEX.deskTop, color: 0x74b9ff, transparent: true, opacity: 0.85});
+  // 3단 분수 수조
+  addCyl(6.0, 1.2, fountainStoneMat, 0, 0.6, -10, {collide: true, sample: true});
+  addCyl(5.4, 0.2, fountainWaterMat, 0, 1.2, -10, {collide: true, sample: true});
+  addCyl(3.2, 2.0, fountainStoneMat, 0, 2.0, -10, {collide: true, sample: true});
+  addCyl(2.8, 0.2, fountainWaterMat, 0, 3.1, -10, {collide: true, sample: true});
+  addCyl(1.2, 3.5, fountainStoneMat, 0, 3.6, -10, {collide: true, sample: true});
+
+  // (C) 팝콘 & 슬러시 카트 2대
+  const cartMat = lambert({color: 0xffffff});
+  const awningMat = lambert({map: TEX.circusStripe || TEX.cork});
+  // 팝콘 카트 1 (X=18, Z=22)
+  addBox(4.5, 2.2, 2.8, cartMat, 18, 1.1, 22, {collide: true, sample: true});
+  addBox(5.0, 0.5, 3.4, awningMat, 18, 3.4, 22, {collide: true, sample: true});
+  [[-1.8, -1.2], [1.8, -1.2], [-1.8, 1.2], [1.8, 1.2]].forEach(([px, pz]) => {
+    addCyl(0.08, 1.4, ferrisSteelMat, 18 + px, 2.4, 22 + pz, {collide: false});
+  });
+
+  // 슬러시 카트 2 (X=-18, Z=22)
+  addBox(4.5, 2.2, 2.8, cartMat, -18, 1.1, 22, {collide: true, sample: true});
+  addBox(5.0, 0.5, 3.4, awningMat, -18, 3.4, 22, {collide: true, sample: true});
+  [[-1.8, -1.2], [1.8, -1.2], [-1.8, 1.2], [1.8, 1.2]].forEach(([px, pz]) => {
+    addCyl(0.08, 1.4, ferrisSteelMat, -18 + px, 2.4, 22 + pz, {collide: false});
+  });
+
+  // 10) [리필존 2곳]
+  refillZones.push({x: 18, z: 22, r: 6.0, yMin: 0, yMax: 5, label: "팝콘 스낵바"});
+  refillZones.push({x: 0, z: -10, r: 6.5, yMin: 0, yMax: 5, label: "카니발 분수대"});
+
+  // 11) [스폰 지점 설정: 24곳+ 고른 분산]
+  // seekerSpawns: 중앙 분수대 앞 및 플라자 3곳
+  seekerSpawns.push(
+    new THREE.Vector3(0, 0.2, 2),
+    new THREE.Vector3(-14, 0.2, 36),
+    new THREE.Vector3(14, 0.2, 36)
+  );
+
+  // hiderSpawns: 6대 놀이기구 및 텐트, 성문, 스낵바 등 전역 24곳
+  hiderSpawns = [
+    [-40, 8.0, -22], [-40, 36.5, -22], [-40, 22.0, -8], [-40, 22.0, -36], // 회전관람차 곤돌라 4곳
+    [40, 10.0, -22], [47, 14.5, -22], [33, 14.5, -22],                   // 스윙 바이킹 3곳
+    [0, 1.6, 14.6], [-4.2, 1.6, 8], [4.2, 1.6, 8],                       // 회전목마 말등 3곳
+    [42, 3.6, 28], [42, 34.6, 28], [42, 40.0, 28],                       // 자이로드롭 3곳
+    [-18, 8.6, -42], [-55, 25.0, -48], [-58, 15.0, -25],                  // 롤러코스터 트랙/승강장 3곳
+    [-38, 1.0, 28], [-42, 1.0, 28],                                       // 회전 찻잔 2곳
+    [0, 1.0, -36], [-4.0, 2.2, -38], [4.0, 2.2, -38],                    // 서커스 텐트 3곳
+    [-12, 14.5, 48], [12, 14.5, 48],                                      // 성문 망루 위 2곳
+    [18, 3.8, 22], [-18, 3.8, 22]                                         // 스낵바 지붕 2곳
+  ].map(p => new THREE.Vector3(p[0], p[1], p[2]));
+}
+
+/* ================= 🎡 원더 놀이동산 실시간 가동 기믹 (Dynamic Attractions Update) ================= */
+function updateAmusementGimmick(dt) {
+  if (currentMapId !== "amusement") return;
+  const t = (Net.now ? Net.now() : Date.now()) / 1000;
+  const isPlaying = G.screen === "GAME" && G.role !== "ghost" && !G.spectating && G.pos;
+
+  // 1. 🎡 회전관람차 실시간 회전 및 곤돌라 카운터 로테이션 + 탑승 승객 운송
+  if (AMUSEMENT_RIDES.ferris) {
+    const fw = AMUSEMENT_RIDES.ferris;
+    fw.angle += dt * fw.speed;
+    fw.wheelGroup.rotation.z = fw.angle;
+
+    for (let i = 0; i < fw.gondolas.length; i++) {
+      const g = fw.gondolas[i];
+      g.prevPos.copy(g.curPos);
+
+      const gAng = fw.angle + (i * Math.PI) / 4;
+      const gx = fw.center.x + Math.cos(gAng) * fw.radius;
+      const gy = fw.center.y + Math.sin(gAng) * fw.radius;
+      const gz = fw.center.z;
+
+      g.curPos.set(gx, gy, gz);
+      g.group.position.set(gx, gy, gz);
+      // 중력 카운터 로테이션 (항상 똑바로 서 있음)
+      g.group.rotation.z = 0;
+
+      // 동적 충돌 박스 업데이트
+      g.box3.min.set(gx - 1.3, gy - 0.2, gz - 1.2);
+      g.box3.max.set(gx + 1.3, gy + 0.2, gz + 1.2);
+
+      // 탑승 플레이어 운송 물리
+      if (isPlaying) {
+        const onGondola = (Math.abs(G.pos.x - gx) < 1.3 &&
+          Math.abs(G.pos.z - gz) < 1.2 &&
+          Math.abs(G.pos.y - (gy + 0.2)) < 0.8);
+
+        if (onGondola) {
+          const dx = g.curPos.x - g.prevPos.x;
+          const dy = g.curPos.y - g.prevPos.y;
+          if (dx) moveHorizontalAxis("x", dx);
+          if (dy > 0 || Math.abs(G.pos.y - (gy + 0.2)) < 0.4) G.pos.y += dy;
+        }
+      }
+    }
+  }
+
+  // 2. ⛵ 스윙 바이킹 왕복 진자 스윙 & 갑판 운송 물리
+  if (AMUSEMENT_RIDES.viking) {
+    const vk = AMUSEMENT_RIDES.viking;
+    vk.prevPos.copy(vk.curPos);
+
+    // 하모닉 진자 스윙: sin(t * 1.35)
+    vk.angle = Math.sin(t * 1.35) * 0.65;
+    vk.group.rotation.z = vk.angle;
+
+    const shipX = vk.pivot.x - Math.sin(vk.angle) * vk.armLen;
+    const shipY = vk.pivot.y - Math.cos(vk.angle) * vk.armLen;
+    const shipZ = vk.pivot.z;
+    vk.curPos.set(shipX, shipY, shipZ);
+
+    vk.deckBox3.min.set(shipX - 6.5, shipY - 0.5, shipZ - 2.2);
+    vk.deckBox3.max.set(shipX + 6.5, shipY + 0.5, shipZ + 2.2);
+
+    if (isPlaying) {
+      const onShip = (Math.abs(G.pos.x - shipX) < 6.5 &&
+        Math.abs(G.pos.z - shipZ) < 2.2 &&
+        Math.abs(G.pos.y - shipY) < 1.0);
+
+      if (onShip) {
+        const dx = vk.curPos.x - vk.prevPos.x;
+        const dy = vk.curPos.y - vk.prevPos.y;
+        if (dx) moveHorizontalAxis("x", dx);
+        if (dy > 0 || Math.abs(G.pos.y - shipY) < 0.5) G.pos.y += dy;
+      }
+    }
+  }
+
+  // 3. 🎠 회전목마 회전 및 6마리 말 오르내림 + 회전 탑승 물리
+  if (AMUSEMENT_RIDES.carousel) {
+    const cr = AMUSEMENT_RIDES.carousel;
+    const dAng = dt * cr.speed;
+    cr.angle += dAng;
+    cr.group.rotation.y = cr.angle;
+
+    // 말 상하 바운스
+    for (let h = 0; h < cr.horses.length; h++) {
+      const horse = cr.horses[h];
+      const bob = Math.sin(t * 3.2 + horse.phase) * 0.55;
+      horse.mesh.position.y = horse.baseY + bob;
+    }
+
+    // 캐러셀 바닥 탑승 플레이어 회전 물리
+    if (isPlaying) {
+      const cDist = Math.hypot(G.pos.x - cr.center.x, G.pos.z - cr.center.z);
+      if (cDist < cr.radius && G.pos.y < 2.2) {
+        // 중심축 기준 원주 회전 이동
+        const curAng = Math.atan2(G.pos.z - cr.center.z, G.pos.x - cr.center.x);
+        const nextAng = curAng + dAng;
+        const targetX = cr.center.x + Math.cos(nextAng) * cDist;
+        const targetZ = cr.center.z + Math.sin(nextAng) * cDist;
+        const dx = targetX - G.pos.x;
+        const dz = targetZ - G.pos.z;
+        if (dx) moveHorizontalAxis("x", dx);
+        if (dz) moveHorizontalAxis("z", dz);
+      }
+    }
+  }
+
+  // 4. 🚀 메가 자이로드롭 초고속 자유낙하 시퀀스 + 탑승 물리
+  if (AMUSEMENT_RIDES.gyro) {
+    const gy = AMUSEMENT_RIDES.gyro;
+    gy.prevY = gy.curY;
+
+    // 20초 주기 시퀀스: 0~10s 천천히 상승 / 10~13s 최정상 정지 / 13~15s 초고속 자유낙하 / 15~18s 브레이크
+    const cyc = t % 20;
+    let targetY = 3.0;
+
+    if (cyc < 10.0) {
+      // 0~10s: 서서히 회전하며 34m 높이까지 상승
+      targetY = 3.0 + (cyc / 10.0) * 31.0;
+      gy.rotAngle += dt * 0.45;
+    } else if (cyc < 13.0) {
+      // 10~13s: 최정상 긴장감 대기
+      targetY = 34.0;
+    } else if (cyc < 15.0) {
+      // 13~15s: 34m -> 4m 중력 가속 자유낙하!
+      const p = (cyc - 13.0) / 2.0;
+      targetY = 34.0 - (p * p) * 30.0;
+    } else if (cyc < 18.0) {
+      // 15~18s: 감속 정지
+      const p = (cyc - 15.0) / 3.0;
+      targetY = 4.0 - p * 1.0;
+    } else {
+      targetY = 3.0;
+    }
+
+    gy.curY = targetY;
+    gy.group.position.y = gy.curY;
+    gy.group.rotation.y = gy.rotAngle;
+
+    gy.box3.min.set(gy.center.x - 4.5, gy.curY - 0.2, gy.center.z - 4.5);
+    gy.box3.max.set(gy.center.x + 4.5, gy.curY + 0.6, gy.center.z + 4.5);
+
+    if (isPlaying) {
+      const gDist = Math.hypot(G.pos.x - gy.center.x, G.pos.z - gy.center.z);
+      if (gDist < 4.5 && gDist > 1.8 && Math.abs(G.pos.y - (gy.curY + 0.6)) < 1.0) {
+        const dy = gy.curY - gy.prevY;
+        G.pos.y += dy;
+      }
+    }
+  }
+
+  // 5. 🎢 롤러코스터 열차 주행 애니메이션
+  if (AMUSEMENT_RIDES.coaster) {
+    const rc = AMUSEMENT_RIDES.coaster;
+    const pts = rc.waypoints;
+    rc.prog = (rc.prog + dt * 0.12) % (pts.length - 1);
+    const idx = Math.floor(rc.prog);
+    const frac = rc.prog - idx;
+    const p1 = pts[idx], p2 = pts[idx + 1];
+
+    rc.group.position.set(p1.x + (p2.x - p1.x) * frac, p1.y + (p2.y - p1.y) * frac, p1.z + (p2.z - p1.z) * frac);
+    rc.group.lookAt(p2);
+  }
+
+  // 6. ☕ 회전 찻잔 이중 회전
+  if (AMUSEMENT_RIDES.teacups && AMUSEMENT_RIDES.teacups.length > 0) {
+    const mainAngle = t * 0.35;
+    for (let c = 0; c < AMUSEMENT_RIDES.teacups.length; c++) {
+      const tc = AMUSEMENT_RIDES.teacups[c];
+      const baseAng = mainAngle + (c * Math.PI * 2) / 3;
+      const cx = -38 + Math.cos(baseAng) * 4.2;
+      const cz = 28 + Math.sin(baseAng) * 4.2;
+      tc.group.position.set(cx, 0.4, cz);
+      tc.subAngle += dt * 1.8;
+      tc.group.rotation.y = tc.subAngle;
+    }
+  }
+}
+
+/* ================= 🎡 놀이동산 정리 함수 (Cleanup) ================= */
+function amusementCleanup() {
+  AMUSEMENT_RIDES = {
+    ferris: null,
+    viking: null,
+    carousel: null,
+    gyro: null,
+    coaster: null,
+    teacups: []
+  };
+
+  if (typeof ambientLight !== "undefined" && ambientLight && ambientLight.color && typeof ambientLight.color.setHex === "function") {
+    ambientLight.color.setHex(0xffffff);
+    ambientLight.intensity = 0.7;
+  }
+  if (typeof sun !== "undefined" && sun && sun.color && typeof sun.color.setHex === "function") {
+    sun.color.setHex(0xffe0b8);
+    sun.intensity = 0.5;
+  }
+}
+
+/* ================= 🎡 놀이동산 결과 위치 설명 ================= */
+function describeAmusementPosition(p) {
+  const high = p.y > 25 ? " · 놀이공원 최상공 상공" : p.y > 12 ? " · 높은 놀이기구 상층" : "";
+  if (p.x < -24 && p.z < -6) return "거대 회전관람차 곤돌라 주변" + high;
+  if (p.x > 24 && p.z < -6) return "스윙 바이킹 해적선 갑판 위" + high;
+  if (Math.abs(p.x) < 14 && Math.abs(p.z - 8) < 14) return "화려한 회전목마 플랫홈 위" + high;
+  if (p.x > 24 && p.z > 14) return "메가 자이로드롭 타워 승강장" + high;
+  if (p.x < -24 && p.z > 14) return "빙글빙글 회전 찻잔 속" + high;
+  if (Math.abs(p.x) < 14 && p.z < -24) return "오색 서커스 빅탑 텐트 안" + high;
+  if (Math.abs(p.x) < 14 && Math.abs(p.z + 10) < 10) return "카니발 무지개 분수대 주변" + high;
+  if (p.z > 36) return "원더 캐슬 성문 아치 근처" + high;
+  if (Math.abs(p.z - 22) < 8) return "팝콘 & 슬러시 카트 매점 뒤" + high;
+  return "원더 놀이동산 중앙 광장" + high;
+}
 
 window.G = G;
 window.isInkMode = isInkMode;
