@@ -1490,11 +1490,12 @@ function clearMap(){
 }
 
 function lambert(opt){ return new THREE.MeshLambertMaterial(opt); }
-function addBox(w,h,d,mat,x,y,z,{collide=true,sample=true,ry=0}={}){
+function addBox(w,h,d,mat,x,y,z,{collide=true,sample=true,rx=0,ry=0,rz=0}={}){
   const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);
-  m.position.set(x,y,z); if(ry)m.rotation.y=ry;
+  m.position.set(x,y,z);
+  if(rx||ry||rz) m.rotation.set(rx,ry,rz);
   mapRoot.add(m);
-  if(collide){ m.updateMatrixWorld(); colliders.push(new THREE.Box3().setFromObject(m)); }
+  if(collide){ m.updateMatrixWorld(true); colliders.push(new THREE.Box3().setFromObject(m)); }
   if(sample) samplables.push(m);
   return m;
 }
@@ -14398,20 +14399,25 @@ function buildZoo() {
   makeRoadSegment(roadW, 64, -26, 0);         // 서쪽 도로
   makeRoadSegment(roadW, 64, 26, 0);          // 동쪽 도로
 
-  // 도로 안전 펜스 (원목 가드레일)
+  // 도로 안전 펜스 (원목 가드레일 & 원목 기둥)
   const guardPostMat = lambert({color: 0x8a5a33});
   const guardRailMat = lambert({color: 0xc89d66});
-  const makeFence = (x1, z1, x2, z2) => {
-    const len = Math.hypot(x2 - x1, z2 - z1);
-    const cx = (x1 + x2) / 2, cz = (z1 + z2) / 2;
-    const ang = Math.atan2(x2 - x1, z2 - z1);
-    const rail = addBox(0.4, 0.35, len, guardRailMat, cx, 1.2, cz, {collide: true, sample: true});
-    rail.rotation.y = ang;
-  };
-  makeFence(-21, -27, 21, -27);
-  makeFence(-21, 27, 21, 27);
-  makeFence(-21, -27, -21, 27);
-  makeFence(21, -27, 21, 27);
+
+  // 북쪽 가드레일 (X: -21 ~ 21, Z = -27)
+  addBox(42, 0.35, 0.4, guardRailMat, 0, 1.2, -27, {collide: true, sample: true});
+  for (let px = -21; px <= 21; px += 7) addCyl(0.18, 1.4, guardPostMat, px, 0.7, -27, {collide: true});
+
+  // 남쪽 가드레일 (X: -21 ~ 21, Z = 27)
+  addBox(42, 0.35, 0.4, guardRailMat, 0, 1.2, 27, {collide: true, sample: true});
+  for (let px = -21; px <= 21; px += 7) addCyl(0.18, 1.4, guardPostMat, px, 0.7, 27, {collide: true});
+
+  // 서쪽 가드레일 (X = -21, Z: -27 ~ 27)
+  addBox(0.4, 0.35, 54, guardRailMat, -21, 1.2, 0, {collide: true, sample: true});
+  for (let pz = -21; pz <= 21; pz += 7) addCyl(0.18, 1.4, guardPostMat, -21, 0.7, pz, {collide: true});
+
+  // 동쪽 가드레일 (X = 21, Z: -27 ~ 27)
+  addBox(0.4, 0.35, 54, guardRailMat, 21, 1.2, 0, {collide: true, sample: true});
+  for (let pz = -21; pz <= 21; pz += 7) addCyl(0.18, 1.4, guardPostMat, 21, 0.7, pz, {collide: true});
 
   // 3) [테마 구역 1: 북서쪽 초원 사바나 - 기린 & 얼룩말 방사장] (x: -56 ~ -24, z: -46 ~ -14)
   const woodPostMat = lambert({color: 0x5a3d28});
@@ -14565,8 +14571,7 @@ function buildZoo() {
   const rockPlat1 = addBox(18, 5.0, 18, lionRockMat, 42, 2.5, 30, {collide: true, sample: true});
   const rockPlat2 = addBox(12, 6.0, 12, lionRockMat, 44, 7.5, 32, {collide: true, sample: true});
   // 튀어나온 곶 바위 (전망 곶)
-  const peakSpit = addBox(6.0, 1.5, 10.0, lionRockMat, 36, 10.5, 26, {collide: true, sample: true});
-  peakSpit.rotation.y = 0.35;
+  const peakSpit = addBox(6.0, 1.5, 10.0, lionRockMat, 36, 10.5, 26, {collide: true, sample: true, ry: 0.35});
 
   // 탄성 트램펄린 바위 (점프대 기믹)
   const jumpRockMesh = addCyl(2.6, 1.2, lambert({color: 0xd9822b}), 34, 1.2, 22, {collide: true, sample: true});
@@ -14663,6 +14668,8 @@ function buildZoo() {
   samplables.push(bLower); samplables.push(bRoof);
 
   const busTopBox = new THREE.Box3();
+  busTopBox.min.set(-26 - 2.7, 3.7, -32 - 5.2);
+  busTopBox.max.set(-26 + 2.7, 4.1, -32 + 5.2);
   colliders.push(busTopBox);
 
   ZOO_BUS = {
@@ -14706,14 +14713,14 @@ function buildZoo() {
     const pz = Math.sin(angle) * radius;
     const py = 1.6 + i * 1.65;
 
-    // 디딤판 메쉬 (올라탈 수 있는 판자)
-    const step = addBox(3.4, 0.45, 2.0, baobabWoodMat, px, py, pz, {collide: true, sample: true});
-    step.rotation.y = -angle;
+    // 디딤판 메쉬 (시각적 회전 적용)
+    addBox(3.4, 0.45, 2.0, baobabWoodMat, px, py, pz, {collide: false, sample: true, ry: -angle});
+    // 디딤판 실제 충돌체 (회전 박스 AABB 왜곡 없는 2.4x2.4 정사각 발판으로 투명 벽 발생 원천 방지)
+    addAABBCollider(px, py, pz, 2.4, 0.45, 2.4);
 
     // 나무 틈새/옹이 껍질 턱 (은신 가능한 틈 디테일)
     if (i % 2 === 1) {
-      const knot = addBox(1.2, 1.4, 0.5, baobabBarkMat, px * 0.88, py + 0.7, pz * 0.88, {collide: false});
-      knot.rotation.y = -angle;
+      addBox(1.2, 1.4, 0.5, baobabBarkMat, px * 0.88, py + 0.7, pz * 0.88, {collide: false, ry: -angle});
     }
   }
 
@@ -14767,22 +14774,22 @@ function buildZoo() {
     const brAng = (k * Math.PI) / 3;
     const bx = Math.cos(brAng) * 7.5;
     const bz = Math.sin(brAng) * 7.5;
-    const branch = addBox(1.4, 1.2, 8.5, baobabBarkMat, bx, 19.2, bz, {collide: true, sample: true});
-    branch.rotation.y = -brAng + Math.PI / 2;
+    // 시각적 가지 빔
+    addBox(1.4, 1.2, 8.5, baobabBarkMat, bx, 19.2, bz, {collide: false, sample: true, ry: -brAng + Math.PI / 2});
+    // 가지를 따라 딛고 걸을 수 있는 3개 정사각 충돌체 (회전 박스 AABB 왜곡 및 공중 투명벽 방지)
+    [5.0, 7.5, 10.0].forEach(dist => {
+      addAABBCollider(Math.cos(brAng) * dist, 19.2, Math.sin(brAng) * dist, 1.6, 1.2, 1.6);
+    });
 
-    // 가지 끝 풍성한 우산형 잎 덩어리
-    const foliage = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 5.4, 2.4, 8), k % 2 === 0 ? baobabLeafMat1 : baobabLeafMat2);
-    foliage.position.set(Math.cos(brAng) * 11.0, 21.0, Math.sin(brAng) * 11.0);
-    mapRoot.add(foliage);
-    samplables.push(foliage);
+    // 가지 끝 풍성한 우산형 잎 덩어리 (충돌체 추가: 캐릭터가 잎 내부로 겹치지 않고 잎 위에 올라설 수 있음)
+    const fx = Math.cos(brAng) * 11.0;
+    const fz = Math.sin(brAng) * 11.0;
+    addCyl(5.2, 2.4, k % 2 === 0 ? baobabLeafMat1 : baobabLeafMat2, fx, 21.0, fz, {collide: true, sample: true, rt: 4.2});
   }
   // 최상층 전망대 원형 데크 (Y=20.0, 플레이어가 올라설 수 있음)
   addCyl(4.4, 0.6, baobabWoodMat, 0, 20.0, 0, {collide: true, sample: true});
-  // 중앙 우듬지 잎
-  const topCrown = new THREE.Mesh(new THREE.CylinderGeometry(3.5, 5.0, 2.8, 8), baobabLeafMat1);
-  topCrown.position.set(0, 22.2, 0);
-  mapRoot.add(topCrown);
-  samplables.push(topCrown);
+  // 중앙 우듬지 잎 (충돌체 추가: 머리나 몸통이 초록 잎 내부로 파고들지 않고 상단에 착지 가능)
+  addCyl(4.8, 2.8, baobabLeafMat1, 0, 22.2, 0, {collide: true, sample: true, rt: 3.5});
 
   // 8.6) [자유롭게 돌아다니는 작은 동물들 (토끼, 병아리, 강아지, 고양이 13마리)]
   const rabbitMat = lambert({color: 0xfbfbf8});
