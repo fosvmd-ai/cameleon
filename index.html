@@ -235,6 +235,9 @@ label.chk input{width:20px;height:20px;}
 #btnWallStick{font-size:12px;padding:7px 11px;border-radius:12px;background:rgba(255,248,231,.95);
   box-shadow:2px 2px 0 rgba(0,0,0,.3);max-width:min(46vw,200px);white-space:normal;line-height:1.2;}
 #btnWallStick.on{background:#e53e3e;color:#fff;font-weight:bold;}
+#btnUnstuck{font-size:12px;padding:7px 11px;border-radius:12px;background:rgba(255,248,231,.95);
+  box-shadow:2px 2px 0 rgba(0,0,0,.3);max-width:min(46vw,200px);white-space:nowrap;line-height:1.2;font-weight:bold;color:#111;}
+#btnUnstuck.cd{background:rgba(200,200,200,.78);color:#555;cursor:not-allowed;}
 #roleCard{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:60;pointer-events:none;}
 #roleCard .card{background:var(--cream);border:5px solid var(--ink);border-radius:20px;padding:26px 40px;
   font-size:clamp(22px,5vw,34px);box-shadow:8px 8px 0 rgba(0,0,0,.4);transform:scale(.6);opacity:0;
@@ -772,6 +775,7 @@ if (typeof window.TEACHER_CODE === "undefined" || !window.TEACHER_CODE) window.T
     <button id="btnShowQR" class="hidden">🔗 QR 보여주기</button>
     <button id="btnSpectate" class="hidden">👀 숨기 완료 · 구경하기</button>
     <button id="btnWallStick" class="hidden">🕷️ 벽 붙기[R]</button>
+    <button id="btnUnstuck" class="hidden">🆘 끼임 탈출[T]</button>
   </div>
 </div>
 
@@ -3020,7 +3024,7 @@ function buildLibrary(){
     // 바싹 겹치는 곁잎 뭉치(장식) — 큰 구와 붙어 하나의 풍성한 공처럼 보임
     [[-1.3,4.4,0.3,1.5,0x4a9a3f],[1.3,4.5,-0.2,1.5,0x4a9a3f],[0.2,4.3,1.3,1.4,0x4a9a3f],[0,6.2,0,1.5,0x63b055],[-0.6,5.7,0.6,1.2,0x6ab853]]
       .forEach(([ox,oy,oz,r,cc])=>{ const b=new THREE.Mesh(new THREE.SphereGeometry(r*s,9,7),lambert({color:cc}));
-        b.position.set(x+ox*s,oy*s,z+oz*s); mapRoot.add(b); samplables.push(b); });
+        b.position.set(x+ox*s,oy*s,z+oz*s); mapRoot.add(b); samplables.push(b); addMeshCollider(b,0.02*s); });
   };
   [[0,-15,1.2],[0,15,1.2],[-40,32,1.3],[40,22,1.3],[40,-30,1.1]].forEach(([x,z,s])=>libTree(x,z,s));
   // 서가 분류 라벨(파란 배너, 이미지 3) — 각 서가 정면(-z) 끝
@@ -5520,6 +5524,89 @@ function toggleSpectatorMode(force){
 }
 $("btnSpectate").onclick=()=>{Audio2.resume();toggleSpectatorMode();};
 if($("btnWallStick")) $("btnWallStick").onclick=()=>{Audio2.resume();toggleWallStick();};
+function updateUnstuckButton(){
+  const b = $("btnUnstuck");
+  if(!b) return;
+  const visible = (G.screen==="GAME" && !G.spectating && G.role!=="ghost" && G.role!=="tv");
+  b.classList.toggle("hidden", !visible);
+  if(!visible) return;
+  const now = performance.now();
+  const rem = Math.ceil(((G.unstuckCdUntil || 0) - now) / 1000);
+  if(rem > 0){
+    b.classList.add("cd");
+    b.textContent = `⏳ 탈출 (${rem}초)`;
+  } else {
+    b.classList.remove("cd");
+    b.textContent = IS_TOUCH ? "🆘 끼임 탈출" : "🆘 끼임 탈출[T]";
+  }
+}
+function performUnstuck(){
+  if(G.screen!=="GAME" || G.spectating || G.role==="ghost" || G.role==="tv") return;
+  if(G.frozen){ toast("🧊 선생님이 얼음을 걸어 움직일 수 없습니다!"); return; }
+  if(G.iceFrozen){ toast("🧊 얼음 상태에서는 사용할 수 없습니다!"); return; }
+  if(G.copsState==="imprisoned" || G.copsState==="captured"){ toast("🔒 수감/연행 중에는 사용할 수 없습니다!"); return; }
+
+  const now = performance.now();
+  if(now < (G.unstuckCdUntil || 0)){
+    const rem = Math.ceil((G.unstuckCdUntil - now) / 1000);
+    toast(`⏳ 끼임 탈출 쿨타임 중입니다 (${rem}초 남음)`);
+    return;
+  }
+
+  const isPosClear = (px, py, pz) => {
+    const oldX = G.pos.x, oldY = G.pos.y, oldZ = G.pos.z;
+    G.pos.set(px, py, pz);
+    const box = setPlayerBox();
+    let blocked = false;
+    for(const c of colliders){
+      if(solidOverlap(box, c)){ blocked = true; break; }
+    }
+    G.pos.set(oldX, oldY, oldZ);
+    return !blocked && Math.abs(px) < ROOM_W/2 - 1 && Math.abs(pz) < ROOM_D/2 - 1 && py >= 0 && py < WALL_H - 2;
+  };
+
+  let escaped = false;
+  const offsets = [
+    [0, 2.5, 0], [0, 4.5, 0],
+    [2.8, 0.5, 0], [-2.8, 0.5, 0], [0, 0.5, 2.8], [0, 0.5, -2.8],
+    [4.5, 1.5, 0], [-4.5, 1.5, 0], [0, 1.5, 4.5], [0, 1.5, -4.5]
+  ];
+  for(const [ox, oy, oz] of offsets){
+    const tx = G.pos.x + ox, ty = Math.max(0.2, G.pos.y + oy), tz = G.pos.z + oz;
+    if(isPosClear(tx, ty, tz)){
+      G.pos.set(tx, ty, tz);
+      escaped = true;
+      break;
+    }
+  }
+
+  if(!escaped){
+    const pool = (G.role==="seeker" && seekerSpawns.length) ? seekerSpawns : (hiderSpawns.length ? hiderSpawns : seekerSpawns);
+    for(const sp of pool){
+      if(isPosClear(sp.x, sp.y + 0.3, sp.z)){
+        G.pos.set(sp.x, sp.y + 0.3, sp.z);
+        escaped = true;
+        break;
+      }
+    }
+    if(!escaped && pool.length){
+      const sp = pool[0];
+      G.pos.set(sp.x, sp.y + 0.5, sp.z);
+      escaped = true;
+    }
+  }
+
+  G.vy = 0;
+  G.wallStuck = false;
+  G.wallCollider = null;
+  if(typeof updateWallStickButton === "function") updateWallStickButton();
+  G.unstuckCdUntil = now + 60000;
+  updateUnstuckButton();
+  Audio2.sfxJump();
+  burst(G.pos.clone().add(new THREE.Vector3(0, 0.8, 0)), "#4aa8ff", 10, 3.0, 0.45);
+  toast("🆘 끼임 탈출 완료! (쿨타임 60초)");
+}
+if($("btnUnstuck")) $("btnUnstuck").onclick=()=>{Audio2.resume();performUnstuck();};
 $("btnShowQR").onclick=()=>{Audio2.resume();openQRZoom();};
 
 /* ================= 이동/충돌 ================= */
@@ -6378,7 +6465,7 @@ $("panelToggle").onclick=()=>{
 
 /* ================= 술래 판정 ================= */
 // 술래 사정거리: 조금 떨어져 있어도 잡을 수 있도록 넉넉하게 잡습니다. (2칸 더 늘림)
-const JUDGE_RANGE=13;
+const JUDGE_RANGE=18;
 const judgeRay=new THREE.Raycaster();
 const occlusionRay=new THREE.Raycaster();
 const _judgeCenter=new THREE.Vector3();
@@ -6461,8 +6548,9 @@ async function tryJudge(cx,cy){
       _judgeToTarget.normalize();
       const dot=clamp(_judgeToTarget.dot(judgeRay.ray.direction),-1,1);
       const angle=Math.acos(dot);
-      const allowedAngle=Math.atan2(0.8,distance)+0.045;
-      if(angle>allowedAngle)return;
+      const bodyDist=G.pos ? G.pos.distanceTo(_judgeCenter) : distance;
+      const allowedAngle=(distance<=5.0) ? (Math.PI/2.8) : (Math.atan2(2.2,distance)+0.14);
+      if(angle>allowedAngle && bodyDist>2.8)return;
       if(isJudgeBlocked(_judgeCenter,distance))return;
 
       const score=angle*4+distance*0.01;
@@ -6546,6 +6634,7 @@ addEventListener("keydown",e=>{
   if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space","Tab"].includes(e.code))e.preventDefault();
   if(G.screen!=="GAME")return;
   if(e.code==="KeyE")setMirror(!G.mirror);
+  if((e.code==="KeyT" || key==="t" || key==="ㅅ") && !e.repeat) { performUnstuck(); }
   if((e.code==="KeyR" || key==="r" || key==="ㄱ") && !e.repeat) {
     toggleWallStick();
   }
@@ -11930,6 +12019,7 @@ function loop(){
   // 그 이동만큼 함께 따라가도록 매 프레임 반영합니다(카메라 자유이동과는 별개).
   if(G.spectating)_specGimmickPrev.copy(G.pos);
   updateMapGimmicks(dt);   // 신규 맵 기믹(과학실 정전·급식실 3종·도서관 책수레). 화면 무관 호출로 조명 복구 보장.
+  if(typeof updateUnstuckButton === 'function') updateUnstuckButton();
   if(G.spectating){ G.specAnchorPos.add(_specGimmickDelta.copy(G.pos).sub(_specGimmickPrev)); syncLocalFairy(); }
   renderer.render(scene,camera);
 }
@@ -12900,6 +12990,7 @@ function buildLavaMap() {
     mesh.rotation.y = ry;
     mapRoot.add(mesh);
     samplables.push(mesh);
+    addMeshCollider(mesh);
     LAVA_WATERFALLS.push({mesh, x, z, y, tex: texWaterfall});
   };
   makeWaterfall(-62, 11, -55, 10, 22, 1.2, 0);
@@ -12937,10 +13028,8 @@ function buildLavaMap() {
 
   for (let i = -3; i <= 3; i++) {
     const rX = i * 6;
-    const ribL = addCyl(1.2, 16, boneMat, rX, 10, -18, {collide: true});
-    ribL.rotation.z = 0.35;
-    const ribR = addCyl(1.2, 16, boneMat, rX, 10, -6, {collide: true});
-    ribR.rotation.z = -0.35;
+    addCyl(1.2, 16, boneMat, rX, 10, -18, {collide: true, rz: 0.35});
+    addCyl(1.2, 16, boneMat, rX, 10, -6, {collide: true, rz: -0.35});
   }
   addBox(8, 6, 10, boneMat, 24, 15, -12);
   addCyl(1.0, 6, boneMat, 22, 19, -15, {collide: true});
@@ -12948,9 +13037,8 @@ function buildLavaMap() {
 
   function createCrystalCluster(x, y, z, mat, count = 5) {
     for (let i = 0; i < count; i++) {
-      const c = addCyl(0.8 + Math.random() * 0.8, 4 + Math.random() * 5, mat, x + (Math.random() - 0.5) * 3, y + 2, z + (Math.random() - 0.5) * 3, {collide: true});
-      c.rotation.x = (Math.random() - 0.5) * 0.5;
-      c.rotation.z = (Math.random() - 0.5) * 0.5;
+      const rx = (Math.random() - 0.5) * 0.5, rz = (Math.random() - 0.5) * 0.5;
+      addCyl(0.8 + Math.random() * 0.8, 4 + Math.random() * 5, mat, x + (Math.random() - 0.5) * 3, y + 2, z + (Math.random() - 0.5) * 3, {collide: true, rx, rz});
     }
   }
   createCrystalCluster(80, 28, -55, purpleCrystalMat, 7);
@@ -13521,10 +13609,15 @@ function buildMazeMap() {
   function addBranchCatwalk(x1, z1, x2, z2, y) {
     const dX = x2 - x1, dZ = z2 - z1;
     const len = Math.hypot(dX, dZ);
-    const branch = addCyl(1.8, len, woodMat, (x1 + x2)/2, y, (z1 + z2)/2, {collide: true});
+    const branch = addCyl(1.8, len, woodMat, (x1 + x2)/2, y, (z1 + z2)/2, {collide: false});
     branch.rotation.y = Math.atan2(dX, dZ);
     branch.rotation.z = Math.PI / 2;
     samplables.push(branch);
+    const steps = Math.max(2, Math.ceil(len / 2.5));
+    for (let s = 0; s <= steps; s++) {
+      const f = s / steps;
+      addAABBCollider(x1 + dX * f, y, z1 + dZ * f, 3.0, 2.8, 3.0);
+    }
   }
   addBranchCatwalk(-27, -18, -45, -45, 14);
   addBranchCatwalk(27, -18, 45, -45, 14);
@@ -13815,13 +13908,13 @@ function buildValley() {
     addCyl(0.4 * scale, 4.0 * scale, trunkWoodMat, tx, 2.0 * scale, tz, {collide: true, sample: true});
     const c1 = new THREE.Mesh(new THREE.ConeGeometry(3.0 * scale, 3.8 * scale, 8), pineDarkMat);
     c1.position.set(tx, 4.2 * scale, tz);
-    mapRoot.add(c1); samplables.push(c1);
+    mapRoot.add(c1); samplables.push(c1); addMeshCollider(c1);
     const c2 = new THREE.Mesh(new THREE.ConeGeometry(2.3 * scale, 3.2 * scale, 8), pineMidMat);
     c2.position.set(tx, 6.2 * scale, tz);
-    mapRoot.add(c2); samplables.push(c2);
+    mapRoot.add(c2); samplables.push(c2); addMeshCollider(c2);
     const c3 = new THREE.Mesh(new THREE.ConeGeometry(1.5 * scale, 2.6 * scale, 8), broadLimeMat);
     c3.position.set(tx, 8.0 * scale, tz);
-    mapRoot.add(c3); samplables.push(c3);
+    mapRoot.add(c3); samplables.push(c3); addMeshCollider(c3);
   };
 
   // (B) 풍성한 활엽수 / 참나무 (Broadleaf Oak Tree - 둥근 엽륜 구체 클러스터)
@@ -13837,7 +13930,7 @@ function buildValley() {
     subOffsets.forEach(([ox, oy, oz]) => {
       const sub = new THREE.Mesh(new THREE.SphereGeometry(2.0 * scale, 10, 8), broadLimeMat);
       sub.position.set(tx + ox * scale, oy * scale, tz + oz * scale);
-      mapRoot.add(sub); samplables.push(sub);
+      mapRoot.add(sub); samplables.push(sub); addMeshCollider(sub);
     });
   };
 
@@ -13849,7 +13942,7 @@ function buildValley() {
       const cy = (4.5 + b * 1.5) * scale;
       const bCanopy = new THREE.Mesh(new THREE.SphereGeometry(1.6 * scale, 8, 8), broadLimeMat);
       bCanopy.position.set(tx + (b % 2 === 0 ? 0.8 : -0.8) * scale, cy, tz);
-      mapRoot.add(bCanopy); samplables.push(bCanopy);
+      mapRoot.add(bCanopy); samplables.push(bCanopy); addMeshCollider(bCanopy);
     }
   };
 
@@ -14157,8 +14250,7 @@ function buildValley() {
   const coolerLidMat = lambert({color: 0x3182ce});
   addBox(4.6, 2.4, 3.2, coolerBodyMat, 44, 1.2, -6, {collide: true, sample: true});
   addBox(4.0, 0.2, 2.6, coolerInsideMat, 44, 2.3, -6, {collide: false, sample: true});
-  const coolerLid = addBox(4.6, 0.4, 3.2, coolerLidMat, 44, 3.2, -7.5, {collide: true, sample: true});
-  coolerLid.rotation.x = 0.65;
+  const coolerLid = addBox(4.6, 0.4, 3.2, coolerLidMat, 44, 3.2, -7.5, {collide: true, sample: true, rx: 0.65});
 
   [0xe53e3e, 0x38a169, 0xd69e2e].forEach((cc, idx) => {
     addCyl(0.35, 1.2, lambert({color: cc}), 38 + idx * 1.5, 0.6, -2, {collide: true, sample: true});
@@ -14402,10 +14494,10 @@ function buildZoo() {
     // 아카시아 특유의 넓적한 평평한 수관
     const c1 = new THREE.Mesh(new THREE.CylinderGeometry(4.2 * s, 4.6 * s, 1.2 * s, 8), leafGreenMat);
     c1.position.set(tx, 6.5 * s, tz);
-    mapRoot.add(c1); samplables.push(c1);
+    mapRoot.add(c1); samplables.push(c1); addMeshCollider(c1);
     const c2 = new THREE.Mesh(new THREE.CylinderGeometry(2.4 * s, 2.8 * s, 1.0 * s, 8), leafBrightMat);
     c2.position.set(tx, 7.6 * s, tz);
-    mapRoot.add(c2); samplables.push(c2);
+    mapRoot.add(c2); samplables.push(c2); addMeshCollider(c2);
   };
 
   [-58, -40, -22, 22, 40, 58].forEach(tx => {
@@ -14481,8 +14573,7 @@ function buildZoo() {
   // 기린 몸통
   addBox(5.0, 3.6, 6.5, giraffeMat, gX, 8.5, gZ, {collide: true, sample: true});
   // 기린 긴 목 (등반 가능)
-  const gNeck = addCyl(0.7, 7.5, giraffeMat, gX, 13.0, gZ + 2.2, {collide: true, sample: true});
-  gNeck.rotation.x = -0.25;
+  const gNeck = addCyl(0.7, 7.5, giraffeMat, gX, 13.0, gZ + 2.2, {collide: true, sample: true, rx: -0.25});
   // 기린 머리 & 뿔
   addBox(1.8, 1.6, 2.8, giraffeMat, gX, 16.5, gZ + 3.2, {collide: true, sample: true});
   addCyl(0.12, 1.0, giraffeDarkMat, gX - 0.5, 17.6, gZ + 2.8, {collide: false});
@@ -14496,8 +14587,7 @@ function buildZoo() {
   [[-0.8, -1.3], [0.8, -1.3], [-0.8, 1.3], [0.8, 1.3]].forEach(([dx, dz]) => {
     addCyl(0.25, 2.5, zebraMat, zX + dx, 1.25, zZ + dz, {collide: true});
   });
-  const zHead = addBox(1.2, 1.4, 2.0, zebraMat, zX, 4.4, zZ + 1.8, {collide: true, sample: true});
-  zHead.rotation.x = 0.35;
+  const zHead = addBox(1.2, 1.4, 2.0, zebraMat, zX, 4.4, zZ + 1.8, {collide: true, sample: true, rx: 0.35});
   ZOO_ANIMALS.push({name: "얼룩말", type: "zebra", mesh: zHead, baseY: 4.4});
 
   // 사바나 건초더미 & 먹이통
@@ -14527,7 +14617,7 @@ function buildZoo() {
   // 머리
   const pandaHead = new THREE.Mesh(new THREE.SphereGeometry(2.0, 12, 12), pandaWhiteMat);
   pandaHead.position.set(pX, 5.2, pZ + 0.8);
-  mapRoot.add(pandaHead); samplables.push(pandaHead);
+  mapRoot.add(pandaHead); samplables.push(pandaHead); addMeshCollider(pandaHead);
   // 귀 2개
   const pEarL = new THREE.Mesh(new THREE.SphereGeometry(0.65, 8, 8), pandaBlackMat);
   pEarL.position.set(pX - 1.5, 6.8, pZ + 0.6);
@@ -14604,7 +14694,7 @@ function buildZoo() {
   });
   const polarHead = new THREE.Mesh(new THREE.SphereGeometry(1.6, 10, 10), snowMat);
   polarHead.position.set(bearX, 4.4, bearZ + 2.8);
-  mapRoot.add(polarHead); samplables.push(polarHead);
+  mapRoot.add(polarHead); samplables.push(polarHead); addMeshCollider(polarHead);
   ZOO_ANIMALS.push({name: "북극곰", type: "polarbear", mesh: polarHead, baseY: 4.4});
 
   // 6) [테마 구역 4: 남동쪽 맹수 사자의 바위 & 거대 코끼리] (x: 24 ~ 56, z: 14 ~ 46)
@@ -14629,7 +14719,7 @@ function buildZoo() {
   addBox(2.2, 2.0, 4.0, lionGoldMat, lionX, 12.0, lionZ, {collide: true, sample: true});
   const lionMane = new THREE.Mesh(new THREE.SphereGeometry(1.8, 12, 12), lionManeMat);
   lionMane.position.set(lionX, 13.5, lionZ - 1.8);
-  mapRoot.add(lionMane); samplables.push(lionMane);
+  mapRoot.add(lionMane); samplables.push(lionMane); addMeshCollider(lionMane);
   ZOO_ANIMALS.push({name: "사자", type: "lion", mesh: lionMane, baseY: 13.5});
 
   // (I) 아프리카 거대 코끼리 조각 (Elephant Statue)
@@ -14644,9 +14734,8 @@ function buildZoo() {
   // 코끼리 머리와 긴 코
   const elHead = new THREE.Mesh(new THREE.SphereGeometry(2.4, 10, 10), elephantGrayMat);
   elHead.position.set(elX, 6.5, elZ - 3.8);
-  mapRoot.add(elHead); samplables.push(elHead);
-  const elTrunk = addCyl(0.45, 4.5, elephantGrayMat, elX, 4.5, elZ - 5.5, {collide: true});
-  elTrunk.rotation.x = -0.4;
+  mapRoot.add(elHead); samplables.push(elHead); addMeshCollider(elHead);
+  const elTrunk = addCyl(0.45, 4.5, elephantGrayMat, elX, 4.5, elZ - 5.5, {collide: true, rx: -0.4});
   // 상아 2개
   const tuskL = addCyl(0.18, 3.2, tuskIvoryMat, elX - 1.4, 5.2, elZ - 5.0, {collide: false});
   tuskL.rotation.x = -0.6; tuskL.rotation.z = -0.2;
@@ -15466,6 +15555,7 @@ function buildAmusement() {
   const centerPillar = new THREE.Mesh(new THREE.CylinderGeometry(2.0, 2.2, 7.5, 12), carouselGoldMat);
   centerPillar.position.y = 4.0;
   carouselGroup.add(centerPillar);
+  addCyl(2.2, 7.5, carouselGoldMat, cX, 4.0, cZ, {collide: true, sample: true, rt: 2.0});
 
   // 회전목마 원뿔 지붕 (단단한 상단 충돌체 지원)
   const cRoof = new THREE.Mesh(new THREE.ConeGeometry(9.2, 4.0, 16), carouselRoofMat);
