@@ -174,6 +174,17 @@ label.chk input{width:20px;height:20px;}
 #customizerBox{position:fixed;inset:0;z-index:85;display:flex;align-items:center;justify-content:center;
   background:rgba(15,22,32,.65);backdrop-filter:blur(3px);padding:12px;pointer-events:auto;}
 #customizerBox.hidden{display:none;}
+#hostHiderBox{position:fixed;inset:0;z-index:86;display:flex;align-items:center;justify-content:center;
+  background:rgba(15,22,32,.55);padding:14px;pointer-events:auto;}
+#hostHiderBox.hidden{display:none;}
+#hostHiderBox .hhCard{background:var(--cream);border:3px solid var(--ink);border-radius:16px;
+  padding:16px 18px;max-width:460px;width:100%;max-height:82vh;overflow-y:auto;
+  box-shadow:5px 5px 0 rgba(0,0,0,.3);}
+.hhRow{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;
+  background:#fff;border:2px solid var(--ink);border-radius:10px;margin-bottom:6px;font-size:13px;}
+.hhInfo{display:flex;flex-direction:column;gap:2px;text-align:left;}
+.hhBtns{display:flex;gap:5px;flex-shrink:0;}
+.hhBtns button{padding:5px 9px;font-size:12px;}
 #customizerBox .custCard{background:var(--cream);border:3px solid var(--ink);border-radius:18px;
   padding:16px 18px;max-width:740px;width:100%;max-height:92vh;overflow-y:auto;
   box-shadow:6px 6px 0 rgba(0,0,0,.32);}
@@ -813,6 +824,7 @@ if (typeof window.TEACHER_CODE === "undefined" || !window.TEACHER_CODE) window.T
     <div class="tpRow"><button id="btnFreeze">🧊 얼음! (움직임 멈춤)</button></div>
     <div class="tpRow"><button id="btnBlackout" class="hidden">⚡ 정전 기믹 켜짐 (끄기)</button></div>
     <div class="tpRow"><button id="btnToggleTV">📺 TV 전체 조망</button></div>
+    <div class="tpRow"><button id="btnHostHiderList">👀 숨은 지우개 관리</button></div>
   </div>
 </div>
 
@@ -873,6 +885,20 @@ if (typeof window.TEACHER_CODE === "undefined" || !window.TEACHER_CODE) window.T
   </div>
 </div>
 
+<div id="hostHiderBox" class="hidden">
+  <div class="hhCard">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <h3 style="margin:0;">👀 숨은 지우개 관리</h3>
+      <button id="btnHostHiderRefresh" class="secondary" style="padding:4px 8px;font-size:12px;">🔄 새로고침</button>
+    </div>
+    <div class="note" style="margin:0 0 10px;text-align:left;">끼어 있거나 이상한 곳에 숨은 지우개를 관찰하고 랜덤 위치로 재배치할 수 있어요.</div>
+    <div id="hostHiderList"></div>
+    <div class="row" style="margin-top:10px;justify-content:flex-end;">
+      <button id="btnHostHiderClose" class="secondary">닫기</button>
+    </div>
+  </div>
+</div>
+
 <div id="lobbyPracticeBox" class="hidden">
   <div class="lpCard">
     <h3 style="margin-bottom:6px;">🎮 기다리며 연습</h3>
@@ -899,6 +925,7 @@ if (typeof window.TEACHER_CODE === "undefined" || !window.TEACHER_CODE) window.T
     <div id="tvFollowName">술래 없음</div>
     <button id="tvFollowNext">▶</button>
     <button id="tvFollowWide" title="전체 조망">🏫</button>
+    <button id="tvFollowRespawn" class="hidden" title="이 지우개 랜덤 위치로 이동">🎲 재배치</button>
   </div>
   <button id="btnTvSpectateToggle" class="hidden">👀 자유 시점 ↔ 📺 TV</button>
   <button id="btnPracticeReturn" class="hidden">↩ 우리 반 게임방으로 돌아가기</button>
@@ -7504,6 +7531,7 @@ const Net={
     onChildAdded(pref,s=>{ 
       this.players[s.key]=s.val(); 
       if (s.key === this.uid) {
+        G._lastRespawnNonce = s.val().respawnNonce || 0;
         G.zombieState = s.val().zombieState || 0;
         G.teamId = s.val().teamId || "team1";
         G.teamColor = TEAM_COLORS[G.teamId]?.color || "#FF3B30";
@@ -7539,6 +7567,10 @@ const Net={
         G.imprisoned = !!after.imprisoned;
         if (after.invincibleTimer !== undefined && after.invincibleTimer > G.invincibleTimer) {
           G.invincibleTimer = after.invincibleTimer;
+        }
+        if (after.respawnNonce && after.respawnNonce !== G._lastRespawnNonce) {
+          G._lastRespawnNonce = after.respawnNonce;
+          if (typeof applyHostRandomRespawn === "function") applyHostRandomRespawn();
         }
         if (typeof isCopsMode === "function" && isCopsMode()) {
           if (!prevEsc && G.escortedBy) {
@@ -7938,6 +7970,13 @@ const Net={
     this.fb.update(this.fb.ref(this.db,`rooms/${this.code}/meta`),{frozen:!!on}).catch(()=>{});
   },
   toggleFrozen(){ this.setFrozen(!this.meta.frozen); },
+  respawnHiderRandom(uid){
+    if(!G.isHost||this.mode!=="online"||!uid)return;
+    const p=this.players[uid];
+    this.fb.update(this.fb.ref(this.db,"rooms/"+this.code+"/players/"+uid),{respawnNonce:Date.now()}).then(()=>{
+      toast("🎲 "+((p&&p.nick)||"지우개")+"님을 랜덤 위치로 재배치했어요!");
+    }).catch(()=>{ toast("재배치 요청에 실패했어요."); });
+  },
   /* ── v2: 라운드 통계 (세션 내에서만 유지, 방 삭제 시 소멸) ── */
   async recordRoundStats(winner){
     if(!G.isHost||this.mode!=="online")return;
@@ -9783,14 +9822,93 @@ $("btnBlackout").onclick=()=>{Audio2.resume();
   toast(off?"⚡ 정전 기믹을 켰어요":"💡 정전 기믹을 껐어요");
 };
 
+let hostWatchUid=null;
+function applyHostRandomRespawn(){
+  if(G.role!=="hider"||G.found||G.screen!=="GAME")return;
+  if(G.wallStuck&&typeof detachFromWall==="function")detachFromWall(false);
+  G.flying=false;G.flyUp=false;G.flyDown=false;G.vy=0;G.pose="stand";
+  const pool=(typeof hiderSpawns!=="undefined"&&hiderSpawns.length)?hiderSpawns:[];
+  if(pool.length){
+    let candidates=pool;
+    if(pool.length>1){
+      let far=pool.filter(sp=>sp.distanceTo(G.pos)>4);
+      if(far.length)candidates=far;
+    }
+    const sp=candidates[Math.floor(Math.random()*candidates.length)];
+    G.pos.copy(sp);
+  }else{
+    G.pos.set((Math.random()-0.5)*16,0,(Math.random()-0.5)*16);
+  }
+  if(typeof resolveClipping==="function")resolveClipping();
+  G.lastPosSent="";
+  Audio2.sfxRefill();
+  toast("🎲 방장이 새로운 랜덤 위치로 이동시켰어요!");
+  syncLocalFairy();
+  updateMobileButtons();
+}
+function activeHiderList(){
+  return Object.entries(Net.players||{}).filter(([u,p])=>{
+    if(!p||p.role!=="hider"||p.found)return false;
+    const pr=Net.presence&&Net.presence[u];
+    return u===Net.uid||!pr||pr.online!==false;
+  });
+}
+function renderHostHiderList(){
+  const box=$("hostHiderList");if(!box)return;
+  const list=activeHiderList();
+  if(!list.length){
+    box.innerHTML='<div class="note" style="text-align:center;padding:12px;">현재 숨어있는 지우개가 없어요.</div>';
+    return;
+  }
+  box.innerHTML="";
+  list.forEach(([u,p])=>{
+    const row=document.createElement("div");row.className="hhRow";
+    const r=remotes.get(u);
+    const stuckWall=r&&r.target&&r.target.wallStuck;
+    const info=document.createElement("div");info.className="hhInfo";
+    info.innerHTML="<strong>"+escapeHtml(p.nick||"지우개")+"</strong><span style='font-size:11px;opacity:.72;'>"+(stuckWall?"🧗 벽붙기 중":"🙈 숨는 중")+"</span>";
+    const btns=document.createElement("div");btns.className="hhBtns";
+    const btnWatch=document.createElement("button");btnWatch.className="secondary";btnWatch.textContent="👁️ 보기";
+    btnWatch.onclick=()=>{
+      Audio2.resume();
+      hostWatchUid=u;
+      if(!G.tvMode)toggleTVMode(true);
+      tvFollowYaw=0;
+      $("hostHiderBox").classList.add("hidden");
+      updateTeacherPanelUI();
+    };
+    const btnMove=document.createElement("button");btnMove.className="blue";btnMove.textContent="🎲 랜덤 이동";
+    btnMove.onclick=()=>{
+      Audio2.resume();
+      Net.respawnHiderRandom(u);
+    };
+    btns.appendChild(btnWatch);btns.appendChild(btnMove);
+    row.appendChild(info);row.appendChild(btns);
+    box.appendChild(row);
+  });
+}
+if($("btnHostHiderList"))$("btnHostHiderList").onclick=()=>{
+  Audio2.resume();
+  renderHostHiderList();
+  $("hostHiderBox").classList.remove("hidden");
+};
+if($("btnHostHiderRefresh"))$("btnHostHiderRefresh").onclick=()=>{Audio2.resume();renderHostHiderList();};
+if($("btnHostHiderClose"))$("btnHostHiderClose").onclick=()=>$("hostHiderBox").classList.add("hidden");
+if($("hostHiderBox"))$("hostHiderBox").onclick=e=>{if(e.target===$("hostHiderBox"))$("hostHiderBox").classList.add("hidden");};
+if($("tvFollowRespawn"))$("tvFollowRespawn").onclick=()=>{
+  Audio2.resume();
+  if(hostWatchUid)Net.respawnHiderRandom(hostWatchUid);
+};
+
 function toggleTVMode(force){
   G.tvMode=typeof force==="boolean"?force:!G.tvMode;
   $("tvHud").classList.toggle("hidden",!G.tvMode);
   $("btnToggleTV").textContent=G.tvMode?"📺 TV 모드 끄기":"📺 TV 전체 조망";
   $("tvFollowBar").classList.toggle("hidden",!G.tvMode);
   tvYaw=0;
+  if(!G.tvMode)hostWatchUid=null;
   // TV를 켜면 첫 번째 술래부터 비춥니다.
-  if(G.tvMode){ tvFollowIdx=0; tvFollowYaw=0; }
+  if(G.tvMode&&!hostWatchUid){ tvFollowIdx=0; tvFollowYaw=0; }
 }
 $("btnToggleTV").onclick=()=>{Audio2.resume();toggleTVMode();};
 $("btnTvSpectateToggle").onclick=()=>{Audio2.resume();toggleTVMode();};
@@ -9806,8 +9924,17 @@ function tvSeekerList(){
   });
 }
 function tvCycleFollow(delta){
+  if(delta===0){ hostWatchUid=null; tvFollowIdx=-1; return; }        // 전체 조망
+  if(hostWatchUid){
+    const hList=activeHiderList().map(([u])=>u);
+    if(!hList.length){ hostWatchUid=null; tvFollowIdx=-1; return; }
+    const cur=hList.indexOf(hostWatchUid);
+    const next=cur<0?0:(cur+delta+hList.length)%hList.length;
+    hostWatchUid=hList[next];
+    tvFollowYaw=0;
+    return;
+  }
   const list=tvSeekerList();
-  if(delta===0){ tvFollowIdx=-1; return; }        // 전체 조망
   if(!list.length){ tvFollowIdx=-1; return; }
   if(tvFollowIdx<0){ tvFollowIdx=(delta>0?0:list.length-1); }
   else{ tvFollowIdx=(tvFollowIdx+delta+list.length)%list.length; }
@@ -9857,7 +9984,19 @@ function updateTeacherPanelUI(){
     !(G.isHost&&Net.mode==="online"&&G.screen==="GAME"&&(Net.meta.hostRole||"spectator")==="spectator"));
   // TV 추적바: TV 모드일 때만
   $("tvFollowBar").classList.toggle("hidden",!(G.tvMode&&G.isHost&&G.screen==="GAME"));
+  if($("tvFollowRespawn"))$("tvFollowRespawn").classList.toggle("hidden",!(G.tvMode&&G.isHost&&G.screen==="GAME"&&hostWatchUid));
   if(G.tvMode){
+    const tvBn = $("tvBlockedNotice");
+    if(hostWatchUid){
+      const hp=Net.players[hostWatchUid];
+      if(!hp||hp.role!=="hider"||hp.found){
+        hostWatchUid=null;
+      }else{
+        $("tvFollowName").textContent=`👁️ ${hp.nick||"지우개"} 관찰 중`;
+        tvBn.classList.add("hidden");
+        return;
+      }
+    }
     const list=tvSeekerList();
     let label="🏫 전체 조망";
     if(tvFollowIdx>=0 && list.length){
@@ -9872,7 +10011,6 @@ function updateTeacherPanelUI(){
     }
     $("tvFollowName").textContent=label;
     // 숨는 시간(찾는 시간이 아닐 때)엔 위치가 드러나지 않도록 일부러 벽 밖 조망만 보여줍니다.
-    const tvBn = $("tvBlockedNotice");
     const tvBnGm = Net.meta?.settings?.gameMode || "hide";
     if (tvBnGm === "zombie") {
       tvBn.classList.toggle("hidden", G.phase==="SEEK");
@@ -9888,6 +10026,20 @@ function updateTeacherPanelUI(){
   }
 }
 function updateTVCamera(){
+  if(hostWatchUid){
+    let tx=0,ty=0,tz=0,tyaw=0;
+    if(hostWatchUid===Net.uid){ tx=G.pos.x; ty=G.pos.y; tz=G.pos.z; tyaw=G.yaw; }
+    else{
+      const r=remotes.get(hostWatchUid);
+      if(r){ tx=r.cur.x; ty=r.cur.y; tz=r.cur.z; tyaw=r.cur.ry; }
+    }
+    const camYaw=tyaw+Math.PI+tvFollowYaw;
+    const dist=5.5, height=3.6;
+    camera.position.set(tx+Math.sin(camYaw)*dist,ty+height,tz+Math.cos(camYaw)*dist);
+    camera.up.set(0,1,0);
+    camera.lookAt(tx,ty+0.9,tz);
+    return;
+  }
   const list=tvSeekerList();
   // 술래는 '찾는 시간(SEEK)'에만 교실에 등장하므로, 그 외엔 전체 조망으로 보여줍니다.
   const canFollow=(G.phase==="SEEK");
