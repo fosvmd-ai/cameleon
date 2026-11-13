@@ -171,6 +171,28 @@ label.chk input{width:20px;height:20px;}
 #lobbyPracticeBox .lpCard{background:var(--cream);border:3px solid var(--ink);border-radius:16px;
   padding:18px 20px;max-width:520px;width:100%;max-height:88vh;overflow-y:auto;text-align:center;
   box-shadow:5px 5px 0 rgba(0,0,0,.3);}
+#customizerBox{position:fixed;inset:0;z-index:85;display:flex;align-items:center;justify-content:center;
+  background:rgba(15,22,32,.65);backdrop-filter:blur(3px);padding:12px;pointer-events:auto;}
+#customizerBox.hidden{display:none;}
+#customizerBox .custCard{background:var(--cream);border:3px solid var(--ink);border-radius:18px;
+  padding:16px 18px;max-width:740px;width:100%;max-height:92vh;overflow-y:auto;
+  box-shadow:6px 6px 0 rgba(0,0,0,.32);}
+.custLayout{display:grid;grid-template-columns:260px 1fr;gap:14px;align-items:start;margin-top:10px;}
+@media (max-width:680px){.custLayout{grid-template-columns:1fr;}}
+.custPreviewWrap{background:linear-gradient(180deg,#d8ecff 0%,#f2f7ff 70%,#e2ebd9 100%);
+  border:2.5px solid var(--ink);border-radius:14px;padding:8px;text-align:center;position:relative;}
+#custPreviewCanvas{width:240px;height:250px;display:block;margin:0 auto;cursor:crosshair;touch-action:none;}
+.custPresetGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:8px;margin-top:6px;}
+.custPresetCard{background:#fff;border:2.5px solid var(--ink);border-radius:10px;padding:6px 4px;
+  cursor:pointer;text-align:center;font-size:11px;font-weight:bold;transition:transform .1s,box-shadow .1s;}
+.custPresetCard:hover{transform:translateY(-2px);box-shadow:2px 2px 0 var(--ink);}
+.custPresetCard.sel{background:#fff3c9;border-color:#ff7b00;box-shadow:0 0 0 2px #ff7b00;}
+.custPresetCard canvas{width:46px;height:46px;border-radius:6px;border:1.5px solid rgba(0,0,0,.2);display:block;margin:0 auto 4px;}
+.custColors{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0;}
+.custSwatch{width:26px;height:26px;border-radius:50%;border:2.5px solid var(--ink);cursor:pointer;transition:transform .1s;}
+.custSwatch.sel{transform:scale(1.18);box-shadow:0 0 0 2px #fff,0 0 0 4px var(--ink);}
+.custTools{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px;}
+.custTools button{padding:5px 10px;font-size:12px;}
 @keyframes frozenPulse{0%,100%{transform:translate(-50%,-50%) scale(1);}50%{transform:translate(-50%,-50%) scale(1.08);}}
 
 /* ===== v2: 기록 모달 ===== */
@@ -658,6 +680,7 @@ if (typeof window.TEACHER_CODE === "undefined" || !window.TEACHER_CODE) window.T
 
     <div class="row">
       <button id="btnStart" class="blue hidden">▶ 게임 시작</button>
+      <button id="btnLobbyCustomize" class="secondary">🎨 캐릭터 꾸미기</button>
       <button id="btnLobbyPractice" class="secondary hidden">🎮 기다리며 연습하기</button>
       <button id="btnStats" class="secondary">📊 기록</button>
       <span id="waitMsg" class="note">선생님이 시작하기를 기다리는 중...</span>
@@ -808,6 +831,48 @@ if (typeof window.TEACHER_CODE === "undefined" || !window.TEACHER_CODE) window.T
 <!-- v2: 학생 "얼음!" 배너 -->
 <div id="frozenBanner" class="hidden">🧊 얼음!</div>
 <div id="centerAlert" class="hidden">⚡ 곧 정전!</div>
+<div id="customizerBox" class="hidden">
+  <div class="custCard">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+      <h3 style="margin:0;">🎨 내 캐릭터 꾸미기</h3>
+      <span class="note" style="margin:0;">술래가 아닐 때 선택한 캐릭터로 플레이해요!</span>
+    </div>
+    <div class="custLayout">
+      <div class="custPreviewWrap">
+        <canvas id="custPreviewCanvas" width="240" height="250"></canvas>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:6px;justify-content:center;">
+          <button id="custRotLeft" class="secondary" style="padding:4px 8px;font-size:12px;">⟲</button>
+          <input id="custRotSlider" type="range" min="-180" max="180" value="0" style="width:120px;">
+          <button id="custRotRight" class="secondary" style="padding:4px 8px;font-size:12px;">⟳</button>
+        </div>
+        <div class="custTools" style="justify-content:center;">
+          <button id="custModePaint" class="blue">🖌️ 색칠하기</button>
+          <button id="custModeOrbit" class="secondary">🔄 돌려보기</button>
+        </div>
+        <div class="note" style="margin-top:5px;font-size:11px;">캐릭터 위를 드래그하면 직접 색칠할 수 있어요!</div>
+      </div>
+      <div>
+        <div style="font-weight:bold;font-size:13px;color:var(--ink);">✨ 프리셋 스킨 고르기</div>
+        <div id="custPresetGrid" class="custPresetGrid"></div>
+        <div style="font-weight:bold;font-size:13px;color:var(--ink);margin-top:12px;">🖍️ 직접 색칠하기</div>
+        <div id="custColorRow" class="custColors"></div>
+        <div class="custTools">
+          <span style="font-size:12px;font-weight:bold;">굵기:</span>
+          <button class="secondary custBrushBtn" data-sz="5">얇게</button>
+          <button class="blue custBrushBtn" data-sz="10">보통</button>
+          <button class="secondary custBrushBtn" data-sz="18">굵게</button>
+          <button id="custFillBody" class="secondary">🪣 전체 색칠</button>
+          <button id="custResetSkin" class="secondary">↩️ 기본</button>
+        </div>
+      </div>
+    </div>
+    <div class="row" style="margin-top:14px;justify-content:flex-end;">
+      <button id="btnCustCancel" class="secondary">취소</button>
+      <button id="btnCustSave" class="blue">✅ 저장하고 적용</button>
+    </div>
+  </div>
+</div>
+
 <div id="lobbyPracticeBox" class="hidden">
   <div class="lpCard">
     <h3 style="margin-bottom:6px;">🎮 기다리며 연습</h3>
@@ -4295,6 +4360,140 @@ function makeRobberCanvas(){ // 도둑(죄수복) 줄무늬 텍스처
   g.fillText("№ 777",64,83);
   return c;
 }
+
+/* ================= 로비 캐릭터 꾸미기 & 프리셋 스킨 ================= */
+function drawCuteFace(g, eyeColor="#2B2B2B", cheekColor=null){
+  if(cheekColor){
+    g.fillStyle=cheekColor;
+    g.beginPath();g.arc(34,46,6,0,Math.PI*2);g.fill();
+    g.beginPath();g.arc(94,46,6,0,Math.PI*2);g.fill();
+  }
+  g.fillStyle=eyeColor;
+  g.beginPath();g.arc(46,34,6,0,Math.PI*2);g.fill();
+  g.beginPath();g.arc(82,34,6,0,Math.PI*2);g.fill();
+  g.beginPath();g.arc(64,52,7,0,Math.PI);g.lineWidth=3;g.strokeStyle=eyeColor;g.stroke();
+}
+function makePresetCanvas(id){
+  const c=document.createElement("canvas");c.width=256;c.height=256;
+  const g=c.getContext("2d");
+  if(id==="mono"){
+    g.fillStyle="#ffffff";g.fillRect(0,0,256,256);
+    // 파랑-검정-하양 지우개 종이띠
+    g.fillStyle="#2575e8";g.fillRect(0,58,256,70);
+    g.fillStyle="#18202c";g.fillRect(0,72,256,14);
+    g.fillStyle="#ffffff";g.fillRect(0,92,256,12);
+    g.fillStyle="#2575e8";g.fillRect(0,152,128,40); // 옆면 띠
+    g.fillStyle="#18202c";g.fillRect(0,162,128,8);
+    g.fillStyle="#2575e8";g.fillRect(0,192,256,64); // 팔다리
+    drawCuteFace(g,"#2B2B2B","#ff9ebb");
+  }else if(id==="strawberry"){
+    g.fillStyle="#ffc2d1";g.fillRect(0,0,256,256);
+    g.fillStyle="#ffe5ec";
+    [[24,84],[64,96],[104,84],[150,40],[200,80],[180,104],[225,35],[30,155],[95,165]].forEach(([x,y])=>{
+      g.beginPath();g.arc(x,y,7,0,Math.PI*2);g.fill();
+    });
+    g.fillStyle="#ff5d8f";g.fillRect(128,192,128,64); // 신발/다리
+    drawCuteFace(g,"#4a192c","#ff7597");
+  }else if(id==="watermelon"){
+    g.fillStyle="#f04747";g.fillRect(0,0,256,128);
+    g.fillStyle="#2e9e49";g.fillRect(0,128,256,128);
+    g.fillStyle="#1a5c2a";
+    for(let x=8;x<128;x+=22)g.fillRect(x,128,9,64);
+    g.fillStyle="#1e1e1e";
+    [[24,72],[44,96],[64,78],[88,98],[104,70],[150,40],[192,82],[226,48],[172,102]].forEach(([x,y])=>{
+      g.beginPath();g.ellipse(x,y,3.5,6,0,0,Math.PI*2);g.fill();
+    });
+    drawCuteFace(g,"#1a1a1a");
+  }else if(id==="panda"){
+    g.fillStyle="#ffffff";g.fillRect(0,0,256,192);
+    g.fillStyle="#22252a";g.fillRect(0,192,256,64); // 검은 팔다리
+    g.fillRect(0,95,256,33); // 허리띠/어깨 느낌
+    // 귀 & 눈 패치
+    g.beginPath();g.arc(20,14,14,0,Math.PI*2);g.fill();
+    g.beginPath();g.arc(108,14,14,0,Math.PI*2);g.fill();
+    g.beginPath();g.ellipse(46,35,14,11,-0.2,0,Math.PI*2);g.fill();
+    g.beginPath();g.ellipse(82,35,14,11,0.2,0,Math.PI*2);g.fill();
+    g.fillStyle="#ffffff";
+    g.beginPath();g.arc(46,34,4.5,0,Math.PI*2);g.fill();
+    g.beginPath();g.arc(82,34,4.5,0,Math.PI*2);g.fill();
+    g.fillStyle="#22252a";
+    g.beginPath();g.arc(64,49,4.5,0,Math.PI*2);g.fill();
+    g.beginPath();g.arc(64,56,6,0,Math.PI);g.lineWidth=2.5;g.strokeStyle="#22252a";g.stroke();
+  }else if(id==="tiger"){
+    g.fillStyle="#ff9924";g.fillRect(0,0,256,256);
+    g.fillStyle="#3a1e09";
+    [[0,14,34,7],[94,14,34,7],[0,78,42,8],[86,78,42,8],[0,104,128,7],[142,24,48,8],[186,62,56,8],[144,98,92,8]].forEach(([x,y,w,h])=>g.fillRect(x,y,w,h));
+    for(let y=138;y<256;y+=18)g.fillRect(0,y,256,6);
+    g.fillStyle="#fff2d6";g.beginPath();g.ellipse(64,52,20,14,0,0,Math.PI*2);g.fill();
+    drawCuteFace(g,"#2b1404");
+  }else if(id==="frog"){
+    g.fillStyle="#52c44e";g.fillRect(0,0,256,256);
+    g.fillStyle="#e8f7c5";g.beginPath();g.ellipse(64,88,36,28,0,0,Math.PI*2);g.fill();
+    g.fillStyle="#ffffff";
+    g.beginPath();g.arc(44,32,12,0,Math.PI*2);g.fill();
+    g.beginPath();g.arc(84,32,12,0,Math.PI*2);g.fill();
+    g.fillStyle="#1f291e";
+    g.beginPath();g.arc(44,32,6,0,Math.PI*2);g.fill();
+    g.beginPath();g.arc(84,32,6,0,Math.PI*2);g.fill();
+    g.fillStyle="#ff8fa3";
+    g.beginPath();g.arc(28,48,6,0,Math.PI*2);g.fill();
+    g.beginPath();g.arc(100,48,6,0,Math.PI*2);g.fill();
+    g.beginPath();g.arc(64,48,12,0.15*Math.PI,0.85*Math.PI);g.lineWidth=3;g.strokeStyle="#1f291e";g.stroke();
+  }else if(id==="chick"){
+    g.fillStyle="#ffe14d";g.fillRect(0,0,256,192);
+    g.fillStyle="#ffe14d";g.fillRect(0,192,128,64); // 노란 팔
+    g.fillStyle="#ff8c1a";g.fillRect(128,192,128,64); // 주황 발
+    g.fillStyle="#ff7b00";
+    g.beginPath();g.moveTo(64,42);g.lineTo(74,50);g.lineTo(64,58);g.lineTo(54,50);g.closePath();g.fill();
+    g.fillStyle="#ff9ebb";
+    g.beginPath();g.arc(32,46,6,0,Math.PI*2);g.fill();
+    g.beginPath();g.arc(96,46,6,0,Math.PI*2);g.fill();
+    g.fillStyle="#2b2b2b";
+    g.beginPath();g.arc(44,34,6,0,Math.PI*2);g.fill();
+    g.beginPath();g.arc(84,34,6,0,Math.PI*2);g.fill();
+  }else if(id==="astronaut"){
+    g.fillStyle="#f4f6fa";g.fillRect(0,0,256,192);
+    g.fillStyle="#cbd5e1";g.fillRect(0,192,256,64);
+    g.fillStyle="#64748b";g.fillRect(128,220,128,36); // 부츠
+    // 헬멧 바이저
+    g.fillStyle="#1e293b";
+    if(g.roundRect){g.beginPath();g.roundRect(22,16,84,46,12);g.fill();}else g.fillRect(22,16,84,46);
+    g.fillStyle="#38bdf8";
+    g.beginPath();g.moveTo(32,24);g.lineTo(56,24);g.lineTo(36,42);g.closePath();g.fill();
+    // 가슴 컨트롤 패널
+    g.fillStyle="#94a3b8";g.fillRect(42,76,44,24);
+    g.fillStyle="#ef4444";g.fillRect(48,82,10,10);
+    g.fillStyle="#3b82f6";g.fillRect(62,82,18,10);
+    // 등 산소통
+    g.fillStyle="#cbd5e1";g.fillRect(150,24,84,78);
+    g.fillStyle="#ef4444";g.fillRect(178,42,28,10);
+  }else if(id==="rainbow"){
+    const cols=["#ff595e","#ffca3a","#8ac926","#1982c4","#6a4c93"];
+    for(let i=0;i<5;i++){
+      g.fillStyle=cols[i];
+      g.fillRect(0,i*26,256,26);
+      g.fillRect(0,128+i*13,256,13);
+    }
+    g.fillStyle="#ffca3a";g.fillRect(0,192,128,64);
+    g.fillStyle="#1982c4";g.fillRect(128,192,128,64);
+    drawCuteFace(g,"#1a1a1a");
+  }else{
+    return makeEraserCanvas("#FFFFFF");
+  }
+  return c;
+}
+const SKIN_PRESETS=[
+  {id:"default",name:"하양 지우개"},
+  {id:"mono",name:"모노 지우개"},
+  {id:"strawberry",name:"딸기우유"},
+  {id:"watermelon",name:"수박"},
+  {id:"panda",name:"판다"},
+  {id:"tiger",name:"호랑이"},
+  {id:"frog",name:"개구리"},
+  {id:"chick",name:"병아리"},
+  {id:"astronaut",name:"우주인"},
+  {id:"rainbow",name:"무지개"}
+];
 function getActiveGameMode() {
   if (Net.mode === "practice" || G.lobbyPractice) {
     return G.practiceGameMode || ($("selPracticeGameMode") ? $("selPracticeGameMode").value : "hide");
@@ -4675,19 +4874,21 @@ function rebuildMyFairy() {
     if (myFairy.tex) myFairy.tex.dispose();
   }
 
-  // 3. 새 캔버스 생성 (백업이 있으면 복원)
+  // 3. 새 캔버스 생성 (백업이 있으면 복원, 로비 커스텀 스킨 우선 적용 — 술래 제외)
   let canvas;
   if (isHideSeeker) {
     canvas = makePencilCanvas();
+  } else if (backupCanvas) {
+    canvas = backupCanvas; // 칠했던 색상 그대로 복원!
+  } else if (G.role !== "seeker" && G.customSkinCanvas) {
+    canvas = document.createElement("canvas");
+    canvas.width = 256; canvas.height = 256;
+    canvas.getContext("2d").drawImage(G.customSkinCanvas, 0, 0);
   } else if (isRobber) {
     canvas = makeRobberCanvas();
   } else {
-    if (backupCanvas) {
-      canvas = backupCanvas; // 칠했던 색상 그대로 복원!
-    } else {
-      const bgColor = (typeof isInkMode === "function" && isInkMode()) ? G.teamColor : "#FFFFFF";
-      canvas = makeEraserCanvas(bgColor);
-    }
+    const bgColor = (typeof isInkMode === "function" && isInkMode()) ? G.teamColor : "#FFFFFF";
+    canvas = makeEraserCanvas(bgColor);
   }
 
   // 4. 캐릭터 다시 빌드
@@ -5211,7 +5412,7 @@ function ensureRemote(uid,info){
     r.fairy.hitbox.userData.uid=uid;
     r.fairy.hitbox.userData.taggable=info.role==="hider"&&!info.found;
   }
-  if(info.tex && info.tex!==r.lastTex){
+  if(info.role!=="seeker" && info.tex && info.tex!==r.lastTex){
     r.lastTex=info.tex;
     const img=new Image();
     img.onload=()=>{ const g=r.fairy.canvas.getContext("2d");
@@ -8177,9 +8378,15 @@ function enterPaint(){
   if (typeof rebuildMyFairy === "function") rebuildMyFairy();
 
   const isRobber = typeof isCopsMode === "function" && isCopsMode() && (G.role === "hider" || G.role === "fairy");
-  const g=myFairy.canvas.getContext("2d");
-  const canvas = isRobber ? makeRobberCanvas() : makeEraserCanvas("#FFFFFF");
-  g.drawImage(canvas,0,0); myFairy.tex.needsUpdate=true;
+  if (G.role !== "seeker") {
+    const g=myFairy.canvas.getContext("2d");
+    const canvas = G.customSkinCanvas ? G.customSkinCanvas : (isRobber ? makeRobberCanvas() : makeEraserCanvas("#FFFFFF"));
+    g.drawImage(canvas,0,0); myFairy.tex.needsUpdate=true;
+    if (G.customSkinCanvas && Net.mode === "online") {
+      Net.uploadTex(true);
+      G.texUploaded = false; // 숨는 시간에 추가로 색칠하면 다시 업로드 가능
+    }
+  }
 
   const gm = typeof getActiveGameMode === "function" ? getActiveGameMode() : (Net.meta?.settings?.gameMode || "hide");
 
@@ -9211,7 +9418,7 @@ async function startLobbyPractice(){
     if(sp)G.pos.copy(sp); else G.pos.set(0,0,10);
     const ctx=myFairy.canvas.getContext("2d");
     const bgColor = isInkMode() ? G.teamColor : "#FFFFFF";
-    ctx.drawImage(makeEraserCanvas(bgColor),0,0);myFairy.tex.needsUpdate=true;
+    ctx.drawImage(G.customSkinCanvas || makeEraserCanvas(bgColor),0,0);myFairy.tex.needsUpdate=true;
     showScreen("GAME");
     $("paintPanel").classList.remove("hidden");
     $("btnPracticeReturn").classList.remove("hidden");
@@ -9244,6 +9451,252 @@ $("btnLobbyPracticeStart").onclick=startLobbyPractice;
 $("btnLobbyPracticeClose").onclick=()=>$("lobbyPracticeBox").classList.add("hidden");
 $("lobbyPracticeBox").onclick=e=>{ if(e.target===$("lobbyPracticeBox"))$("lobbyPracticeBox").classList.add("hidden"); };
 $("btnPracticeReturn").onclick=returnFromLobbyPractice;
+
+/* ================= 로비 캐릭터 꾸미기 컨트롤러 ================= */
+(function initLobbyCustomizer(){
+  const STORAGE_KEY="er_custom_skin_v1";
+  const PRESET_KEY="er_custom_preset_v1";
+  G.customSkinCanvas=null;
+  G.customSkinPreset=localStorage.getItem(PRESET_KEY)||"default";
+
+  try{
+    const saved=localStorage.getItem(STORAGE_KEY);
+    if(saved){
+      const img=new Image();
+      img.onload=()=>{
+        const c=document.createElement("canvas");c.width=256;c.height=256;
+        c.getContext("2d").drawImage(img,0,0,256,256);
+        G.customSkinCanvas=c;
+      };
+      img.src=saved;
+    }
+  }catch(_){}
+
+  const CUST_COLORS=["#ffffff","#2b2b2b","#ff4d6d","#ff9524","#ffe14d","#4cd964","#38bdf8","#2575e8","#a855f7","#ffb7c5","#a47148","#94a3b8"];
+  let custCanvas=document.createElement("canvas");custCanvas.width=256;custCanvas.height=256;
+  let custColor="#ff4d6d";
+  let custBrush=10;
+  let custMode="paint"; // "paint" | "orbit"
+  let custYaw=0;
+  let custActivePreset=G.customSkinPreset||"default";
+  let custRenderer=null,custScene=null,custCam=null,custFairy=null,custRaf=null;
+  let custDragging=false,custDragButton=0,custLastX=0,custLastPaint=null;
+  const custRay=new THREE.Raycaster();
+
+  function renderPresetGrid(){
+    const grid=$("custPresetGrid");if(!grid)return;
+    grid.innerHTML="";
+    SKIN_PRESETS.forEach(p=>{
+      const card=document.createElement("div");
+      card.className="custPresetCard"+(custActivePreset===p.id?" sel":"");
+      const thumb=document.createElement("canvas");thumb.width=48;thumb.height=48;
+      const srcC=makePresetCanvas(p.id);
+      thumb.getContext("2d").drawImage(srcC,0,0,128,128,0,0,48,48);
+      const lbl=document.createElement("div");lbl.textContent=p.name;
+      card.appendChild(thumb);card.appendChild(lbl);
+      card.onclick=()=>{
+        Audio2.resume();
+        custActivePreset=p.id;
+        custCanvas.getContext("2d").drawImage(makePresetCanvas(p.id),0,0);
+        if(custFairy)custFairy.tex.needsUpdate=true;
+        renderPresetGrid();
+      };
+      grid.appendChild(card);
+    });
+  }
+
+  function renderColorRow(){
+    const row=$("custColorRow");if(!row)return;
+    row.innerHTML="";
+    CUST_COLORS.forEach(col=>{
+      const sw=document.createElement("div");
+      sw.className="custSwatch"+(custColor.toLowerCase()===col.toLowerCase()?" sel":"");
+      sw.style.background=col;
+      sw.onclick=()=>{custColor=col;renderColorRow();};
+      row.appendChild(sw);
+    });
+    const picker=document.createElement("input");
+    picker.type="color";picker.value=custColor;picker.title="자유 색상";
+    picker.style.cssText="width:28px;height:28px;border:2px solid var(--ink);border-radius:6px;padding:0;cursor:pointer;";
+    picker.oninput=()=>{custColor=picker.value;renderColorRow();};
+    row.appendChild(picker);
+  }
+
+  function setCustMode(m){
+    custMode=m;
+    if($("custModePaint"))$("custModePaint").className=(m==="paint")?"blue":"secondary";
+    if($("custModeOrbit"))$("custModeOrbit").className=(m==="orbit")?"blue":"secondary";
+    const cv=$("custPreviewCanvas");
+    if(cv)cv.style.cursor=(m==="paint")?"crosshair":"grab";
+  }
+
+  function initPreview3D(){
+    const cv=$("custPreviewCanvas");if(!cv)return;
+    if(!custRenderer){
+      try{
+        custRenderer=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true});
+        custRenderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+        custRenderer.setSize(240,250,false);
+        custScene=new THREE.Scene();
+        custCam=new THREE.PerspectiveCamera(40,240/250,0.1,20);
+        custCam.position.set(0,1.05,2.7);
+        custCam.lookAt(0,0.75,0);
+        custScene.add(new THREE.AmbientLight(0xffffff,0.85));
+        const dl=new THREE.DirectionalLight(0xffffff,0.7);
+        dl.position.set(2,3,2.5);
+        custScene.add(dl);
+        custFairy=buildFairy(custCanvas,false);
+        custFairy.group.position.set(0,0,0);
+        custScene.add(custFairy.group);
+      }catch(e){
+        console.warn("커스터마이저 3D 미리보기 초기화 실패:",e);
+        return;
+      }
+    }else if(custFairy){
+      custFairy.tex.needsUpdate=true;
+    }
+  }
+
+  function paintPreviewAt(clientX,clientY){
+    const cv=$("custPreviewCanvas");if(!cv||!custCam||!custFairy)return false;
+    const rect=cv.getBoundingClientRect();
+    const ndc=new THREE.Vector2(((clientX-rect.left)/rect.width)*2-1,-((clientY-rect.top)/rect.height)*2+1);
+    custRay.setFromCamera(ndc,custCam);
+    const hits=custRay.intersectObjects(custFairy.parts,false);
+    if(!hits.length||!hits[0].uv)return false;
+    const hit=hits[0];
+    const uv=hit.uv;
+    let rc=hit.object.userData.paintRect;
+    if(!rc&&hit.object.userData.paintRects){
+      rc=hit.object.userData.paintRects.find(r=>uv.x>=r[0]-0.002&&uv.x<=r[2]+0.002&&uv.y>=r[1]-0.002&&uv.y<=r[3]+0.002);
+    }
+    const px=uv.x*256, py=(1-uv.y)*256;
+    const g=custCanvas.getContext("2d");
+    g.save();
+    if(rc){
+      const rx=rc[0]*256, ry=(1-rc[3])*256, rw=(rc[2]-rc[0])*256, rh=(rc[3]-rc[1])*256;
+      g.beginPath();g.rect(rx,ry,rw,rh);g.clip();
+    }
+    g.fillStyle=custColor;g.strokeStyle=custColor;g.lineCap="round";
+    if(custLastPaint&&custLastPaint.obj===hit.object){
+      g.lineWidth=custBrush*2;
+      g.beginPath();g.moveTo(custLastPaint.x,custLastPaint.y);g.lineTo(px,py);g.stroke();
+    }else{
+      g.beginPath();g.arc(px,py,custBrush,0,Math.PI*2);g.fill();
+    }
+    g.restore();
+    custLastPaint={x:px,y:py,obj:hit.object};
+    custFairy.tex.needsUpdate=true;
+    custActivePreset="custom";
+    renderPresetGrid();
+    return true;
+  }
+
+  function startPreviewLoop(){
+    if(custRaf)cancelAnimationFrame(custRaf);
+    const tick=()=>{
+      if($("customizerBox").classList.contains("hidden")){custRaf=null;return;}
+      if(custFairy)custFairy.group.rotation.y=custYaw;
+      if(custRenderer&&custScene&&custCam)custRenderer.render(custScene,custCam);
+      custRaf=requestAnimationFrame(tick);
+    };
+    custRaf=requestAnimationFrame(tick);
+  }
+
+  function openCustomizer(){
+    Audio2.resume();
+    if(G.customSkinCanvas){
+      custCanvas.getContext("2d").drawImage(G.customSkinCanvas,0,0);
+    }else{
+      custCanvas.getContext("2d").drawImage(makePresetCanvas("default"),0,0);
+    }
+    custActivePreset=G.customSkinCanvas?(G.customSkinPreset||"custom"):"default";
+    custYaw=0;
+    if($("custRotSlider"))$("custRotSlider").value="0";
+    renderPresetGrid();
+    renderColorRow();
+    setCustMode("paint");
+    $("customizerBox").classList.remove("hidden");
+    initPreview3D();
+    startPreviewLoop();
+  }
+
+  function closeCustomizer(save){
+    if(save){
+      const saved=document.createElement("canvas");saved.width=256;saved.height=256;
+      saved.getContext("2d").drawImage(custCanvas,0,0);
+      G.customSkinCanvas=saved;
+      G.customSkinPreset=custActivePreset;
+      try{
+        localStorage.setItem(STORAGE_KEY,saved.toDataURL("image/png"));
+        localStorage.setItem(PRESET_KEY,custActivePreset);
+      }catch(_){}
+      if(G.role!=="seeker"&&typeof myFairy!=="undefined"&&myFairy&&myFairy.canvas){
+        myFairy.canvas.getContext("2d").drawImage(saved,0,0);
+        myFairy.tex.needsUpdate=true;
+      }
+      toast("🎨 캐릭터 꾸미기가 저장되었어요! (술래 제외 게임 적용)");
+    }
+    $("customizerBox").classList.add("hidden");
+    if(custRaf){cancelAnimationFrame(custRaf);custRaf=null;}
+  }
+
+  if($("btnLobbyCustomize"))$("btnLobbyCustomize").onclick=openCustomizer;
+  if($("btnCustCancel"))$("btnCustCancel").onclick=()=>closeCustomizer(false);
+  if($("btnCustSave"))$("btnCustSave").onclick=()=>closeCustomizer(true);
+  if($("customizerBox"))$("customizerBox").onclick=e=>{if(e.target===$("customizerBox"))closeCustomizer(false);};
+  if($("custModePaint"))$("custModePaint").onclick=()=>setCustMode("paint");
+  if($("custModeOrbit"))$("custModeOrbit").onclick=()=>setCustMode("orbit");
+  if($("custRotSlider"))$("custRotSlider").oninput=e=>{custYaw=(+e.target.value)*Math.PI/180;};
+  if($("custRotLeft"))$("custRotLeft").onclick=()=>{custYaw-=Math.PI/4;if($("custRotSlider"))$("custRotSlider").value=Math.round(((custYaw*180/Math.PI)%360+540)%360-180);};
+  if($("custRotRight"))$("custRotRight").onclick=()=>{custYaw+=Math.PI/4;if($("custRotSlider"))$("custRotSlider").value=Math.round(((custYaw*180/Math.PI)%360+540)%360-180);};
+
+  document.querySelectorAll(".custBrushBtn").forEach(btn=>{
+    btn.onclick=()=>{
+      custBrush=Number(btn.dataset.sz)||10;
+      document.querySelectorAll(".custBrushBtn").forEach(b=>b.className=(b===btn)?"blue custBrushBtn":"secondary custBrushBtn");
+    };
+  });
+
+  if($("custFillBody"))$("custFillBody").onclick=()=>{
+    const g=custCanvas.getContext("2d");
+    g.fillStyle=custColor;g.fillRect(0,0,256,256);
+    drawCuteFace(g,"#2B2B2B");
+    if(custFairy)custFairy.tex.needsUpdate=true;
+    custActivePreset="custom";renderPresetGrid();
+  };
+  if($("custResetSkin"))$("custResetSkin").onclick=()=>{
+    custActivePreset="default";
+    custCanvas.getContext("2d").drawImage(makePresetCanvas("default"),0,0);
+    if(custFairy)custFairy.tex.needsUpdate=true;
+    renderPresetGrid();
+  };
+
+  const pCv=$("custPreviewCanvas");
+  if(pCv){
+    pCv.addEventListener("contextmenu",e=>e.preventDefault());
+    pCv.addEventListener("pointerdown",e=>{
+      custDragging=true;custDragButton=e.button;custLastX=e.clientX;custLastPaint=null;
+      pCv.setPointerCapture&&pCv.setPointerCapture(e.pointerId);
+      if(custMode==="paint"&&e.button!==2){
+        if(!paintPreviewAt(e.clientX,e.clientY))custDragButton=2; // 빈 배경 클릭 시 회전으로 전환
+      }
+    });
+    pCv.addEventListener("pointermove",e=>{
+      if(!custDragging)return;
+      if(custMode==="paint"&&custDragButton!==2){
+        paintPreviewAt(e.clientX,e.clientY);
+      }else{
+        const dx=e.clientX-custLastX;custLastX=e.clientX;
+        custYaw+=dx*0.015;
+        if($("custRotSlider"))$("custRotSlider").value=Math.round(((custYaw*180/Math.PI)%360+540)%360-180);
+      }
+    });
+    const endDrag=()=>{custDragging=false;custLastPaint=null;};
+    pCv.addEventListener("pointerup",endDrag);
+    pCv.addEventListener("pointercancel",endDrag);
+  }
+})();
 
 async function startRoundButton(btn){
   Audio2.resume();
@@ -9591,7 +10044,7 @@ async function startOfflinePractice(){
     const isRobber = typeof isCopsMode === "function" && isCopsMode() && (G.role === "hider" || G.role === "fairy");
     if (G.role !== "seeker" && G.zombieState !== 2) {
       const g=myFairy.canvas.getContext("2d");
-      const canvas = isRobber ? makeRobberCanvas() : makeEraserCanvas(isInkMode() ? G.teamColor : "#FFFFFF");
+      const canvas = G.customSkinCanvas ? G.customSkinCanvas : (isRobber ? makeRobberCanvas() : makeEraserCanvas(isInkMode() ? G.teamColor : "#FFFFFF"));
       g.drawImage(canvas,0,0); myFairy.tex.needsUpdate=true;
     }
     showScreen("GAME");
